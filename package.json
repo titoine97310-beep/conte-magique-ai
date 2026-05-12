@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "contemagiqueia",
   "main": "expo-router/entry",
   "version": "1.0.0",
@@ -53,4 +54,28 @@
     "typescript": "~5.9.2"
   },
   "private": true
+=======
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "openai": "^6.36.0",
+    "expo": "~54.0.34",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
+  }
+>>>>>>> 1aa07c9a89f69fcc36d530981d747bd2fdd22854
 }

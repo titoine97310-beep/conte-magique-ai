@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ConteMagiqueIA",
-    "slug": "ConteMagiqueIA",
+    "slug": "contemagiqueia",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -11,8 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+        "NSSpeechRecognitionUsageDescription": "Allow ConteMagiqueIA to use speech recognition.",
+        "NSMicrophoneUsageDescription": "Allow ConteMagiqueIA to use the microphone."
       }
     },
     "android": {
@@ -24,11 +24,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.RECORD_AUDIO"
-      ],
-      "package": "com.pagaingaspi.ConteMagiqueIA"
+      "permissions": ["android.permission.RECORD_AUDIO"],
+      "package": "com.contemagiqueia.app"
     },
     "web": {
       "output": "static",
@@ -36,7 +33,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-speech-recognition",
       [
         "expo-splash-screen",
         {
