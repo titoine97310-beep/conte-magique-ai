@@ -47,3 +47,9 @@ node_modules
 node_modules
 node_modules
 node_modules
+node_modules
+.env
+.expo
+android
+backend/node_modules
+*.exe
