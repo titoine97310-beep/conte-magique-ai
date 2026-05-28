@@ -1,4 +1,4 @@
-const BACKEND_URL = "https://chowder-aide-deranged.ngrok-free.dev";
+const BACKEND_URL = "https://conte-magique-ai.onrender.com";
 
 export async function generateStory(
   prompt: string,
