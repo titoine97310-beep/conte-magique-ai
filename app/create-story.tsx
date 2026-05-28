@@ -1,21 +1,25 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Alert, Linking, ScrollView,
+  Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from "react-native";
+import { auth } from "../services/firebase";
 
 import { setCurrentStory } from "../services/currentStory";
 import { generateImage, generateStory } from "../services/openaiService";
 import { saveStory } from "../services/storageService";
+
 import {
   canGenerateStory,
   incrementStoryUsage,
+  setAdminMode
 } from "../services/usageService";
 
 type ImageStyle = "cartoon" | "fantasy" | "realistic" | "comic";
@@ -37,9 +41,9 @@ const storyTypes = [
 ] as const;
 
 const storyLengths = [
-  { id: "short", label: "⚡ Courte", scenes: 4 },
-  { id: "medium", label: "📖 Moyenne", scenes: 6 },
-  { id: "long", label: "🌙 Longue", scenes: 8 },
+  { id: "short", label: "⚡ Courte", scenes: 4, disabled: false },
+  { id: "medium", label: "📖 Moyenne", scenes: 6, disabled: true },
+  { id: "long", label: "🌙 Longue", scenes: 8, disabled: true },
 ] as const;
 
 function getStylePrompt(style: ImageStyle) {
@@ -59,6 +63,22 @@ function getStylePrompt(style: ImageStyle) {
 }
 
 export default function CreateStoryScreen() {
+  useEffect(() => {
+
+  const enableAdmin = async () => {
+
+    // TON téléphone uniquement
+    const isAdmin = false;
+
+    if (isAdmin) {
+      await setAdminMode();
+    }
+  };
+
+  enableAdmin();
+
+}, []);
+
   const [prompt, setPrompt] = useState("");
   const [imageStyle, setImageStyle] = useState<ImageStyle>("cartoon");
   const [storyType, setStoryType] = useState<StoryType>("magic");
@@ -74,23 +94,33 @@ export default function CreateStoryScreen() {
     }
 
     const usage = await canGenerateStory();
+    if (usage.mode === "free-text") {
+  await new Promise<void>((resolve) => {
+    Alert.alert(
+      "🎁 Bienvenue dans ConteMagiqueIA",
+      "Tu as droit à 2 histoires gratuites :\n\n1️⃣ Une première histoire en texte seul\n2️⃣ Une deuxième histoire avec texte + images\n\nEnsuite, tu pourras choisir un pack pour continuer l’aventure.",
+      [
+        {
+          text: "OK, je commence",
+          onPress: () => resolve(),
+        },
+      ]
+    );
+  });
+}
+    const textOnlyMode =
+      usage.mode === "free-text" || usage.mode === "paid-text";
 
     if (!usage.allowed) {
-      Alert.alert(
-        "Limite atteinte 🚀",
-        "Tu as utilisé tes 5 histoires gratuites.\n\n👉 Écris-moi sur WhatsApp pour continuer 🙂",
-        [
-          {
-            text: "Contacter",
-            onPress: () => {
-              Linking.openURL("https://wa.me/33631406509");
-            },
-          }, 
-          { text: "Plus tard" },
-        ]
-      );
-      return;
-    }
+  if (auth.currentUser) {
+    router.push("/premium");
+  } else {
+    router.push("/register");
+  }
+
+  return;
+}
+
 
     try {
       setLoading(true);
@@ -106,38 +136,55 @@ export default function CreateStoryScreen() {
 
       const scenesWithImages = [];
 
-      for (let i = 0; i < scenes.length; i++) {
-        setLoadingText(`Création de l’image ${i + 1} / ${scenes.length}...`);
+for (let i = 0; i < scenes.length; i++) {
 
-        const styledImagePrompt = `
-        ${selectedStylePrompt}
+  // MODE TEXTE SEUL
+  if (textOnlyMode) {
 
-        Personnages principaux de cette histoire :
-        ${charactersDescription}
+    scenesWithImages.push({
+      ...scenes[i],
+      imageUrl: null,
+      imageStyle,
+      storyType,
+      storyLength,
+    });
 
-        Scène à illustrer :
-        ${scenes[i].imagePrompt}
+    continue;
+  }
 
-        Consignes importantes :
-        - garder les mêmes personnages d’une scène à l’autre
-        - mêmes couleurs
-        - même apparence
-        - mêmes accessoires
-        - style cohérent entre toutes les images
-        - rendu doux, lumineux, familial, adapté aux enfants
-        - aucun personnage connu, aucune marque, aucun logo
-        `;
-        const imageUrl = await generateImage(styledImagePrompt);
+  // MODE PREMIUM AVEC IMAGES
+  setLoadingText(`Création de l’image ${i + 1} / ${scenes.length}...`);
 
-        scenesWithImages.push({
-          ...scenes[i],
-          imagePrompt: styledImagePrompt,
-          imageStyle,
-          storyType,
-          storyLength,
-          imageUrl,
-        });
-      }
+  const styledImagePrompt = `
+  ${selectedStylePrompt}
+
+  Personnages principaux de cette histoire :
+  ${charactersDescription}
+
+  Scène à illustrer :
+  ${scenes[i].imagePrompt}
+
+  Consignes importantes :
+  - garder les mêmes personnages d’une scène à l’autre
+  - mêmes couleurs
+  - même apparence
+  - mêmes accessoires
+  - style cohérent entre toutes les images
+  - rendu doux, lumineux, familial, adapté aux enfants
+  - aucun personnage connu, aucune marque, aucun logo
+  `;
+
+  const imageUrl = await generateImage(styledImagePrompt);
+
+  scenesWithImages.push({
+    ...scenes[i],
+    imagePrompt: styledImagePrompt,
+    imageStyle,
+    storyType,
+    storyLength,
+    imageUrl,
+  });
+}
 
       const finalStory = {
         prompt,
@@ -150,7 +197,7 @@ export default function CreateStoryScreen() {
       const savedStory = await saveStory(finalStory);
       setCurrentStory(savedStory || finalStory);
 
-      await incrementStoryUsage();
+      await incrementStoryUsage(usage.mode);
 
       router.push("/player");
     } catch (e) {
@@ -234,26 +281,35 @@ export default function CreateStoryScreen() {
 
         <View style={styles.grid}>
           {storyLengths.map((item) => {
-            const isActive = storyLength === item.id;
+  const isActive = storyLength === item.id;
 
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.optionButton, isActive && styles.optionActive]}
-                onPress={() => setStoryLength(item.id)}
-                disabled={loading}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    isActive && styles.optionTextActive,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+  return (
+    <TouchableOpacity
+      key={item.id}
+      style={[
+        styles.optionButton,
+        isActive && styles.optionActive,
+        item.disabled && styles.optionDisabled,
+      ]}
+      onPress={() => {
+        if (!item.disabled) {
+          setStoryLength(item.id);
+        }
+      }}
+      disabled={loading || item.disabled}
+    >
+      <Text
+        style={[
+          styles.optionText,
+          isActive && styles.optionTextActive,
+        ]}
+      >
+        {item.label}
+        {item.disabled ? " 🔒 Bientôt" : ""}
+      </Text>
+    </TouchableOpacity>
+  );
+})}
         </View>
 
         <TouchableOpacity
@@ -355,5 +411,8 @@ const styles = StyleSheet.create({
   backText: {
     color: "white",
     fontWeight: "800",
+  },
+  optionDisabled: {
+    opacity: 0.45,
   },
 });

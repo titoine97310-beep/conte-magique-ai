@@ -213,7 +213,9 @@ export default function PlayerScreen() {
         });
 
         if (!response.ok) {
-          throw new Error("Erreur backend TTS");
+          const errorText = await response.text();
+          console.log("Réponse backend TTS :", response.status, errorText);
+          throw new Error(`Erreur backend TTS ${response.status}`);
         }
 
         if (iaRunRef.current !== runId) return resolve();
@@ -423,11 +425,21 @@ export default function PlayerScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
         <View style={styles.fullscreenContainer}>
-          <Animated.Image
-            source={{ uri: current.imageUrl }}
-            style={styles.fullscreenImage}
-            resizeMode="contain"
-          />
+          {current.imageUrl ? (
+            <Animated.Image
+              source={{ uri: current.imageUrl }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={styles.textOnlyFullscreen}>
+            <Text style={styles.textOnlyIcon}>📖</Text>
+            <Text style={styles.textOnlyTitle}>Histoire texte</Text>
+            <Text style={styles.textOnlySubtitle}>
+              Cette histoire est disponible sans image.
+            </Text>
+          </View>
+        )}
 
           <TouchableOpacity style={styles.closeFullscreenButton} onPress={stopVoice}>
             <Text style={styles.closeFullscreenText}>✕</Text>
@@ -464,10 +476,20 @@ export default function PlayerScreen() {
             },
           ]}
         >
-          <Animated.Image
-            source={{ uri: current.imageUrl }}
-            style={[styles.image, { transform: [{ scale: zoomAnim }] }]}
-          />
+          {current.imageUrl ? (
+            <Animated.Image
+              source={{ uri: current.imageUrl }}
+              style={[styles.image, { transform: [{ scale: zoomAnim }] }]}
+            />
+          ) : (
+            <View style={styles.textOnlyImageFrame}>
+            <Text style={styles.textOnlyIconSmall}>📖</Text>
+            <Text style={styles.textOnlyFrameTitle}>Histoire texte</Text>
+            <Text style={styles.textOnlyFrameSubtitle}>
+              Lecture sans image
+            </Text>
+          </View>
+        )}
 
           {(nightMode || bedtimeMode) && <View style={styles.imageNightOverlay} />}
         </Animated.View>
@@ -766,5 +788,51 @@ const styles = StyleSheet.create({
   fullscreenSceneText: {
     color: "white",
     fontWeight: "900",
+  },
+    textOnlyFullscreen: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 30,
+    backgroundColor: "#020617",
+  },
+  textOnlyIcon: {
+    fontSize: 70,
+    marginBottom: 18,
+  },
+  textOnlyTitle: {
+    color: "white",
+    fontSize: 28,
+    fontWeight: "900",
+    marginBottom: 10,
+  },
+  textOnlySubtitle: {
+    color: "#CBD5E1",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  textOnlyImageFrame: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#020617",
+    padding: 20,
+  },
+  textOnlyIconSmall: {
+    fontSize: 46,
+    marginBottom: 10,
+  },
+  textOnlyFrameTitle: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  textOnlyFrameSubtitle: {
+    color: "#CBD5E1",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });
