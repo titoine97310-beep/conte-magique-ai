@@ -17,7 +17,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getCurrentStory, setCurrentStory } from "../services/currentStory";
 import { toggleFavoriteStory } from "../services/storageService";
 
-const TTS_URL = "https://chowder-aide-deranged.ngrok-free.dev/tts";
+
+const TTS_URL = "https://conte-magique-ai.onrender.com/tts";
 
 export default function PlayerScreen() {
   useKeepAwake();
@@ -45,9 +46,7 @@ export default function PlayerScreen() {
   const current = scenes[index];
 
   const gradientColors: [string, string] =
-    nightMode || bedtimeMode
-      ? ["#020617", "#111827"]
-      : ["#111827", "#312E81"];
+    nightMode || bedtimeMode ? ["#020617", "#111827"] : ["#111827", "#312E81"];
 
   function styleLabel() {
     if (story?.imageStyle === "cartoon") return "🎨 Cartoon";
@@ -159,13 +158,10 @@ export default function PlayerScreen() {
 
       if (audioRunRef.current !== runId) return;
 
-      const { sound } = await Audio.Sound.createAsync(
-        getAmbienceSound(ambience),
-        {
-          isLooping: true,
-          volume: 0,
-        }
-      );
+      const { sound } = await Audio.Sound.createAsync(getAmbienceSound(ambience), {
+        isLooping: true,
+        volume: 0,
+      });
 
       if (audioRunRef.current !== runId) {
         await sound.unloadAsync();
@@ -189,71 +185,87 @@ export default function PlayerScreen() {
   }
 
   async function playTTSAndWait(
-    text: string,
-    runId: number,
-    emotion: string,
-    isBedtime = false
-  ) {
-    return new Promise<void>(async (resolve) => {
-      try {
-        Speech.stop();
-        await stopTTS();
-        await lowerAmbience(isBedtime);
+  text: string,
+  runId: number,
+  emotion: string,
+  isBedtime = false
+) {
+  return new Promise<void>(async (resolve) => {
+    try {
+      Speech.stop();
+      await stopTTS();
+      await lowerAmbience(isBedtime);
 
-        const response = await fetch(TTS_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text,
-            mode: isBedtime ? "bedtime" : "story",
-            emotion: emotion || "warm",
-          }),
-        });
+      const response = await fetch(TTS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+          mode: isBedtime ? "bedtime" : "story",
+          emotion: emotion || "warm",
+        }),
+      });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.log("Réponse backend TTS :", response.status, errorText);
-          throw new Error(`Erreur backend TTS ${response.status}`);
-        }
-
-        if (iaRunRef.current !== runId) return resolve();
-
-        const blob = await response.blob();
-
-        const audioUri = await new Promise<string>((res, rej) => {
-          const reader = new FileReader();
-          reader.onloadend = () => res(reader.result as string);
-          reader.onerror = rej;
-          reader.readAsDataURL(blob);
-        });
-
-        if (iaRunRef.current !== runId) return resolve();
-
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: audioUri },
-          { shouldPlay: true, volume: 1.0 }
-        );
-
-        ttsSoundRef.current = sound;
-
-        sound.setOnPlaybackStatusUpdate(async (status) => {
-          if (!status.isLoaded) return;
-
-          if (status.didJustFinish) {
-            await stopTTS();
-            await stopAmbience();
-            resolve();
-          }
-        });
-      } catch (e) {
-        console.log("Erreur TTS auto :", e);
-        await stopAmbience();
-        resolve();
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log("Réponse backend TTS :", response.status, errorText);
+        throw new Error(`Erreur backend TTS ${response.status}`);
       }
-    });
-  }
+
+      if (iaRunRef.current !== runId) return resolve();
+
+      const blob = await response.blob();
+
+      const audioUri = await new Promise<string>((res, rej) => {
+        const reader = new FileReader();
+        reader.onloadend = () => res(reader.result as string);
+        reader.onerror = rej;
+        reader.readAsDataURL(blob);
+      });
+
+      if (iaRunRef.current !== runId) return resolve();
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUri },
+        { shouldPlay: true, volume: 1.0 }
+      );
+
+      ttsSoundRef.current = sound;
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+
+        if (status.didJustFinish) {
+          stopTTS();
+          stopAmbience();
+          resolve();
+        }
+      });
+    } catch (e) {
+      console.log("Erreur TTS auto :", e);
+
+      Speech.speak(text, {
+        language: "fr-FR",
+        pitch: isBedtime ? 0.8 : 1,
+        rate: isBedtime ? 0.75 : 0.9,
+        onDone: () => {
+          stopAmbience();
+          resolve();
+        },
+        onStopped: () => {
+          stopAmbience();
+          resolve();
+        },
+        onError: () => {
+          stopAmbience();
+          resolve();
+        },
+      });
+    }
+  });
+}
 
   async function toggleFavorite() {
     if (!story?.id) return;
@@ -433,13 +445,13 @@ export default function PlayerScreen() {
             />
           ) : (
             <View style={styles.textOnlyFullscreen}>
-            <Text style={styles.textOnlyIcon}>📖</Text>
-            <Text style={styles.textOnlyTitle}>Histoire texte</Text>
-            <Text style={styles.textOnlySubtitle}>
-              Cette histoire est disponible sans image.
-            </Text>
-          </View>
-        )}
+              <Text style={styles.textOnlyIcon}>📖</Text>
+              <Text style={styles.textOnlyTitle}>Histoire texte</Text>
+              <Text style={styles.textOnlySubtitle}>
+                Cette histoire est disponible sans image.
+              </Text>
+            </View>
+          )}
 
           <TouchableOpacity style={styles.closeFullscreenButton} onPress={stopVoice}>
             <Text style={styles.closeFullscreenText}>✕</Text>
@@ -483,13 +495,11 @@ export default function PlayerScreen() {
             />
           ) : (
             <View style={styles.textOnlyImageFrame}>
-            <Text style={styles.textOnlyIconSmall}>📖</Text>
-            <Text style={styles.textOnlyFrameTitle}>Histoire texte</Text>
-            <Text style={styles.textOnlyFrameSubtitle}>
-              Lecture sans image
-            </Text>
-          </View>
-        )}
+              <Text style={styles.textOnlyIconSmall}>📖</Text>
+              <Text style={styles.textOnlyFrameTitle}>Histoire texte</Text>
+              <Text style={styles.textOnlyFrameSubtitle}>Lecture sans image</Text>
+            </View>
+          )}
 
           {(nightMode || bedtimeMode) && <View style={styles.imageNightOverlay} />}
         </Animated.View>
@@ -525,19 +535,13 @@ export default function PlayerScreen() {
         </Animated.View>
 
         <View style={styles.voiceRow}>
-          <TouchableOpacity
-            style={styles.voiceButton}
-            onPress={() => startIAStory(false)}
-          >
+          <TouchableOpacity style={styles.voiceButton} onPress={() => startIAStory(false)}>
             <Text style={styles.voiceText}>
               {iaReading ? "🔊 Lecture IA..." : "🔊 Lire IA"}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.voiceButton}
-            onPress={() => startIAStory(false)}
-          >
+          <TouchableOpacity style={styles.voiceButton} onPress={() => startIAStory(false)}>
             <Text style={styles.voiceText}>
               {iaReading ? "🎬 En cours..." : "🎬 Lecture auto"}
             </Text>
@@ -789,7 +793,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "900",
   },
-    textOnlyFullscreen: {
+  textOnlyFullscreen: {
     flex: 1,
     width: "100%",
     justifyContent: "center",

@@ -2,7 +2,7 @@
   "expo": {
     "name": "ConteMagiqueIA",
     "slug": "contemagiqueia",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "contemagiqueia",
@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#111827",
         "foregroundImage": "./assets/images/adaptive-icon.png"
@@ -37,7 +38,8 @@
             "backgroundColor": "#111827"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
