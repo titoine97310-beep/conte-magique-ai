@@ -371,70 +371,143 @@ app.post("/tts", async (req, res) => {
       text,
       mode = "story",
       emotion = "warm",
-      language = "auto",
+      narrator = "narratrice",
     } = req.body;
 
     if (!text?.trim()) {
-      return res.status(400).json({ error: "Texte manquant" });
+      return res.status(400).json({
+        error: "Texte manquant",
+      });
     }
 
-    let instructions;
+    const narratorProfiles = {
+      narratrice: {
+        voice: "marin",
+        speed: 0.88,
+        instructions: `
+Tu es Élise, une narratrice professionnelle de livres audio pour enfants.
+Utilise une voix chaleureuse, humaine, fluide et expressive.
+Adapte naturellement ton intonation aux émotions et aux dialogues.
+Parle calmement, sans réciter mécaniquement.
+`,
+      },
 
-    if (mode === "bedtime") {
-      instructions = `
-Lis comme une narratrice professionnelle racontant une histoire du soir à un enfant.
-Utilise une voix très douce, chaleureuse, naturelle et rassurante.
-Parle lentement, avec des respirations et des pauses naturelles.
-Varie légèrement l'intonation selon les personnages.
-Ne récite pas mécaniquement.
-Respecte parfaitement la langue et la prononciation du texte fourni.
-`;
-    } else if (emotion === "danger") {
-      instructions = `
-Raconte cette histoire comme un conteur professionnel pour enfants.
-Utilise un suspense léger et rassurant, jamais effrayant.
-La voix doit être vivante, fluide et expressive.
-Fais varier naturellement le rythme et l'intonation.
-Respecte parfaitement la langue et la prononciation du texte fourni.
+      narrateur: {
+        voice: "cedar",
+        speed: 0.88,
+        instructions: `
+Tu es Arthur, un narrateur chaleureux et rassurant.
+Raconte comme un papa bienveillant qui lit une histoire à un enfant.
+Utilise une voix naturelle, calme, protectrice et expressive.
+Ne parle jamais de manière monotone ou robotique.
+`,
+      },
+
+      magicien: {
+        voice: "fable",
+        speed: 0.84,
+        instructions: `
+Tu es Merlin, un vieux magicien bienveillant.
+Utilise une voix mystérieuse, théâtrale et pleine d’émerveillement.
+Fais de petites pauses avant les découvertes importantes.
+Reste chaleureux et rassurant pour les enfants.
+`,
+      },
+
+      fee: {
+        voice: "shimmer",
+        speed: 0.9,
+        instructions: `
+Tu es Luna, une fée joyeuse et bienveillante.
+Utilise une voix légère, lumineuse, magique et expressive.
+Fais ressentir la joie, la curiosité et l’émerveillement.
+Reste naturelle et évite toute intonation caricaturale.
+`,
+      },
+
+      dodo: {
+        voice: "marin",
+        speed: 0.76,
+        instructions: `
+Tu racontes une histoire du soir pour aider un enfant à s’endormir.
+Utilise une voix très douce, lente, chaleureuse et rassurante.
+Fais des pauses calmes entre les phrases.
+Ne précipite jamais les dialogues.
+Garde une énergie paisible du début à la fin.
+`,
+      },
+    };
+
+    const profile =
+      narratorProfiles[narrator] || narratorProfiles.narratrice;
+
+    let emotionInstructions = "";
+
+    if (emotion === "danger") {
+      emotionInstructions = `
+Ajoute une légère tension et un suspense doux, sans jamais faire peur.
 `;
     } else if (emotion === "victory") {
-      instructions = `
-Raconte cette histoire avec joie, chaleur et émerveillement.
-Utilise une voix naturelle, souriante et expressive.
-Marque les exclamations et les moments heureux sans exagérer.
-Respecte parfaitement la langue et la prononciation du texte fourni.
+      emotionInstructions = `
+Utilise un ton joyeux, fier et émerveillé pour célébrer la réussite.
 `;
     } else if (emotion === "mystery") {
-      instructions = `
-Raconte cette histoire avec curiosité et un mystère doux.
-Utilise une voix calme, naturelle et expressive.
-Ajoute de petites pauses avant les révélations.
-Ne prends jamais un ton effrayant.
-Respecte parfaitement la langue et la prononciation du texte fourni.
+      emotionInstructions = `
+Utilise une curiosité douce et marque de petites pauses avant les révélations.
+`;
+    } else if (emotion === "calm") {
+      emotionInstructions = `
+Utilise un ton tendre, paisible et réconfortant.
 `;
     } else {
-      instructions = `
-Raconte cette histoire comme une narratrice professionnelle de livres audio pour enfants.
-La voix doit être chaleureuse, humaine, fluide et expressive.
-Ne lis pas comme un robot et ne récite pas mot à mot de façon monotone.
-Adapte naturellement l'intonation aux émotions, aux questions et aux dialogues.
-Utilise des pauses naturelles et un rythme agréable.
-Respecte parfaitement la langue et la prononciation du texte fourni.
+      emotionInstructions = `
+Utilise un ton chaleureux, vivant et rempli d’émerveillement.
 `;
     }
+
+    const bedtimeInstructions =
+      mode === "bedtime"
+        ? `
+Cette lecture est destinée au coucher.
+Ralentis davantage et utilise une énergie très calme.
+`
+        : "";
+
+    const instructions = `
+${profile.instructions}
+
+${emotionInstructions}
+
+${bedtimeInstructions}
+
+Respecte exactement la langue du texte fourni.
+Prononce les mots aussi naturellement que possible.
+Marque les virgules par de courtes pauses et les points par des pauses plus longues.
+`;
+
+    const speed =
+      mode === "bedtime"
+        ? 0.74
+        : profile.speed;
 
     const response = await openai.audio.speech.create({
       model: "gpt-4o-mini-tts",
-      voice: "marin",
+      voice: profile.voice,
       input: text,
       instructions,
+      speed,
       response_format: "mp3",
     });
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const buffer = Buffer.from(
+      await response.arrayBuffer()
+    );
 
     res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Content-Length", buffer.length.toString());
+    res.setHeader(
+      "Content-Length",
+      buffer.length.toString()
+    );
 
     return res.send(buffer);
   } catch (e) {
