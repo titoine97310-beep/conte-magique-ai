@@ -364,29 +364,68 @@ ${safePrompt}
 });
 
 app.post("/tts", async (req, res) => {
-  console.log("Requête TTS reçue :", req.body?.text?.slice(0, 50));
+  console.log("Requête TTS reçue :", req.body?.text?.slice(0, 80));
 
   try {
-    const { text, mode = "story", emotion = "warm" } = req.body;
+    const {
+      text,
+      mode = "story",
+      emotion = "warm",
+      language = "auto",
+    } = req.body;
 
-    if (!text) {
+    if (!text?.trim()) {
       return res.status(400).json({ error: "Texte manquant" });
     }
 
-    const instructions =
-      mode === "bedtime"
-        ? "Lis comme un conteur très doux pour endormir un enfant. Voix adaptée, chaleureuse, calme, avec des pauses naturelles. Ne sois jamais brusque."
-        : emotion === "danger"
-        ? "Lis comme un conteur pour enfants avec une légère tension, du suspense doux, sans faire peur. Voix expressive et rythmée."
-        : emotion === "victory"
-        ? "Lis comme un conteur joyeux et émerveillé. Ton chaleureux, positif, célébration douce."
-        : emotion === "mystery"
-        ? "Lis comme un conteur mystérieux mais rassurant. Fais des pauses, garde une voix douce et curieuse."
-        : "Lis comme un conteur chaleureux pour enfants. Voix expressive, naturelle, avec des pauses et de l’émerveillement.";
+    let instructions;
+
+    if (mode === "bedtime") {
+      instructions = `
+Lis comme une narratrice professionnelle racontant une histoire du soir à un enfant.
+Utilise une voix très douce, chaleureuse, naturelle et rassurante.
+Parle lentement, avec des respirations et des pauses naturelles.
+Varie légèrement l'intonation selon les personnages.
+Ne récite pas mécaniquement.
+Respecte parfaitement la langue et la prononciation du texte fourni.
+`;
+    } else if (emotion === "danger") {
+      instructions = `
+Raconte cette histoire comme un conteur professionnel pour enfants.
+Utilise un suspense léger et rassurant, jamais effrayant.
+La voix doit être vivante, fluide et expressive.
+Fais varier naturellement le rythme et l'intonation.
+Respecte parfaitement la langue et la prononciation du texte fourni.
+`;
+    } else if (emotion === "victory") {
+      instructions = `
+Raconte cette histoire avec joie, chaleur et émerveillement.
+Utilise une voix naturelle, souriante et expressive.
+Marque les exclamations et les moments heureux sans exagérer.
+Respecte parfaitement la langue et la prononciation du texte fourni.
+`;
+    } else if (emotion === "mystery") {
+      instructions = `
+Raconte cette histoire avec curiosité et un mystère doux.
+Utilise une voix calme, naturelle et expressive.
+Ajoute de petites pauses avant les révélations.
+Ne prends jamais un ton effrayant.
+Respecte parfaitement la langue et la prononciation du texte fourni.
+`;
+    } else {
+      instructions = `
+Raconte cette histoire comme une narratrice professionnelle de livres audio pour enfants.
+La voix doit être chaleureuse, humaine, fluide et expressive.
+Ne lis pas comme un robot et ne récite pas mot à mot de façon monotone.
+Adapte naturellement l'intonation aux émotions, aux questions et aux dialogues.
+Utilise des pauses naturelles et un rythme agréable.
+Respecte parfaitement la langue et la prononciation du texte fourni.
+`;
+    }
 
     const response = await openai.audio.speech.create({
-      model: "gpt-5.4-mini-tts",
-      voice: "alloy",
+      model: "gpt-4o-mini-tts",
+      voice: "marin",
       input: text,
       instructions,
       response_format: "mp3",
@@ -395,6 +434,8 @@ app.post("/tts", async (req, res) => {
     const buffer = Buffer.from(await response.arrayBuffer());
 
     res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Length", buffer.length.toString());
+
     return res.send(buffer);
   } catch (e) {
     console.error("Erreur TTS complète :", e);
