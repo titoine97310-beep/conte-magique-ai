@@ -373,6 +373,7 @@ app.post("/tts", async (req, res) => {
       emotion = "warm",
       narrator = "narratrice",
     } = req.body;
+  console.log("Narrateur reçu :", narrator);
 
     if (!text?.trim()) {
       return res.status(400).json({
@@ -440,6 +441,7 @@ Garde une énergie paisible du début à la fin.
 
     const profile =
       narratorProfiles[narrator] || narratorProfiles.narratrice;
+      console.log("Voix OpenAI choisie :", profile.voice); 
 
     let emotionInstructions = "";
 
