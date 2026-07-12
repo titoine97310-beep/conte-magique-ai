@@ -313,61 +313,16 @@ Style premium, cohérent entre les scènes.
 `;
 }
 
-app.post("/image", async (req, res) => {
-  try {
-    const { prompt } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: "Prompt image manquant" });
-    }
-
-    const safePrompt = sanitizePrompt(prompt);
-    const stylePrompt = getImageStylePrompt(safePrompt);
-
-    const finalPrompt = `
-${stylePrompt}
-
-Consignes de sécurité :
-- personnages originaux uniquement
-- aucun logo, aucune marque
-- aucune violence graphique
-- scène adaptée aux enfants
-
-Scène à générer :
-${safePrompt}
-`;
-
-    const result = await openai.images.generate({
-      model: "gpt-image-1",
-      prompt: finalPrompt,
-      size: "1024x1024",
-      quality: "medium",
-    });
-
-    const base64 = result.data?.[0]?.b64_json;
-
-    if (!base64) {
-      throw new Error("Image non générée");
-    }
-
-    return res.json({
-      imageUrl: `data:image/png;base64,${base64}`,
-    });
-  } catch (e) {
-    console.error("Erreur /image :", e);
-
-    return res.status(500).json({
-      error: "Erreur génération image",
-      message: e?.message,
-    });
-  }
-});
-
 app.post("/tts", async (req, res) => {
   console.log("Requête TTS reçue :", req.body?.text?.slice(0, 80));
 
   try {
-    const { text, mode = "story", emotion = "warm" } = req.body;
+    const {
+      text,
+      mode = "story",
+      emotion = "warm",
+      narrator = "narratrice",
+    } = req.body;
 
     if (!text?.trim()) {
       return res.status(400).json({
@@ -375,36 +330,98 @@ app.post("/tts", async (req, res) => {
       });
     }
 
-    const instructions =
+    const narratorProfiles = {
+      narratrice: {
+        voice: "alloy",
+        instructions: `
+Lis comme une narratrice chaleureuse pour enfants.
+Utilise une voix naturelle, fluide et expressive.
+Fais des pauses naturelles, sans exagérer les émotions.
+`,
+      },
+
+      narrateur: {
+        voice: "cedar",
+        instructions: `
+Lis comme un narrateur chaleureux pour enfants.
+Utilise une voix naturelle, claire et rassurante.
+Fais des pauses naturelles, sans effets théâtraux.
+`,
+      },
+
+      magicien: {
+        voice: "cedar",
+        instructions: `
+Lis comme un conteur bienveillant avec une légère touche de mystère.
+Garde une voix naturelle, claire et stable.
+Ne murmure pas et n'exagère pas les effets.
+`,
+      },
+
+      fee: {
+        voice: "alloy",
+        instructions: `
+Lis comme une conteuse joyeuse et bienveillante.
+Garde une voix naturelle, légère et fluide.
+Ajoute seulement une touche d’émerveillement.
+`,
+      },
+
+      dodo: {
+        voice: "alloy",
+        instructions: `
+Lis doucement comme une histoire du soir.
+Garde une voix naturelle, calme et rassurante.
+Utilise des pauses plus longues entre les phrases.
+Ne murmure pas.
+`,
+      },
+    };
+
+    const profile =
+      narratorProfiles[narrator] || narratorProfiles.narratrice;
+
+    console.log("Narrateur reçu :", narrator);
+    console.log("Voix choisie :", profile.voice);
+
+    let emotionInstructions = "";
+
+    if (emotion === "danger") {
+      emotionInstructions =
+        "Ajoute un suspense très léger, sans jamais devenir effrayant.";
+    } else if (emotion === "victory") {
+      emotionInstructions =
+        "Utilise un ton joyeux et chaleureux.";
+    } else if (emotion === "calm") {
+      emotionInstructions =
+        "Utilise un ton doux et paisible.";
+    } else if (emotion === "night") {
+      emotionInstructions =
+        "Utilise un ton calme et rassurant.";
+    }
+
+    const bedtimeInstructions =
       mode === "bedtime"
         ? `
-Lis comme un conteur très doux pour endormir un enfant.
-Utilise une voix chaleureuse, calme et naturelle.
-Parle lentement avec des pauses naturelles.
-Respecte exactement la langue du texte.
+Cette lecture est destinée au coucher.
+Parle calmement et marque davantage les pauses.
 `
-        : emotion === "danger"
-        ? `
-Lis comme un conteur pour enfants avec une légère tension.
-Garde une voix rassurante, naturelle et fluide.
-Respecte exactement la langue du texte.
-`
-        : emotion === "victory"
-        ? `
-Lis comme un conteur joyeux et chaleureux.
-Garde une narration naturelle et fluide.
-Respecte exactement la langue du texte.
-`
-        : `
-Lis comme un conteur chaleureux pour enfants.
-Utilise une voix naturelle, fluide et expressive.
-Fais des pauses naturelles sans exagérer les émotions.
-Respecte exactement la langue du texte.
+        : "";
+
+    const instructions = `
+${profile.instructions}
+
+${emotionInstructions}
+
+${bedtimeInstructions}
+
+Respecte exactement la langue du texte fourni.
+Prononce les mots naturellement.
 `;
 
     const response = await openai.audio.speech.create({
       model: "gpt-4o-mini-tts",
-      voice: "alloy",
+      voice: profile.voice,
       input: text,
       instructions,
       response_format: "mp3",
