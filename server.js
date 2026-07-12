@@ -367,13 +367,7 @@ app.post("/tts", async (req, res) => {
   console.log("Requête TTS reçue :", req.body?.text?.slice(0, 80));
 
   try {
-    const {
-      text,
-      mode = "story",
-      emotion = "warm",
-      narrator = "narratrice",
-    } = req.body;
-  console.log("Narrateur reçu :", narrator);
+    const { text, mode = "story", emotion = "warm" } = req.body;
 
     if (!text?.trim()) {
       return res.status(400).json({
@@ -381,135 +375,45 @@ app.post("/tts", async (req, res) => {
       });
     }
 
-    const narratorProfiles = {
-      narratrice: {
-        voice: "marin",
-        speed: 0.88,
-        instructions: `
-Tu es Élise, une narratrice professionnelle de livres audio pour enfants.
-Utilise une voix chaleureuse, humaine, fluide et expressive.
-Adapte naturellement ton intonation aux émotions et aux dialogues.
-Parle calmement, sans réciter mécaniquement.
-`,
-      },
-
-      narrateur: {
-        voice: "cedar",
-        speed: 0.88,
-        instructions: `
-Tu es Arthur, un narrateur chaleureux et rassurant.
-Raconte comme un papa bienveillant qui lit une histoire à un enfant.
-Utilise une voix naturelle, calme, protectrice et expressive.
-Ne parle jamais de manière monotone ou robotique.
-`,
-      },
-
-      magicien: {
-        voice: "fable",
-        speed: 0.84,
-        instructions: `
-Tu es Merlin, un vieux magicien bienveillant.
-Utilise une voix mystérieuse, théâtrale et pleine d’émerveillement.
-Fais de petites pauses avant les découvertes importantes.
-Reste chaleureux et rassurant pour les enfants.
-`,
-      },
-
-      fee: {
-        voice: "shimmer",
-        speed: 0.9,
-        instructions: `
-Tu es Luna, une fée joyeuse et bienveillante.
-Utilise une voix légère, lumineuse, magique et expressive.
-Fais ressentir la joie, la curiosité et l’émerveillement.
-Reste naturelle et évite toute intonation caricaturale.
-`,
-      },
-
-      dodo: {
-        voice: "marin",
-        speed: 0.76,
-        instructions: `
-Tu racontes une histoire du soir pour aider un enfant à s’endormir.
-Utilise une voix très douce, lente, chaleureuse et rassurante.
-Fais des pauses calmes entre les phrases.
-Ne précipite jamais les dialogues.
-Garde une énergie paisible du début à la fin.
-`,
-      },
-    };
-
-    const profile =
-      narratorProfiles[narrator] || narratorProfiles.narratrice;
-      console.log("Voix OpenAI choisie :", profile.voice); 
-
-    let emotionInstructions = "";
-
-    if (emotion === "danger") {
-      emotionInstructions = `
-Ajoute une légère tension et un suspense doux, sans jamais faire peur.
-`;
-    } else if (emotion === "victory") {
-      emotionInstructions = `
-Utilise un ton joyeux, fier et émerveillé pour célébrer la réussite.
-`;
-    } else if (emotion === "mystery") {
-      emotionInstructions = `
-Utilise une curiosité douce et marque de petites pauses avant les révélations.
-`;
-    } else if (emotion === "calm") {
-      emotionInstructions = `
-Utilise un ton tendre, paisible et réconfortant.
-`;
-    } else {
-      emotionInstructions = `
-Utilise un ton chaleureux, vivant et rempli d’émerveillement.
-`;
-    }
-
-    const bedtimeInstructions =
+    const instructions =
       mode === "bedtime"
         ? `
-Cette lecture est destinée au coucher.
-Ralentis davantage et utilise une énergie très calme.
+Lis comme un conteur très doux pour endormir un enfant.
+Utilise une voix chaleureuse, calme et naturelle.
+Parle lentement avec des pauses naturelles.
+Respecte exactement la langue du texte.
 `
-        : "";
-
-    const instructions = `
-${profile.instructions}
-
-${emotionInstructions}
-
-${bedtimeInstructions}
-
-Respecte exactement la langue du texte fourni.
-Prononce les mots aussi naturellement que possible.
-Marque les virgules par de courtes pauses et les points par des pauses plus longues.
+        : emotion === "danger"
+        ? `
+Lis comme un conteur pour enfants avec une légère tension.
+Garde une voix rassurante, naturelle et fluide.
+Respecte exactement la langue du texte.
+`
+        : emotion === "victory"
+        ? `
+Lis comme un conteur joyeux et chaleureux.
+Garde une narration naturelle et fluide.
+Respecte exactement la langue du texte.
+`
+        : `
+Lis comme un conteur chaleureux pour enfants.
+Utilise une voix naturelle, fluide et expressive.
+Fais des pauses naturelles sans exagérer les émotions.
+Respecte exactement la langue du texte.
 `;
-
-    const speed =
-      mode === "bedtime"
-        ? 0.74
-        : profile.speed;
 
     const response = await openai.audio.speech.create({
       model: "gpt-4o-mini-tts",
-      voice: profile.voice,
+      voice: "alloy",
       input: text,
       instructions,
-      speed,
       response_format: "mp3",
     });
 
-    const buffer = Buffer.from(
-      await response.arrayBuffer()
-    );
+    const buffer = Buffer.from(await response.arrayBuffer());
 
     res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader(
-      "Content-Length",
-      buffer.length.toString()
-    );
+    res.setHeader("Content-Length", buffer.length.toString());
 
     return res.send(buffer);
   } catch (e) {
