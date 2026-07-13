@@ -331,52 +331,55 @@ app.post("/tts", async (req, res) => {
     }
 
     const narratorProfiles = {
-      narratrice: {
-        voice: "alloy",
-        instructions: `
-Lis comme une narratrice chaleureuse pour enfants.
-Utilise une voix naturelle, fluide et expressive.
-Fais des pauses naturelles, sans exagérer les émotions.
+  narratrice: {
+    voice: "nova",
+    instructions: `
+Lis comme une conteuse chaleureuse pour enfants.
+Voix naturelle, douce, expressive.
+Raconte comme une maman lisant une histoire.
 `,
-      },
+  },
 
-      narrateur: {
-        voice: "cedar",
-        instructions: `
-Lis comme un narrateur chaleureux pour enfants.
-Utilise une voix naturelle, claire et rassurante.
-Fais des pauses naturelles, sans effets théâtraux.
+  narrateur: {
+    voice: "onyx",
+    instructions: `
+Lis comme un papa racontant une histoire.
+Voix grave, rassurante, naturelle.
 `,
-      },
+  },
 
-      magicien: {
-        voice: "cedar",
-        instructions: `
-Lis comme un conteur bienveillant avec une légère touche de mystère.
-Garde une voix naturelle, claire et stable.
-Ne murmure pas et n'exagère pas les effets.
+  magicien: {
+    voice: "sage",
+    instructions: `
+Lis comme un vieux magicien bienveillant.
+Voix mystérieuse mais chaleureuse.
 `,
-      },
+  },
 
-      fee: {
-        voice: "alloy",
-        instructions: `
-Lis comme une conteuse joyeuse et bienveillante.
-Garde une voix naturelle, légère et fluide.
-Ajoute seulement une touche d’émerveillement.
+  fee: {
+    voice: "shimmer",
+    instructions: `
+Lis comme une fée joyeuse.
+Voix légère, lumineuse, pleine d'émerveillement.
 `,
-      },
+  },
 
-      dodo: {
-        voice: "alloy",
-        instructions: `
-Lis doucement comme une histoire du soir.
-Garde une voix naturelle, calme et rassurante.
-Utilise des pauses plus longues entre les phrases.
-Ne murmure pas.
+  mamie: {
+    voice: "ballad",
+    instructions: `
+Lis comme une grand-mère racontant un conte à ses petits-enfants.
+Voix très douce, lente et affectueuse.
 `,
-      },
-    };
+  },
+
+  garcon: {
+    voice: "echo",
+    instructions: `
+Lis comme un jeune garçon racontant une aventure.
+Voix vive, enthousiaste et naturelle.
+`,
+  },
+};
 
     const profile =
       narratorProfiles[narrator] || narratorProfiles.narratrice;
