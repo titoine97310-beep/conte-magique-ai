@@ -313,6 +313,60 @@ Style premium, cohérent entre les scènes.
 `;
 }
 
+app.post("/image", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt?.trim()) {
+      return res.status(400).json({
+        error: "Prompt image manquant",
+      });
+    }
+
+    const safePrompt = sanitizePrompt(prompt);
+    const stylePrompt = getImageStylePrompt(safePrompt);
+
+    const finalPrompt = `
+${stylePrompt}
+
+Consignes de sécurité :
+- personnages originaux uniquement
+- aucun logo
+- aucune marque
+- aucune violence graphique
+- scène adaptée aux enfants
+
+Scène à générer :
+${safePrompt}
+`;
+
+    const result = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt: finalPrompt,
+      size: "1024x1024",
+      quality: "medium",
+    });
+
+    const base64 = result.data?.[0]?.b64_json;
+
+    if (!base64) {
+      throw new Error("Aucune image retournée par OpenAI");
+    }
+
+    return res.json({
+      imageUrl: `data:image/png;base64,${base64}`,
+    });
+  } catch (e) {
+    console.error("Erreur /image complète :", e);
+
+    return res.status(500).json({
+      error: "Erreur génération image",
+      message: e?.message,
+      status: e?.status,
+    });
+  }
+});
+
 app.post("/tts", async (req, res) => {
   console.log("Requête TTS reçue :", req.body?.text?.slice(0, 80));
 
