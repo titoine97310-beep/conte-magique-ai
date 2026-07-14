@@ -398,7 +398,8 @@ Raconte comme une maman lisant une histoire.
     voice: "onyx",
     instructions: `
 Lis comme un papa racontant une histoire.
-Voix grave, rassurante, naturelle.
+Voix grave, rassurante, naturelle, expressive.
+Prends ton temps et fais des pauses naturelles.
 `,
   },
 
@@ -406,7 +407,7 @@ Voix grave, rassurante, naturelle.
     voice: "sage",
     instructions: `
 Lis comme un vieux magicien bienveillant.
-Voix mystérieuse mais chaleureuse.
+Voix mystérieuse mais chaleureuse, expressive, naturelle
 `,
   },
 
@@ -414,7 +415,7 @@ Voix mystérieuse mais chaleureuse.
     voice: "shimmer",
     instructions: `
 Lis comme une fée joyeuse.
-Voix légère, lumineuse, pleine d'émerveillement.
+Voix légère, lumineuse, pleine d'émerveillement, naturelle, expressive.
 `,
   },
 
@@ -422,7 +423,7 @@ Voix légère, lumineuse, pleine d'émerveillement.
     voice: "ballad",
     instructions: `
 Lis comme une grand-mère racontant un conte à ses petits-enfants.
-Voix très douce, lente et affectueuse.
+Voix très douce, lente et affectueuse, expressive, naturelle.
 `,
   },
 
@@ -430,7 +431,7 @@ Voix très douce, lente et affectueuse.
     voice: "echo",
     instructions: `
 Lis comme un jeune garçon racontant une aventure.
-Voix vive, enthousiaste et naturelle.
+Voix vive, enthousiaste et naturelle, expressive.
 `,
   },
 };
