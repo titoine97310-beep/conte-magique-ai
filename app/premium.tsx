@@ -2,31 +2,31 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-import { addImageCredits, addTextCredits } from "../services/usageService";
+import { addIllustratedStories, addTextStories } from "../services/usageService";
 
 export default function PremiumScreen() {
   async function buyTextPack() {
-    await addTextCredits(10);
+    await addTextStories(20);
 
-    Alert.alert("Pack activé 🎉", "Tu as maintenant 10 histoires texte.");
+    Alert.alert("Pack activé 🎉", "Tu as maintenant 20 histoires texte.");
 
     router.push("/");
   }
 
   async function buyPremiumPack() {
-    await addImageCredits(5);
+    await addIllustratedStories(20);
 
     Alert.alert(
       "Pack Premium activé 🎉",
-      "Tu as maintenant 5 histoires illustrées."
+      "Tu as maintenant 20 histoires illustrées."
     );
 
     router.push("/");

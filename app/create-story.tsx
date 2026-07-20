@@ -23,6 +23,12 @@ import {
 type ImageStyle = "cartoon" | "fantasy" | "realistic" | "comic";
 type StoryType = "funny" | "adventure" | "magic" | "mystery";
 type StoryLength = "short" | "medium" | "long";
+type Narrator =
+  | "narratrice"
+  | "narrateur"
+  | "magicien"
+  | "fee"
+  | "dodo";
 
 const imageStyles = [
   { id: "cartoon", label: "🎨 Cartoon" },
@@ -42,6 +48,34 @@ const storyLengths = [
   { id: "short", label: "⚡ Courte", scenes: 4, disabled: false },
   { id: "medium", label: "📖 Moyenne", scenes: 6, disabled: true },
   { id: "long", label: "🌙 Longue", scenes: 8, disabled: true },
+] as const;
+
+const narrators = [
+  {
+    id: "narratrice",
+    label: "👩 Élise",
+    subtitle: "Douce et expressive",
+  },
+  {
+    id: "narrateur",
+    label: "👨 Arthur",
+    subtitle: "Chaleureux et rassurant",
+  },
+  {
+    id: "magicien",
+    label: "🧙 Merlin",
+    subtitle: "Mystérieux et magique",
+  },
+  {
+    id: "fee",
+    label: "🧚 Luna",
+    subtitle: "Joyeuse et féerique",
+  },
+  {
+    id: "dodo",
+    label: "🌙 Dodo",
+    subtitle: "Lent et apaisant",
+  },
 ] as const;
 
 function getStylePrompt(style: ImageStyle) {
@@ -77,6 +111,8 @@ export default function CreateStoryScreen() {
   const [imageStyle, setImageStyle] = useState<ImageStyle>("cartoon");
   const [storyType, setStoryType] = useState<StoryType>("magic");
   const [storyLength, setStoryLength] = useState<StoryLength>("short");
+  const [narrator, setNarrator] =
+  useState<Narrator>("narratrice");
 
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
@@ -113,21 +149,6 @@ export default function CreateStoryScreen() {
         );
       });
     }
-
-      if (usage.mode === "free-text") {
-  await new Promise<void>((resolve) => {
-    Alert.alert(
-      "🎁 Bienvenue dans ConteMagiqueIA",
-      "Tu as droit à 2 histoires gratuites :\n\n1️⃣ Une première histoire en texte seul\n2️⃣ Une deuxième histoire avec texte + images\n\nEnsuite, tu pourras choisir un pack pour continuer l’aventure.",
-      [
-        {
-          text: "OK, je commence",
-          onPress: () => resolve(),
-        },
-      ]
-    );
-  });
-}
 
 const textOnlyMode =
   usage.mode === "free-text" || usage.mode === "paid-text";
@@ -197,6 +218,7 @@ Consignes importantes :
         imageStyle,
         storyType,
         storyLength,
+        narrator,
         scenes: scenesWithImages,
       };
 
@@ -318,6 +340,44 @@ Consignes importantes :
           })}
         </View>
 
+        <Text style={styles.sectionTitle}>Qui raconte l’histoire ?</Text>
+
+<View style={styles.narratorGrid}>
+  {narrators.map((item) => {
+    const isActive = narrator === item.id;
+
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={[
+          styles.narratorButton,
+          isActive && styles.narratorActive,
+        ]}
+        onPress={() => setNarrator(item.id)}
+        disabled={loading}
+      >
+        <Text
+          style={[
+            styles.narratorLabel,
+            isActive && styles.narratorLabelActive,
+          ]}
+        >
+          {item.label}
+        </Text>
+
+        <Text
+          style={[
+            styles.narratorSubtitle,
+            isActive && styles.narratorSubtitleActive,
+          ]}
+        >
+          {item.subtitle}
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+</View>
+
         <TouchableOpacity
           style={[styles.button, loading && { opacity: 0.7 }]}
           onPress={handleGenerate}
@@ -421,4 +481,50 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "800",
   },
+  narratorGrid: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+  marginBottom: 20,
+},
+
+narratorButton: {
+  width: "48%",
+  minHeight: 78,
+  backgroundColor: "rgba(255,255,255,0.14)",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.25)",
+  borderRadius: 14,
+  padding: 12,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+narratorActive: {
+  backgroundColor: "#FFB703",
+  borderColor: "#FFB703",
+},
+
+narratorLabel: {
+  color: "white",
+  fontSize: 16,
+  fontWeight: "900",
+  textAlign: "center",
+},
+
+narratorLabelActive: {
+  color: "#111",
+},
+
+narratorSubtitle: {
+  color: "#CBD5E1",
+  fontSize: 11,
+  fontWeight: "700",
+  textAlign: "center",
+  marginTop: 4,
+},
+
+narratorSubtitleActive: {
+  color: "#333",
+},
 });

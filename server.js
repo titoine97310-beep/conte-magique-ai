@@ -33,7 +33,7 @@ app.post("/tts", async (req, res) => {
         : "Lis comme un conteur chaleureux pour enfants. Voix expressive, naturelle, avec des pauses et de l’émerveillement.";
 
     const response = await openai.audio.speech.create({
-      model: "gpt-5.4-mini-tts",
+      model: "gpt-4o-mini-tts",
       voice: "alloy",
       input: text,
       instructions,

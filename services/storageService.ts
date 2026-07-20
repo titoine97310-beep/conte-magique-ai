@@ -37,7 +37,6 @@ export async function saveStory(story: any) {
     const stories = existing ? JSON.parse(existing) : [];
 
     const storyId = Date.now();
-
     const savedScenes = [];
 
     for (let i = 0; i < story.scenes.length; i++) {
@@ -49,30 +48,37 @@ export async function saveStory(story: any) {
         i
       );
 
-    savedScenes.push({
-      text: scene.text,
-      imagePrompt: scene.imagePrompt,
-      imageStyle: scene.imageStyle,
-      ambience: scene.ambience,
-      imageUrl: localImageUri,
-    });
-  }
+      savedScenes.push({
+        text: scene.text,
+        imagePrompt: scene.imagePrompt,
+        imageStyle: scene.imageStyle,
+        ambience: scene.ambience,
+        imageUrl: localImageUri,
+      });
+    }
 
     const newStory = {
       id: storyId,
       createdAt: new Date().toISOString(),
       favorite: false,
-      prompt: story.prompt, 
+      prompt: story.prompt,
       imageStyle: story.imageStyle,
+      storyType: story.storyType,
+      storyLength: story.storyLength,
+      narrator: story.narrator || "narratrice",
       scenes: savedScenes,
     };
 
     stories.unshift(newStory);
 
     await AsyncStorage.setItem(KEY, JSON.stringify(stories));
+
+    console.log("Histoire sauvegardée avec narrateur :", newStory.narrator);
+
     return newStory;
   } catch (e) {
     console.log("Erreur sauvegarde :", e);
+    return null;
   }
 }
 

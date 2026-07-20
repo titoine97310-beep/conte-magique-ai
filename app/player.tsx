@@ -103,7 +103,7 @@ export default function PlayerScreen() {
   async function lowerAmbience(isBedtime = false) {
     try {
       if (soundRef.current) {
-        await soundRef.current.setVolumeAsync(isBedtime ? 0.02 : 0.04);
+        await soundRef.current.setVolumeAsync(isBedtime ? 0.05 : 0.15);
       }
     } catch (e) {
       console.log("Erreur baisse ambiance :", e);
@@ -130,7 +130,7 @@ export default function PlayerScreen() {
     if (!sound) return;
 
     try {
-      for (let volume = 0.15; volume >= 0; volume -= 0.03) {
+      for (let volume = 0.5; volume >= 0; volume -= 0.03) {
         if (audioRunRef.current !== runId) return;
 
         await sound.setVolumeAsync(Math.max(volume, 0));
@@ -171,7 +171,7 @@ export default function PlayerScreen() {
       soundRef.current = sound;
       await sound.playAsync();
 
-      const maxVolume = bedtimeMode ? 0.06 : nightMode ? 0.08 : 0.15;
+      const maxVolume = bedtimeMode ? 0.06 : nightMode ? 0.08 : 0.12;
 
       for (let volume = 0; volume <= maxVolume; volume += 0.02) {
         if (audioRunRef.current !== runId) return;
@@ -196,16 +196,19 @@ export default function PlayerScreen() {
       await stopTTS();
       await lowerAmbience(isBedtime);
 
+      console.log("Narrateur envoyé au backend :", story?.narrator);
+
       const response = await fetch(TTS_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          text,
-          mode: isBedtime ? "bedtime" : "story",
-          emotion: emotion || "warm",
-        }),
+  text,
+  mode: isBedtime ? "bedtime" : "story",
+  emotion: emotion || "warm",
+  narrator: story?.narrator || "narratrice",
+}),
       });
 
       if (!response.ok) {
@@ -218,31 +221,55 @@ export default function PlayerScreen() {
 
       const blob = await response.blob();
 
-      const audioUri = await new Promise<string>((res, rej) => {
-        const reader = new FileReader();
-        reader.onloadend = () => res(reader.result as string);
-        reader.onerror = rej;
-        reader.readAsDataURL(blob);
-      });
+const audioUri = await new Promise<string>((resolveAudio, rejectAudio) => {
+  const reader = new FileReader();
 
-      if (iaRunRef.current !== runId) return resolve();
+  reader.onloadend = () => {
+    if (typeof reader.result === "string") {
+      resolveAudio(reader.result);
+    } else {
+      rejectAudio(new Error("Conversion audio impossible"));
+    }
+  };
 
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUri },
-        { shouldPlay: true, volume: 1.0 }
-      );
+  reader.onerror = () => {
+    rejectAudio(new Error("Erreur de lecture audio"));
+  };
 
-      ttsSoundRef.current = sound;
+  reader.readAsDataURL(blob);
+});
 
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) return;
+if (iaRunRef.current !== runId) {
+  return resolve();
+}
 
-        if (status.didJustFinish) {
-          stopTTS();
-          stopAmbience();
-          resolve();
-        }
-      });
+const { sound } = await Audio.Sound.createAsync(
+  { uri: audioUri },
+  {
+    shouldPlay: true,
+    volume: 1,
+    isLooping: false,
+  }
+);
+
+ttsSoundRef.current = sound;
+
+sound.setOnPlaybackStatusUpdate((status) => {
+  if (!status.isLoaded) return;
+
+  if (status.didJustFinish) {
+    sound.setOnPlaybackStatusUpdate(null);
+
+    void (async () => {
+      try {
+        await stopTTS();
+        await stopAmbience();
+      } finally {
+        resolve();
+      }
+    })();
+  }
+});
     } catch (e) {
       console.log("Erreur TTS auto :", e);
 
