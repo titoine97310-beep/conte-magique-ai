@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import {
+  deleteUser,
   onAuthStateChanged,
   signOut,
   type User,
@@ -9,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -19,8 +21,10 @@ import {
   View,
 } from "react-native";
 
+import * as Application from "expo-application";
 import { auth } from "../services/firebase";
 import {
+  deleteUserProfile,
   getUserProfile,
   updateUserDisplayName,
 } from "../services/userService";
@@ -28,6 +32,7 @@ import type { UserProfile } from "../types/user";
 
 export default function AccountScreen() {
   const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -39,6 +44,9 @@ export default function AccountScreen() {
   const [displayNameInput, setDisplayNameInput] = useState("");
 
   const [savingDisplayName, setSavingDisplayName] = useState(false);
+
+  const appVersion = Application.nativeApplicationVersion ?? "1.0.0";
+const buildVersion = Application.nativeBuildVersion ?? "-";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -182,40 +190,134 @@ async function handleSaveDisplayName() {
   }
 }
 
-  function handleLogout() {
+  const handleContact = async () => {
+  const email = "contact@contemagiqueia.fr";
+  const subject = encodeURIComponent("Support ConteMagiqueIA");
+  const body = encodeURIComponent(
+    "Bonjour,\n\nJe vous contacte au sujet de l'application ConteMagiqueIA.\n\n"
+  );
+
+  const url = `mailto:${email}?subject=${subject}&body=${body}`;
+
+  try {
+    const supported = await Linking.canOpenURL(url);
+
+    if (!supported) {
+      Alert.alert(
+        "Application de messagerie indisponible",
+        `Tu peux nous contacter à l'adresse : ${email}`
+      );
+      return;
+    }
+
+    await Linking.openURL(url);
+  } catch (error) {
+    console.error("Erreur lors de l'ouverture de la messagerie :", error);
+
     Alert.alert(
-      "Se déconnecter",
-      "Veux-tu vraiment te déconnecter de ton compte ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel",
-        },
-        {
-          text: "Se déconnecter",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setLoggingOut(true);
-
-              await signOut(auth);
-
-              router.replace("/");
-            } catch (error) {
-              console.log("Erreur déconnexion :", error);
-
-              Alert.alert(
-                "Erreur",
-                "Impossible de te déconnecter pour le moment."
-              );
-            } finally {
-              setLoggingOut(false);
-            }
-          },
-        },
-      ]
+      "Une erreur est survenue",
+      `Tu peux nous contacter à l'adresse : ${email}`
     );
   }
+};
+
+  const handleDeleteAccount = () => {
+  Alert.alert(
+    "Supprimer mon compte",
+    "Cette action est définitive.\n\nTon profil et les données liées à ton compte seront supprimés.\n\nVeux-tu vraiment continuer ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel",
+      },
+      {
+        text: "Supprimer",
+        style: "destructive",
+        onPress: async () => {
+          const currentUser = auth.currentUser;
+
+          if (!currentUser) {
+            Alert.alert(
+              "Erreur",
+              "Aucun utilisateur connecté n’a été trouvé."
+            );
+            return;
+          }
+
+          try {
+            setDeletingAccount(true);
+
+            const uid = currentUser.uid;
+
+            // 1. Suppression du profil Firestore
+            await deleteUserProfile(uid);
+
+            // 2. Suppression du compte Firebase Auth
+            await deleteUser(currentUser);
+
+            // 3. Retour à l’accueil
+            router.replace("/");
+          } catch (error: any) {
+            console.error(
+              "Erreur lors de la suppression du compte :",
+              error
+            );
+
+            if (error?.code === "auth/requires-recent-login") {
+              Alert.alert(
+                "Reconnexion nécessaire",
+                "Pour des raisons de sécurité, déconnecte-toi puis reconnecte-toi avant de supprimer ton compte."
+              );
+              return;
+            }
+
+            Alert.alert(
+              "Erreur",
+              "La suppression du compte n’a pas pu être terminée."
+            );
+          } finally {
+            setDeletingAccount(false);
+          }
+        },
+      },
+    ]
+  );
+};
+
+function handleLogout() {
+  Alert.alert(
+    "Se déconnecter",
+    "Veux-tu vraiment te déconnecter de ton compte ?",
+    [
+      {
+        text: "Annuler",
+        style: "cancel",
+      },
+      {
+        text: "Se déconnecter",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setLoggingOut(true);
+
+            await signOut(auth);
+
+            router.replace("/");
+          } catch (error) {
+            console.log("Erreur déconnexion :", error);
+
+            Alert.alert(
+              "Erreur",
+              "Impossible de te déconnecter pour le moment."
+            );
+          } finally {
+            setLoggingOut(false);
+          }
+        },
+      },
+    ]
+  );
+}
 
   function getFirstName() {
     const displayName =
@@ -716,7 +818,45 @@ const illustratedPurchases =
 
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
+          <View style={styles.separator} />
+
+<TouchableOpacity
+  style={styles.menuButton}
+  onPress={handleContact}
+  disabled={loggingOut}
+>
+  <Text style={styles.menuIcon}>📧</Text>
+
+  <View style={styles.menuTextContainer}>
+    <Text style={styles.menuText}>
+      Nous contacter
+    </Text>
+
+    <Text style={styles.menuSubText}>
+      contact@contemagiqueia.fr
+    </Text>
+  </View>
+
+  <Text style={styles.menuArrow}>›</Text>
+</TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+  style={[
+    styles.deleteAccountButton,
+    deletingAccount && styles.buttonDisabled,
+  ]}
+  onPress={handleDeleteAccount}
+  disabled={loggingOut || deletingAccount}
+>
+  {deletingAccount ? (
+    <ActivityIndicator color="#FCA5A5" />
+  ) : (
+    <Text style={styles.deleteAccountButtonText}>
+      🗑️ Supprimer mon compte
+    </Text>
+  )}
+</TouchableOpacity>
 
         <TouchableOpacity
           style={[
@@ -735,9 +875,19 @@ const illustratedPurchases =
           )}
         </TouchableOpacity>
 
-                <Text style={styles.footerText}>
-          ConteMagiqueIA ✨
-        </Text>
+                <View style={styles.footerContainer}>
+  <Text style={styles.footerText}>
+    ConteMagiqueIA ✨
+  </Text>
+
+  <Text style={styles.footerVersion}>
+    Version {appVersion} ({buildVersion})
+  </Text>
+
+  <Text style={styles.footerCopyright}>
+    © 2026 ConteMagiqueIA
+  </Text>
+</View>
       </ScrollView>
 
       <Modal
@@ -1186,5 +1336,48 @@ saveButtonText: {
   color: "#111827",
   fontWeight: "900",
   fontSize: 15,
+},
+
+menuTextContainer: {
+  flex: 1,
+},
+
+menuSubText: {
+  color: "#94A3B8",
+  fontSize: 12,
+  marginTop: 3,
+},
+
+footerContainer: {
+  alignItems: "center",
+  marginTop: 25,
+  marginBottom: 30,
+},
+
+footerVersion: {
+  color: "#94A3B8",
+  fontSize: 13,
+  marginTop: 6,
+},
+
+footerCopyright: {
+  color: "#64748B",
+  fontSize: 12,
+  marginTop: 4,
+},
+
+deleteAccountButton: {
+  marginTop: 18,
+  marginBottom: 10,
+  backgroundColor: "#7F1D1D",
+  borderRadius: 14,
+  paddingVertical: 15,
+  alignItems: "center",
+},
+
+deleteAccountButtonText: {
+  color: "#FCA5A5",
+  fontSize: 16,
+  fontWeight: "700",
 },
 });

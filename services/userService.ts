@@ -1,9 +1,11 @@
+
 import {
-    doc,
-    getDoc,
-    runTransaction,
-    setDoc,
-    updateDoc,
+  deleteDoc,
+  doc,
+  getDoc,
+  runTransaction,
+  setDoc,
+  updateDoc,
 } from "firebase/firestore";
 
 import type { PackType, UserProfile } from "../types/user";
@@ -236,4 +238,13 @@ export async function updateLastStoryCreated(
   await updateDoc(getUserReference(uid), {
     lastStoryCreatedAt: new Date().toISOString(),
   });
+}
+
+/**
+ * Supprime définitivement le profil Firestore d'un utilisateur.
+ */
+export async function deleteUserProfile(
+  uid: string
+): Promise<void> {
+  await deleteDoc(getUserReference(uid));
 }
