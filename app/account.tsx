@@ -1,24 +1,29 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import {
-    onAuthStateChanged,
-    signOut,
-    type User,
+  onAuthStateChanged,
+  signOut,
+  type User,
 } from "firebase/auth";
 import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { auth } from "../services/firebase";
-import { getUserProfile } from "../services/userService";
+import {
+  getUserProfile,
+  updateUserDisplayName,
+} from "../services/userService";
 import type { UserProfile } from "../types/user";
 
 export default function AccountScreen() {
@@ -29,6 +34,11 @@ export default function AccountScreen() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+
+  const [displayNameInput, setDisplayNameInput] = useState("");
+
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -91,6 +101,86 @@ export default function AccountScreen() {
   async function handleRefresh() {
     await loadProfile(true);
   }
+
+function openEditDisplayNameModal() {
+  setDisplayNameInput(
+    profile?.displayName ||
+      user?.displayName ||
+      ""
+  );
+
+  setEditModalVisible(true);
+}
+
+function closeEditDisplayNameModal() {
+  if (savingDisplayName) {
+    return;
+  }
+
+  setEditModalVisible(false);
+  setDisplayNameInput("");
+}
+
+async function handleSaveDisplayName() {
+  const currentUser = auth.currentUser;
+  const cleanedDisplayName = displayNameInput.trim();
+
+  if (!currentUser) {
+    Alert.alert(
+      "Erreur",
+      "Ton compte utilisateur est introuvable."
+    );
+    return;
+  }
+
+  if (!cleanedDisplayName) {
+    Alert.alert(
+      "Nom obligatoire",
+      "Entre un nom avant d’enregistrer."
+    );
+    return;
+  }
+
+  try {
+    setSavingDisplayName(true);
+
+    await updateUserDisplayName(
+      currentUser.uid,
+      cleanedDisplayName
+    );
+
+    setProfile((currentProfile) => {
+      if (!currentProfile) {
+        return currentProfile;
+      }
+
+      return {
+        ...currentProfile,
+        displayName: cleanedDisplayName,
+      };
+    });
+
+    setEditModalVisible(false);
+    setDisplayNameInput("");
+
+    Alert.alert(
+      "Nom modifié",
+      "Ton nom affiché a bien été enregistré."
+    );
+  } catch (error) {
+    console.log(
+      "Erreur modification du nom :",
+      error
+    );
+
+    Alert.alert(
+      "Erreur",
+      "Impossible de modifier ton nom pour le moment."
+    );
+  } finally {
+    setSavingDisplayName(false);
+  }
+}
 
   function handleLogout() {
     Alert.alert(
@@ -267,16 +357,16 @@ export default function AccountScreen() {
   }
 
   const textStoriesRemaining =
-    profile?.packs.text.storiesRemaining ?? 0;
+  profile?.packs?.text?.storiesRemaining ?? 0;
 
-  const illustratedStoriesRemaining =
-    profile?.packs.illustrated.storiesRemaining ?? 0;
+const illustratedStoriesRemaining =
+  profile?.packs?.illustrated?.storiesRemaining ?? 0;
 
-  const textPurchases =
-    profile?.packs.text.purchases ?? 0;
+const textPurchases =
+  profile?.packs?.text?.purchases ?? 0;
 
-  const illustratedPurchases =
-    profile?.packs.illustrated.purchases ?? 0;
+const illustratedPurchases =
+  profile?.packs?.illustrated?.purchases ?? 0;
 
   return (
     <LinearGradient
@@ -332,83 +422,93 @@ export default function AccountScreen() {
         )}
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            Mes informations
-          </Text>
+  <Text style={styles.cardTitle}>
+    Mes informations
+  </Text>
 
-          <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-              <Text style={styles.infoIconText}>👤</Text>
-            </View>
+  <View style={styles.card}>
+  <Text style={styles.cardTitle}>
+    Mes carnets
+  </Text>
 
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Prénom</Text>
+  <View style={styles.infoRow}>
+    <View style={styles.infoIcon}>
+      <Text style={styles.infoIconText}>👤</Text>
+    </View>
 
-              <Text style={styles.infoValue}>
-                {getDisplayName()}
-              </Text>
-            </View>
-          </View>
+    <View style={styles.infoContent}>
+      <Text style={styles.infoLabel}>Nom affiché</Text>
 
-          <View style={styles.separator} />
+      <Text style={styles.infoValue}>
+        {getDisplayName()}
+      </Text>
 
-          <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-              <Text style={styles.infoIconText}>📧</Text>
-            </View>
+      <TouchableOpacity
+        onPress={openEditDisplayNameModal}
+        disabled={loggingOut}
+        style={styles.editNameButton}
+      >
+        <Text style={styles.editNameButtonText}>
+          Modifier
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
 
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>
-                Adresse e-mail
-              </Text>
+  <View style={styles.separator} />
 
-              <Text style={styles.infoValue}>
-                {getEmail()}
-              </Text>
-            </View>
-          </View>
+  <View style={styles.infoRow}>
+    <View style={styles.infoIcon}>
+      <Text style={styles.infoIconText}>📧</Text>
+    </View>
 
-          <View style={styles.separator} />
+    <View style={styles.infoContent}>
+      <Text style={styles.infoLabel}>
+        Adresse e-mail
+      </Text>
 
-          <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-              <Text style={styles.infoIconText}>📅</Text>
-            </View>
+      <Text style={styles.infoValue}>
+        {getEmail()}
+      </Text>
+    </View>
+  </View>
 
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>
-                Compte créé le
-              </Text>
+  <View style={styles.separator} />
 
-              <Text style={styles.infoValue}>
-                {getCreationDate()}
-              </Text>
-            </View>
-          </View>
+  <View style={styles.infoRow}>
+    <View style={styles.infoIcon}>
+      <Text style={styles.infoIconText}>📅</Text>
+    </View>
 
-          <View style={styles.separator} />
+    <View style={styles.infoContent}>
+      <Text style={styles.infoLabel}>
+        Compte créé le
+      </Text>
 
-          <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-              <Text style={styles.infoIconText}>🪪</Text>
-            </View>
+      <Text style={styles.infoValue}>
+        {getCreationDate()}
+      </Text>
+    </View>
+  </View>
 
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>
-                Type de compte
-              </Text>
+  <View style={styles.separator} />
 
-              <Text style={styles.infoValue}>
-                {getRoleLabel()}
-              </Text>
-            </View>
-          </View>
-        </View>
+  <View style={styles.infoRow}>
+    <View style={styles.infoIcon}>
+      <Text style={styles.infoIconText}>🪪</Text>
+    </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            Mes carnets
-          </Text>
+    <View style={styles.infoContent}>
+      <Text style={styles.infoLabel}>
+        Type de compte
+      </Text>
+
+      <Text style={styles.infoValue}>
+        {getRoleLabel()}
+      </Text>
+    </View>
+  </View>
+</View>
 
           <View style={styles.packRow}>
             <View style={styles.packIconContainer}>
@@ -635,10 +735,61 @@ export default function AccountScreen() {
           )}
         </TouchableOpacity>
 
-        <Text style={styles.footerText}>
+                <Text style={styles.footerText}>
           ConteMagiqueIA ✨
         </Text>
       </ScrollView>
+
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEditDisplayNameModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>
+              Modifier mon nom
+            </Text>
+
+            <TextInput
+              style={styles.modalInput}
+              value={displayNameInput}
+              onChangeText={setDisplayNameInput}
+              placeholder="Ton nom affiché"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="words"
+              editable={!savingDisplayName}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={closeEditDisplayNameModal}
+                disabled={savingDisplayName}
+              >
+                <Text style={styles.cancelButtonText}>
+                  Annuler
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveDisplayName}
+                disabled={savingDisplayName}
+              >
+                {savingDisplayName ? (
+                  <ActivityIndicator color="#111827" />
+                ) : (
+                  <Text style={styles.saveButtonText}>
+                    Enregistrer
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -957,4 +1108,83 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 25,
   },
+  editNameButton: {
+  alignSelf: "flex-start",
+  marginTop: 8,
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  backgroundColor: "#FFB703",
+  borderRadius: 10,
+},
+
+editNameButtonText: {
+  color: "#111827",
+  fontSize: 13,
+  fontWeight: "800",
+},
+modalOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.65)",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 24,
+},
+
+modalContainer: {
+  width: "100%",
+  backgroundColor: "#1E293B",
+  borderRadius: 22,
+  padding: 22,
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.15)",
+},
+
+modalTitle: {
+  color: "white",
+  fontSize: 22,
+  fontWeight: "900",
+  marginBottom: 18,
+},
+
+modalInput: {
+  backgroundColor: "rgba(255,255,255,0.08)",
+  color: "white",
+  borderRadius: 12,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  fontSize: 16,
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.15)",
+},
+
+modalButtons: {
+  flexDirection: "row",
+  justifyContent: "flex-end",
+  marginTop: 24,
+},
+
+cancelButton: {
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  marginRight: 10,
+},
+
+cancelButtonText: {
+  color: "#CBD5E1",
+  fontSize: 15,
+  fontWeight: "700",
+},
+
+saveButton: {
+  backgroundColor: "#FFB703",
+  borderRadius: 12,
+  paddingHorizontal: 18,
+  paddingVertical: 10,
+},
+
+saveButtonText: {
+  color: "#111827",
+  fontWeight: "900",
+  fontSize: 15,
+},
 });
