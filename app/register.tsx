@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -18,14 +18,34 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { createUserProfile } from "../services/userService";
+
+import {
+  addStories,
+  createUserProfile,
+  getUserProfile,
+  updateLastLogin,
+} from "../services/userService";
+
+import {
+  setUserMode,
+} from "../services/usageService";
 
 import { auth } from "../services/firebase";
 
 type AuthMode = "login" | "register";
 
 export default function RegisterScreen() {
-  const [mode, setMode] = useState<AuthMode>("login");
+  const params = useLocalSearchParams<{
+    mode?: string | string[];
+  }>();
+
+  const requestedMode = Array.isArray(params.mode)
+    ? params.mode[0]
+    : params.mode;
+
+  const [mode, setMode] = useState<AuthMode>(
+    requestedMode === "register" ? "register" : "login"
+  );
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -89,9 +109,25 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
 
-      await signInWithEmailAndPassword(auth, cleanEmail(), password);
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        cleanEmail(),
+        password
+      );
 
-      router.replace("/");
+      await setUserMode();
+      await updateLastLogin(credential.user.uid);
+
+      const profile = await getUserProfile(credential.user.uid);
+      const textRemaining = profile?.packs?.text?.storiesRemaining ?? 0;
+      const illustratedRemaining =
+        profile?.packs?.illustrated?.storiesRemaining ?? 0;
+
+      if (profile?.role === "admin" || textRemaining > 0 || illustratedRemaining > 0) {
+        router.replace("/create-story");
+      } else {
+        router.replace("/premium");
+      }
     } catch (error: any) {
       console.log("Erreur connexion :", error);
 
@@ -129,32 +165,47 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
 
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        cleanEmail(),
-        password
-      );
+      const credential =
+  await createUserWithEmailAndPassword(
+    auth,
+    cleanEmail(),
+    password
+  );
 
-      await updateProfile(credential.user, {
-        displayName: name.trim(),
-      });
+await updateProfile(credential.user, {
+  displayName: name.trim(),
+});
 
-      await createUserProfile({
-        uid: credential.user.uid,
-        displayName: name.trim(),
-        email: credential.user.email ?? cleanEmail(),
-      });
+await createUserProfile({
+  uid: credential.user.uid,
+  displayName: name.trim(),
+  email: credential.user.email ?? cleanEmail(),
+});
 
-      Alert.alert(
-        "Compte créé 🎉",
-        "Bienvenue dans ConteMagiqueIA !",
-        [
-          {
-            text: "Choisir un pack",
-            onPress: () => router.replace("/premium"),
-          },
-        ]
-      );
+await setUserMode();
+
+await addStories(
+  credential.user.uid,
+  "text",
+  2,
+  false
+);
+
+Alert.alert(
+  "Bienvenue 🎁",
+  "Ton compte est prêt et tu as reçu 2 histoires texte gratuites. Tu peux aussi acheter un carnet dès maintenant.",
+  [
+    {
+      text: "Créer une histoire",
+      onPress: () => router.replace("/create-story"),
+    },
+    {
+      text: "Voir les carnets",
+      onPress: () => router.replace("/premium"),
+    },
+  ],
+  { cancelable: false }
+);
     } catch (error: any) {
       console.log("Erreur inscription :", error);
 

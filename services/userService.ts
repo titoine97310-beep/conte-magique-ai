@@ -1,4 +1,3 @@
-
 import {
   deleteDoc,
   doc,
@@ -25,7 +24,6 @@ function getUserReference(uid: string) {
 
 /**
  * Crée le profil Firestore d'un nouvel utilisateur.
- *
  * Si le profil existe déjà, il n'est pas écrasé.
  */
 export async function createUserProfile({
@@ -88,14 +86,16 @@ export async function getUserProfile(
 /**
  * Met à jour la date de dernière connexion.
  */
-export async function updateLastLogin(uid: string): Promise<void> {
+export async function updateLastLogin(
+  uid: string
+): Promise<void> {
   await updateDoc(getUserReference(uid), {
     lastLogin: new Date().toISOString(),
   });
 }
 
 /**
- * Met à jour le nom affiché dans le profil Firestore.
+ * Met à jour le nom affiché.
  */
 export async function updateUserDisplayName(
   uid: string,
@@ -113,16 +113,17 @@ export async function updateUserDisplayName(
 }
 
 /**
- * Ajoute des histoires à un carnet après un achat.
+ * Ajoute des histoires à un carnet.
  *
- * Exemple :
- * addStories(uid, "text", 20)
- * addStories(uid, "illustrated", 20)
+ * countAsPurchase :
+ * - true = achat comptabilisé
+ * - false = cadeau ou ajout gratuit
  */
 export async function addStories(
   uid: string,
   packType: PackType,
-  amount: number
+  amount: number,
+  countAsPurchase = true
 ): Promise<number> {
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new Error(
@@ -140,7 +141,7 @@ export async function addStories(
     }
 
     const profile = userSnapshot.data() as UserProfile;
-    const currentPack = profile.packs[packType];
+    const currentPack = profile.packs?.[packType];
 
     if (!currentPack) {
       throw new Error("Carnet utilisateur introuvable.");
@@ -149,13 +150,17 @@ export async function addStories(
     const newStoriesRemaining =
       currentPack.storiesRemaining + amount;
 
-    transaction.update(userReference, {
+    const updates: Record<string, number> = {
       [`packs.${packType}.storiesRemaining`]:
         newStoriesRemaining,
+    };
 
-      [`packs.${packType}.purchases`]:
-        currentPack.purchases + 1,
-    });
+    if (countAsPurchase) {
+      updates[`packs.${packType}.purchases`] =
+        currentPack.purchases + 1;
+    }
+
+    transaction.update(userReference, updates);
 
     return newStoriesRemaining;
   });
@@ -183,10 +188,7 @@ export async function hasStories(
 }
 
 /**
- * Retire une histoire du carnet demandé.
- *
- * Cette fonction doit être appelée uniquement après
- * la réussite complète de la génération.
+ * Retire une histoire après une génération réussie.
  */
 export async function consumeStory(
   uid: string,
@@ -216,7 +218,8 @@ export async function consumeStory(
       );
     }
 
-    const newStoriesRemaining = currentRemaining - 1;
+    const newStoriesRemaining =
+      currentRemaining - 1;
 
     transaction.update(userReference, {
       [`packs.${packType}.storiesRemaining`]:
@@ -230,7 +233,7 @@ export async function consumeStory(
 }
 
 /**
- * Met uniquement à jour la date de dernière histoire créée.
+ * Met à jour uniquement la date de dernière histoire créée.
  */
 export async function updateLastStoryCreated(
   uid: string
@@ -241,7 +244,7 @@ export async function updateLastStoryCreated(
 }
 
 /**
- * Supprime définitivement le profil Firestore d'un utilisateur.
+ * Supprime le profil Firestore.
  */
 export async function deleteUserProfile(
   uid: string

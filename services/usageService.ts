@@ -1,185 +1,319 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+
 const STORAGE_KEY = "CONTE_MAGIQUE_USAGE_TEST_4";
 
 export type UserRole = "admin" | "guest" | "user";
 
+export type UsageMode =
+  | "admin"
+  | "guest-first-story"
+  | "guest-second-story"
+  | "paid-text"
+  | "paid-image"
+  | "blocked";
+
 export type UsageData = {
   role: UserRole;
-  freeTextUsed: boolean;
-  freeImageUsed: boolean;
 
-  textStoriesRemaining: number;
-  illustratedStoriesRemaining: number;
+  // 0 : aucune histoire découverte
+  // 1 : première histoire texte terminée
+  // 2 : deuxième histoire illustrée terminée
+  guestStoriesCompleted: number;
+
+  textCredits: number;
+  imageCredits: number;
 };
 
 const defaultData: UsageData = {
   role: "guest",
-  freeTextUsed: false,
-  freeImageUsed: false,
-
-  textStoriesRemaining: 0,
-  illustratedStoriesRemaining: 0,
+  guestStoriesCompleted: 0,
+  textCredits: 0,
+  imageCredits: 0,
 };
 
-export async function getUsageData(): Promise<UsageData> {
-  const data = await AsyncStorage.getItem(STORAGE_KEY);
+/**
+ * Convertit automatiquement les anciennes données :
+ * freeTextUsed / freeImageUsed
+ *
+ * Cela évite les erreurs si l'ancienne structure est encore
+ * enregistrée dans AsyncStorage.
+ */
+function migrateUsageData(storedData: any): UsageData {
+  let guestStoriesCompleted = 0;
 
-  if (!data) {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
-    return defaultData;
+  if (typeof storedData?.guestStoriesCompleted === "number") {
+    guestStoriesCompleted = storedData.guestStoriesCompleted;
+  } else {
+    if (storedData?.freeTextUsed === true) {
+      guestStoriesCompleted = 1;
+    }
+
+    if (storedData?.freeImageUsed === true) {
+      guestStoriesCompleted = 2;
+    }
   }
 
-  return JSON.parse(data);
+  return {
+    role:
+      storedData?.role === "admin" ||
+      storedData?.role === "user" ||
+      storedData?.role === "guest"
+        ? storedData.role
+        : "guest",
+
+    guestStoriesCompleted: Math.min(
+      2,
+      Math.max(0, guestStoriesCompleted)
+    ),
+
+    textCredits:
+      typeof storedData?.textCredits === "number"
+        ? Math.max(0, storedData.textCredits)
+        : 0,
+
+    imageCredits:
+      typeof storedData?.imageCredits === "number"
+        ? Math.max(0, storedData.imageCredits)
+        : 0,
+  };
 }
 
-export async function saveUsageData(data: UsageData) {
+export async function getUsageData(): Promise<UsageData> {
+  try {
+    const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+
+    if (!savedData) {
+      await saveUsageData(defaultData);
+      return { ...defaultData };
+    }
+
+    const parsedData = JSON.parse(savedData);
+    const migratedData = migrateUsageData(parsedData);
+
+    // Enregistre automatiquement la nouvelle structure.
+    await saveUsageData(migratedData);
+
+    return migratedData;
+  } catch (error) {
+    console.log("Erreur lecture usage :", error);
+
+    await saveUsageData(defaultData);
+    return { ...defaultData };
+  }
+}
+
+export async function saveUsageData(data: UsageData): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-export async function setAdminMode() {
+export async function setAdminMode(): Promise<void> {
   const data = await getUsageData();
+
   data.role = "admin";
+
   await saveUsageData(data);
 }
 
-export async function setUserMode() {
+export async function setGuestMode(): Promise<void> {
   const data = await getUsageData();
+
+  data.role = "guest";
+
+  await saveUsageData(data);
+}
+
+export async function setUserMode(): Promise<void> {
+  const data = await getUsageData();
+
   data.role = "user";
+
+  // Les crédits d'un utilisateur connecté
+  // sont désormais gérés uniquement dans Firestore.
+  data.textCredits = 0;
+  data.imageCredits = 0;
+
   await saveUsageData(data);
 }
 
-export async function addTextStories(amount: number) {
+export async function addTextCredits(amount: number): Promise<void> {
+  if (amount <= 0) return;
+
   const data = await getUsageData();
-  data.textStoriesRemaining += amount;
+
+  data.textCredits += amount;
+
   await saveUsageData(data);
 }
 
-export async function addIllustratedStories(amount: number) {
+export async function addImageCredits(amount: number): Promise<void> {
+  if (amount <= 0) return;
+
   const data = await getUsageData();
-  data.illustratedStoriesRemaining += amount;
+
+  data.imageCredits += amount;
+
   await saveUsageData(data);
 }
 
-export async function canGenerateTextStory() {
+/**
+ * Détermine quelle expérience doit être générée.
+ */
+export async function canGenerateStory(): Promise<{
+  allowed: boolean;
+  mode: UsageMode;
+}> {
   const data = await getUsageData();
+  console.log("=== USAGE ===");
+  console.log(data);
 
   if (data.role === "admin") {
-    return { allowed: true, mode: "admin" };
+    return {
+      allowed: true,
+      mode: "admin",
+    };
   }
 
-  if (!data.freeTextUsed) {
-    return { allowed: true, mode: "free-text" };
+  /*
+   * Parcours visiteur :
+   *
+   * 0 histoire terminée
+   * → première histoire texte
+   *
+   * 1 histoire terminée
+   * → deuxième histoire illustrée
+   *
+   * 2 histoires terminées
+   * → création de compte demandée
+   */
+  if (data.role === "guest") {
+    if (data.guestStoriesCompleted === 0) {
+      return {
+        allowed: true,
+        mode: "guest-first-story",
+      };
+    }
+
+    if (data.guestStoriesCompleted === 1) {
+      return {
+        allowed: true,
+        mode: "guest-second-story",
+      };
+    }
+
+    return {
+      allowed: false,
+      mode: "blocked",
+    };
   }
 
-  if (data.textStoriesRemaining > 0) {
-    return { allowed: true, mode: "paid-text" };
+  /*
+   * Utilisateur connecté :
+   * il utilise les histoires de ses carnets.
+   */
+  if (data.textCredits > 0) {
+    return {
+      allowed: true,
+      mode: "paid-text",
+    };
   }
 
-  return { allowed: false, mode: "blocked" };
+  if (data.imageCredits > 0) {
+    return {
+      allowed: true,
+      mode: "paid-image",
+    };
+  }
+
+  return {
+    allowed: false,
+    mode: "blocked",
+  };
 }
 
-export async function canGenerateImageStory() {
+/**
+ * Décompte l'histoire uniquement après une génération réussie.
+ */
+export async function incrementStoryUsage(
+  mode?: UsageMode
+): Promise<void> {
   const data = await getUsageData();
 
-  if (data.role === "admin") {
-    return { allowed: true, mode: "admin" };
+  if (data.role === "admin" || mode === "admin") {
+    return;
   }
 
-  if (!data.freeImageUsed) {
-    return { allowed: true, mode: "free-image" };
-  }
-
-  if (data.illustratedStoriesRemaining > 0) {
-    return { allowed: true, mode: "paid-image" };
-  }
-
-  return { allowed: false, mode: "blocked" };
-}
-
-export async function consumeTextStory() {
-  const data = await getUsageData();
-
-  if (data.role === "admin") return;
-
-  if (!data.freeTextUsed) {
-    data.freeTextUsed = true;
-  } else if (data.textStoriesRemaining > 0) {
-    data.textStoriesRemaining--;
-  }
-
-  await saveUsageData(data);
-}
-
-export async function consumeImageStory() {
-  const data = await getUsageData();
-
-  if (data.role === "admin") return;
-
-  if (!data.freeImageUsed) {
-    data.freeImageUsed = true;
-  } else if (data.illustratedStoriesRemaining > 0) {
-    data.illustratedStoriesRemaining--;
+  if (
+    mode === "guest-first-story" &&
+    data.role === "guest" &&
+    data.guestStoriesCompleted === 0
+  ) {
+    data.guestStoriesCompleted = 1;
+  } else if (
+    mode === "guest-second-story" &&
+    data.role === "guest" &&
+    data.guestStoriesCompleted === 1
+  ) {
+    data.guestStoriesCompleted = 2;
+  } else if (
+    mode === "paid-text" &&
+    data.role === "user" &&
+    data.textCredits > 0
+  ) {
+    data.textCredits -= 1;
+  } else if (
+    mode === "paid-image" &&
+    data.role === "user" &&
+    data.imageCredits > 0
+  ) {
+    data.imageCredits -= 1;
   }
 
   await saveUsageData(data);
 }
 
 /**
- * Compatibilité avec le code actuel.
+ * Fonctions conservées pour éviter de casser un éventuel ancien écran.
  */
-export async function canGenerateStory() {
+export async function canGenerateTextStory() {
   const data = await getUsageData();
 
   if (data.role === "admin") {
-    return { allowed: true, mode: "admin" };
+    return { allowed: true, mode: "admin" as UsageMode };
   }
 
-  if (!data.freeTextUsed) {
-    return { allowed: true, mode: "free-text" };
+  if (data.role === "user" && data.textCredits > 0) {
+    return { allowed: true, mode: "paid-text" as UsageMode };
   }
 
-  if (!data.freeImageUsed) {
-    return { allowed: true, mode: "free-image" };
-  }
-
-  if (data.textStoriesRemaining > 0) {
-    return { allowed: true, mode: "paid-text" };
-  }
-
-  if (data.illustratedStoriesRemaining > 0) {
-    return { allowed: true, mode: "paid-image" };
-  }
-
-  return { allowed: false, mode: "blocked" };
+  return { allowed: false, mode: "blocked" as UsageMode };
 }
 
-export async function incrementStoryUsage(mode?: string) {
+export async function canGenerateImageStory() {
   const data = await getUsageData();
 
-  if (data.role === "admin") return;
-
-  switch (mode) {
-    case "free-text":
-      data.freeTextUsed = true;
-      break;
-
-    case "free-image":
-      data.freeImageUsed = true;
-      break;
-
-    case "paid-text":
-      if (data.textStoriesRemaining > 0) {
-        data.textStoriesRemaining--;
-      }
-      break;
-
-    case "paid-image":
-      if (data.illustratedStoriesRemaining > 0) {
-        data.illustratedStoriesRemaining--;
-      }
-      break;
+  if (data.role === "admin") {
+    return { allowed: true, mode: "admin" as UsageMode };
   }
 
-  await saveUsageData(data);
+  if (data.role === "user" && data.imageCredits > 0) {
+    return { allowed: true, mode: "paid-image" as UsageMode };
+  }
+
+  return { allowed: false, mode: "blocked" as UsageMode };
+}
+
+export async function consumeTextStory(): Promise<void> {
+  await incrementStoryUsage("paid-text");
+}
+
+export async function consumeImageStory(): Promise<void> {
+  await incrementStoryUsage("paid-image");
+}
+
+/**
+ * Utile uniquement pendant les tests.
+ */
+export async function resetUsageData(): Promise<void> {
+  await saveUsageData({ ...defaultData });
 }

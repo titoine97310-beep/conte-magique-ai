@@ -10,55 +10,167 @@ import {
   View,
 } from "react-native";
 
-import { addIllustratedStories, addTextStories } from "../services/usageService";
+import { auth } from "../services/firebase";
+
+
+import { setUserMode } from "../services/usageService";
+
+import { addStories } from "../services/userService";
 
 export default function PremiumScreen() {
-  async function buyTextPack() {
-    await addTextStories(20);
-
-    Alert.alert("Pack activé 🎉", "Tu as maintenant 20 histoires texte.");
-
-    router.push("/");
+  function redirectToRegister() {
+    Alert.alert(
+      "Compte requis",
+      "Crée gratuitement ton compte pour acheter et conserver tes carnets.",
+      [
+        {
+          text: "Créer mon compte",
+          onPress: () =>
+            router.replace({
+              pathname: "/register",
+              params: { mode: "register" },
+            } as any),
+        },
+        {
+          text: "J’ai déjà un compte",
+          onPress: () =>
+            router.replace({
+              pathname: "/register",
+              params: { mode: "login" },
+            } as any),
+        },
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+      ]
+    );
   }
 
-  async function buyPremiumPack() {
-    await addIllustratedStories(20);
+  async function buyTextPack() {
+  const currentUser = auth.currentUser;
 
-    Alert.alert(
-      "Pack Premium activé 🎉",
-      "Tu as maintenant 20 histoires illustrées."
+  if (!currentUser) {
+    redirectToRegister();
+    return;
+  }
+
+  try {
+    await setUserMode();
+
+    await addStories(
+      currentUser.uid,
+      "text",
+      2
     );
 
-    router.push("/");
+    Alert.alert(
+      "Carnet Texte activé 🎉",
+      "Tu as maintenant 2 histoires en texte seul.",
+      [
+        {
+          text: "Créer une histoire",
+          onPress: () =>
+            router.replace("/create-story"),
+        },
+      ]
+    );
+  } catch (error) {
+    console.log(error);
+
+    Alert.alert(
+      "Erreur",
+      "Impossible d'activer le carnet."
+    );
+  }
+}
+
+
+  async function buyPremiumPack() {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    redirectToRegister();
+    return;
   }
 
+  try {
+    await setUserMode();
+
+    await addStories(
+      currentUser.uid,
+      "illustrated",
+      2
+    );
+
+    Alert.alert(
+      "Carnet Illustré activé 🎉",
+      "Tu as maintenant 2 histoires illustrées.",
+      [
+        {
+          text: "Créer une histoire",
+          onPress: () =>
+            router.replace("/create-story"),
+        },
+      ]
+    );
+  } catch (error) {
+    console.log(error);
+
+    Alert.alert(
+      "Erreur",
+      "Impossible d'activer le carnet."
+    );
+  }
+}
+
   return (
-    <LinearGradient colors={["#020617", "#312E81"]} style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+    <LinearGradient
+      colors={["#020617", "#312E81"]}
+      style={styles.container}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backText}>← Retour</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>Continue la magie ✨</Text>
 
         <Text style={styles.subtitle}>
-          Choisis ton pack et continue à créer des histoires pour enfants.
+          Choisis ton carnet et continue à créer des histoires personnalisées.
         </Text>
 
         <View style={styles.benefitsBox}>
           <Text style={styles.benefit}>🔊 Narration IA immersive</Text>
           <Text style={styles.benefit}>🌙 Mode dodo magique</Text>
           <Text style={styles.benefit}>💾 Histoires sauvegardées</Text>
-          <Text style={styles.benefit}>🎨 Images disponibles avec Premium</Text>
+          <Text style={styles.benefit}>🎨 Illustrations selon le carnet</Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardIcon}>📖</Text>
-          <Text style={styles.cardTitle}>Pack Texte</Text>
-          <Text style={styles.cardPrice}>3€</Text>
+          <Text style={styles.cardTitle}>Carnet Texte</Text>
+          <Text style={styles.cardPrice}>2,99 €</Text>
+
           <Text style={styles.cardDescription}>
-            10 histoires en texte seul. Idéal pour continuer à raconter sans
-            images.
+            20 histoires en texte seul. Idéal pour profiter de la narration
+            sans générer d’illustrations.
           </Text>
 
-          <TouchableOpacity style={styles.button} onPress={buyTextPack}>
-            <Text style={styles.buttonText}>Choisir le pack texte</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={buyTextPack}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.buttonText}>
+              Choisir le carnet texte
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -68,21 +180,27 @@ export default function PremiumScreen() {
           </View>
 
           <Text style={styles.cardIcon}>🌟</Text>
-          <Text style={styles.cardTitle}>Pack Premium</Text>
-          <Text style={styles.cardPrice}>9,99€</Text>
+          <Text style={styles.cardTitle}>Carnet Illustré</Text>
+          <Text style={styles.cardPrice}>9,99 €</Text>
 
           <Text style={styles.cardDescription}>
-            5 histoires complètes avec texte + images. L’expérience la plus
-            immersive.
+            20 histoires complètes avec texte et illustrations. L’expérience
+            la plus immersive de ConteMagiqueIA.
           </Text>
 
-          <TouchableOpacity style={styles.premiumButton} onPress={buyPremiumPack}>
-            <Text style={styles.premiumButtonText}>Débloquer Premium</Text>
+          <TouchableOpacity
+            style={styles.premiumButton}
+            onPress={buyPremiumPack}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.premiumButtonText}>
+              Choisir le carnet illustré
+            </Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.footerText}>
-          Paiement simulé pour la version test. Le paiement réel sera ajouté
+          Paiement simulé pendant les tests. Le paiement Google Play sera ajouté
           plus tard.
         </Text>
       </ScrollView>
@@ -93,14 +211,31 @@ export default function PremiumScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+
+  scrollContent: {
     padding: 24,
+    paddingTop: 55,
+    paddingBottom: 40,
+  },
+
+  backButton: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingRight: 18,
+    marginBottom: 15,
+  },
+
+  backText: {
+    color: "#CBD5E1",
+    fontSize: 15,
+    fontWeight: "800",
   },
 
   title: {
     color: "white",
     fontSize: 34,
     fontWeight: "900",
-    marginTop: 40,
     marginBottom: 10,
   },
 
@@ -199,6 +334,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "900",
     fontSize: 16,
+    textAlign: "center",
   },
 
   premiumButton: {
@@ -214,6 +350,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "900",
     fontSize: 16,
+    textAlign: "center",
   },
 
   footerText: {
@@ -221,5 +358,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
     marginBottom: 30,
+    lineHeight: 18,
   },
 });
