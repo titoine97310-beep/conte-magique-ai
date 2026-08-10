@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -33,6 +34,7 @@ import {
 type ImageStyle = "cartoon" | "fantasy" | "realistic" | "comic";
 type StoryType = "funny" | "adventure" | "magic" | "mystery";
 type StoryLength = "short" | "medium" | "long";
+type PackType = "text" | "illustrated";
 type Narrator =
   | "narratrice"
   | "narrateur"
@@ -128,6 +130,7 @@ export default function CreateStoryScreen() {
   const [loadingText, setLoadingText] = useState("");
   const [textRemaining, setTextRemaining] = useState(0);
   const [illustratedRemaining, setIllustratedRemaining] = useState(0);
+  const [selectedPack, setSelectedPack] = useState<PackType>("text");
   const [isConnected, setIsConnected] = useState(Boolean(auth.currentUser));
   const welcomeShownRef = useRef(false);
 
@@ -142,11 +145,89 @@ export default function CreateStoryScreen() {
     }
 
     const profile = await getUserProfile(currentUser.uid);
-    setTextRemaining(profile?.packs?.text?.storiesRemaining ?? 0);
-    setIllustratedRemaining(
-      profile?.packs?.illustrated?.storiesRemaining ?? 0
-    );
+    const textCount = profile?.packs?.text?.storiesRemaining ?? 0;
+    const illustratedCount = profile?.packs?.illustrated?.storiesRemaining ?? 0;
+
+    setTextRemaining(textCount);
+    setIllustratedRemaining(illustratedCount);
+
+    const storageKey = `ACTIVE_STORY_PACK:${currentUser.uid}`;
+    const savedPack = await AsyncStorage.getItem(storageKey);
+
+    let nextPack: PackType = savedPack === "illustrated" ? "illustrated" : "text";
+
+    // Si le carnet mémorisé est vide, on bascule automatiquement sur l'autre.
+    if (nextPack === "text" && textCount <= 0 && illustratedCount > 0) {
+      nextPack = "illustrated";
+    } else if (
+      nextPack === "illustrated" &&
+      illustratedCount <= 0 &&
+      textCount > 0
+    ) {
+      nextPack = "text";
+    }
+
+    setSelectedPack(nextPack);
+    await AsyncStorage.setItem(storageKey, nextPack);
   }, []);
+
+  const selectPack = useCallback(async (pack: PackType) => {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) return;
+
+    if (pack === "text" && textRemaining <= 0) {
+      Alert.alert("Carnet vide", "Ton carnet Texte ne contient plus d’histoire.");
+      return;
+    }
+
+    if (pack === "illustrated" && illustratedRemaining <= 0) {
+      Alert.alert(
+        "Carnet vide",
+        "Ton carnet Illustré ne contient plus d’histoire."
+      );
+      return;
+    }
+
+    setSelectedPack(pack);
+    await AsyncStorage.setItem(`ACTIVE_STORY_PACK:${currentUser.uid}`, pack);
+  }, [textRemaining, illustratedRemaining]);
+
+  const openPackSelector = useCallback(() => {
+    if (!isConnected || loading) return;
+
+    const options: any[] = [];
+
+    if (textRemaining > 0) {
+      options.push({
+        text: `📖 Texte · ${textRemaining} restante${textRemaining > 1 ? "s" : ""}`,
+        onPress: () => selectPack("text"),
+      });
+    }
+
+    if (illustratedRemaining > 0) {
+      options.push({
+        text: `🎨 Illustré · ${illustratedRemaining} restante${
+          illustratedRemaining > 1 ? "s" : ""
+        }`,
+        onPress: () => selectPack("illustrated"),
+      });
+    }
+
+    options.push({ text: "Annuler", style: "cancel" });
+
+    Alert.alert(
+      "Choisir un carnet",
+      "Le carnet choisi sera utilisé pour la prochaine histoire.",
+      options
+    );
+  }, [
+    illustratedRemaining,
+    isConnected,
+    loading,
+    selectPack,
+    textRemaining,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -208,12 +289,32 @@ export default function CreateStoryScreen() {
 
       if (profile.role === "admin") {
         usage = { allowed: true, mode: "admin" };
-      } else if (profile.packs.text.storiesRemaining > 0) {
-        usage = { allowed: true, mode: "paid-text" };
-      } else if (profile.packs.illustrated.storiesRemaining > 0) {
-        usage = { allowed: true, mode: "paid-image" };
       } else {
-        usage = { allowed: false, mode: "blocked" };
+        const textCount = profile.packs.text.storiesRemaining;
+        const illustratedCount = profile.packs.illustrated.storiesRemaining;
+
+        let packToUse = selectedPack;
+
+        // Sécurité : si le carnet actif vient de se vider, bascule sur l'autre.
+        if (packToUse === "text" && textCount <= 0 && illustratedCount > 0) {
+          packToUse = "illustrated";
+          await selectPack("illustrated");
+        } else if (
+          packToUse === "illustrated" &&
+          illustratedCount <= 0 &&
+          textCount > 0
+        ) {
+          packToUse = "text";
+          await selectPack("text");
+        }
+
+        if (packToUse === "text" && textCount > 0) {
+          usage = { allowed: true, mode: "paid-text" };
+        } else if (packToUse === "illustrated" && illustratedCount > 0) {
+          usage = { allowed: true, mode: "paid-image" };
+        } else {
+          usage = { allowed: false, mode: "blocked" };
+        }
       }
     } else {
       usage = await canGenerateStory();
@@ -382,16 +483,44 @@ Consignes importantes :
 
         {isConnected && (
           <View style={styles.carnetsCard}>
-            <View style={styles.carnetLine}>
-              <Text style={styles.carnetLabel}>📖 Carnet Texte</Text>
-              <Text style={styles.carnetCount}>{textRemaining}</Text>
-            </View>
+            <Text style={styles.activePackEyebrow}>Carnet actif</Text>
 
-            <View style={styles.carnetSeparator} />
+            <TouchableOpacity
+              style={styles.activePackButton}
+              onPress={openPackSelector}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <View style={styles.activePackTextBox}>
+                <Text style={styles.activePackTitle}>
+                  {selectedPack === "text" ? "📖 Carnet Texte" : "🎨 Carnet Illustré"}
+                </Text>
 
-            <View style={styles.carnetLine}>
-              <Text style={styles.carnetLabel}>🎨 Carnet Illustré</Text>
-              <Text style={styles.carnetCount}>{illustratedRemaining}</Text>
+                <Text style={styles.activePackSubtitle}>
+                  {selectedPack === "text"
+                    ? `${textRemaining} histoire${textRemaining > 1 ? "s" : ""} restante${
+                        textRemaining > 1 ? "s" : ""
+                      }`
+                    : `${illustratedRemaining} histoire${
+                        illustratedRemaining > 1 ? "s" : ""
+                      } restante${illustratedRemaining > 1 ? "s" : ""}`}
+                </Text>
+              </View>
+
+              {textRemaining > 0 && illustratedRemaining > 0 ? (
+                <Text style={styles.activePackArrow}>⌄</Text>
+              ) : null}
+            </TouchableOpacity>
+
+            {textRemaining > 0 && illustratedRemaining > 0 ? (
+              <Text style={styles.changePackHint}>
+                Appuie pour changer de carnet
+              </Text>
+            ) : null}
+
+            <View style={styles.packMiniRow}>
+              <Text style={styles.packMiniText}>📖 Texte : {textRemaining}</Text>
+              <Text style={styles.packMiniText}>🎨 Illustré : {illustratedRemaining}</Text>
             </View>
 
             <TouchableOpacity
@@ -584,6 +713,69 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     marginBottom: 18,
+  },
+  activePackEyebrow: {
+    color: "#CBD5E1",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  activePackButton: {
+    minHeight: 68,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,183,3,0.16)",
+    borderWidth: 1,
+    borderColor: "#FFB703",
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  activePackTextBox: {
+    flex: 1,
+  },
+  activePackTitle: {
+    color: "white",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  activePackSubtitle: {
+    color: "#E2E8F0",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  activePackArrow: {
+    color: "#FFB703",
+    fontSize: 28,
+    fontWeight: "900",
+    marginLeft: 12,
+    marginTop: -6,
+  },
+  changePackHint: {
+    color: "#CBD5E1",
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 7,
+  },
+  packMiniRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 14,
+  },
+  packMiniText: {
+    flex: 1,
+    color: "white",
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   carnetLine: {
     flexDirection: "row",

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
+import { saveStoryToCloud } from "./storyCloudService";
 
 const KEY = "STORIES";
 const STORIES_DIR = `${FileSystem.documentDirectory}stories/`;
@@ -73,6 +74,12 @@ export async function saveStory(story: any) {
 
     await AsyncStorage.setItem(KEY, JSON.stringify(stories));
 
+    try {
+  await saveStoryToCloud(newStory);
+} catch (e) {
+  console.log("Sauvegarde cloud ignorée :", e);
+}
+
     console.log("Histoire sauvegardée avec narrateur :", newStory.narrator);
 
     return newStory;
@@ -129,6 +136,7 @@ export async function toggleFavoriteStory(id: number) {
     );
 
     await AsyncStorage.setItem(KEY, JSON.stringify(updated));
+
   } catch (e) {
     console.log("Erreur favori :", e);
   }

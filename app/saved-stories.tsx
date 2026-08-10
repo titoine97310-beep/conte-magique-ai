@@ -1,6 +1,8 @@
 import { router } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -12,30 +14,99 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setCurrentStory } from "../services/currentStory";
+import { auth } from "../services/firebase";
 import {
   deleteStory,
   getStories,
   toggleFavoriteStory,
 } from "../services/storageService";
+import {
+  deleteCloudStory,
+  getCloudStories,
+  toggleCloudFavorite,
+} from "../services/storyCloudService";
 
 export default function SavedStoriesScreen() {
   const [stories, setStories] = useState<any[]>([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    load();
-  }, []);
-
-  async function load() {
-    const data = await getStories();
-
-    const sorted = data.sort((a: any, b: any) => {
-      if (a.favorite && !b.favorite) return -1;
-      if (!a.favorite && b.favorite) return 1;
-      return b.id - a.id;
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      setAuthReady(true);
     });
 
-    setStories(sorted);
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (authReady) {
+      load();
+    }
+  }, [authReady]);
+
+  async function load() {
+    try {
+      setLoading(true);
+
+      let data: any[] = [];
+
+      if (auth.currentUser) {
+        /*
+         * Utilisateur connecté :
+         * les histoires viennent de Firebase.
+         */
+        data = await getCloudStories();
+
+        console.log(
+          "Histoires chargées depuis Firebase :",
+          data.length
+        );
+      } else {
+        /*
+         * Visiteur :
+         * les histoires restent uniquement sur le téléphone.
+         */
+        data = await getStories();
+
+        console.log(
+          "Histoires chargées depuis le téléphone :",
+          data.length
+        );
+      }
+
+      const sorted = [...data].sort((a: any, b: any) => {
+        if (a.favorite && !b.favorite) return -1;
+        if (!a.favorite && b.favorite) return 1;
+
+        return Number(b.id) - Number(a.id);
+      });
+
+      setStories(sorted);
+    } catch (error) {
+      console.log("Erreur chargement histoires :", error);
+
+      /*
+       * En cas de problème Firebase, on tente d’afficher
+       * la sauvegarde locale afin que l’utilisateur ne perde
+       * pas l’accès à ses histoires sur son téléphone.
+       */
+      const localStories = await getStories();
+
+      const sortedLocalStories = [...localStories].sort(
+        (a: any, b: any) => {
+          if (a.favorite && !b.favorite) return -1;
+          if (!a.favorite && b.favorite) return 1;
+
+          return Number(b.id) - Number(a.id);
+        }
+      );
+
+      setStories(sortedLocalStories);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function openStory(story: any) {
@@ -44,22 +115,93 @@ export default function SavedStoriesScreen() {
   }
 
   async function toggleFavorite(id: number) {
-    await toggleFavoriteStory(id);
-    load();
+    try {
+      if (auth.currentUser) {
+        /*
+         * On met à jour Firebase.
+         */
+        const cloudResult = await toggleCloudFavorite(id);
+
+        if (cloudResult === null) {
+          Alert.alert(
+            "Erreur",
+            "Le favori n’a pas pu être synchronisé."
+          );
+
+          return;
+        }
+
+        /*
+         * On met également à jour la copie locale présente
+         * sur le téléphone.
+         */
+        await toggleFavoriteStory(id);
+      } else {
+        await toggleFavoriteStory(id);
+      }
+
+      await load();
+    } catch (error) {
+      console.log("Erreur modification favori :", error);
+
+      Alert.alert(
+        "Erreur",
+        "Impossible de modifier ce favori pour le moment."
+      );
+    }
   }
 
   function confirmDelete(id: number) {
-    Alert.alert("Supprimer", "Tu veux vraiment supprimer cette histoire ?", [
-      { text: "Annuler", style: "cancel" },
-      {
-        text: "Supprimer",
-        style: "destructive",
-        onPress: async () => {
-          await deleteStory(id);
-          load();
+    Alert.alert(
+      "Supprimer",
+      "Tu veux vraiment supprimer cette histoire ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
         },
-      },
-    ]);
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              if (auth.currentUser) {
+                /*
+                 * Suppression dans Firebase :
+                 * document Firestore + images Storage.
+                 */
+                const cloudDeleted = await deleteCloudStory(id);
+
+                if (!cloudDeleted) {
+                  Alert.alert(
+                    "Erreur",
+                    "La suppression dans le cloud a échoué."
+                  );
+
+                  return;
+                }
+
+                /*
+                 * Suppression de la copie locale.
+                 */
+                await deleteStory(id);
+              } else {
+                await deleteStory(id);
+              }
+
+              await load();
+            } catch (error) {
+              console.log("Erreur suppression histoire :", error);
+
+              Alert.alert(
+                "Erreur",
+                "Impossible de supprimer cette histoire."
+              );
+            }
+          },
+        },
+      ]
+    );
   }
 
   const displayedStories = showFavoritesOnly
@@ -107,7 +249,15 @@ export default function SavedStoriesScreen() {
           </TouchableOpacity>
         </View>
 
-        {displayedStories.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyBox}>
+            <ActivityIndicator size="large" color="#FFB703" />
+
+            <Text style={styles.loadingText}>
+              Chargement de tes histoires…
+            </Text>
+          </View>
+        ) : displayedStories.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>
               {showFavoritesOnly
@@ -130,7 +280,10 @@ export default function SavedStoriesScreen() {
                     onPress={() => openStory(item)}
                   >
                     {thumbnail ? (
-                      <Image source={{ uri: thumbnail }} style={styles.thumbnail} />
+                      <Image
+                        source={{ uri: thumbnail }}
+                        style={styles.thumbnail}
+                      />
                     ) : (
                       <View style={styles.placeholder}>
                         <Text style={styles.placeholderText}>✨</Text>
@@ -144,7 +297,9 @@ export default function SavedStoriesScreen() {
 
                       <Text style={styles.date}>
                         {item.createdAt
-                          ? new Date(item.createdAt).toLocaleDateString("fr-FR")
+                          ? new Date(
+                              item.createdAt
+                            ).toLocaleDateString("fr-FR")
                           : ""}
                       </Text>
                     </View>
@@ -173,7 +328,10 @@ export default function SavedStoriesScreen() {
           />
         )}
 
-        <TouchableOpacity style={styles.backButton} onPress={() => router.push("/")}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.push("/")}
+        >
           <Text style={styles.backText}>Retour accueil</Text>
         </TouchableOpacity>
       </View>
@@ -234,6 +392,13 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     textAlign: "center",
+    opacity: 0.8,
+  },
+  loadingText: {
+    color: "white",
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 14,
     opacity: 0.8,
   },
   card: {

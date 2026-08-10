@@ -61,12 +61,12 @@ export default function PremiumScreen() {
     await addStories(
       currentUser.uid,
       "text",
-      2
+      15
     );
 
     Alert.alert(
       "Carnet Texte activé 🎉",
-      "Tu as maintenant 2 histoires en texte seul.",
+      "Tu as maintenant 15 histoires en texte seul.",
       [
         {
           text: "Créer une histoire",
@@ -100,12 +100,12 @@ export default function PremiumScreen() {
     await addStories(
       currentUser.uid,
       "illustrated",
-      2
+      15
     );
 
     Alert.alert(
       "Carnet Illustré activé 🎉",
-      "Tu as maintenant 2 histoires illustrées.",
+      "Tu as maintenant 15 histoires illustrées.",
       [
         {
           text: "Créer une histoire",
@@ -159,7 +159,7 @@ export default function PremiumScreen() {
           <Text style={styles.cardPrice}>2,99 €</Text>
 
           <Text style={styles.cardDescription}>
-            20 histoires en texte seul. Idéal pour profiter de la narration
+            15 histoires en texte seul. Idéal pour profiter de la narration
             sans générer d’illustrations.
           </Text>
 
@@ -184,7 +184,7 @@ export default function PremiumScreen() {
           <Text style={styles.cardPrice}>9,99 €</Text>
 
           <Text style={styles.cardDescription}>
-            20 histoires complètes avec texte et illustrations. L’expérience
+            15 histoires complètes avec texte et illustrations. L’expérience
             la plus immersive de ConteMagiqueIA.
           </Text>
 
