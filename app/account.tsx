@@ -788,37 +788,26 @@ const illustratedPurchases =
           <View style={styles.separator} />
 
           <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => router.push("/cgu" as any)}
-            disabled={loggingOut}
-          >
-            <Text style={styles.menuIcon}>📄</Text>
+  style={styles.menuButton}
+  onPress={() => router.push("/legal" as any)}
+  disabled={loggingOut}
+>
+  <Text style={styles.menuIcon}>⚖️</Text>
 
-            <Text style={styles.menuText}>
-              Conditions générales
-            </Text>
+  <View style={styles.menuTextContainer}>
+    <Text style={styles.menuText}>
+      Centre juridique
+    </Text>
 
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
+    <Text style={styles.menuSubText}>
+      CGU, confidentialité, mentions légales...
+    </Text>
+  </View>
 
-          <View style={styles.separator} />
+  <Text style={styles.menuArrow}>›</Text>
+</TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() =>
-              router.push("/privacy" as any)
-            }
-            disabled={loggingOut}
-          >
-            <Text style={styles.menuIcon}>🔒</Text>
-
-            <Text style={styles.menuText}>
-              Politique de confidentialité
-            </Text>
-
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          <View style={styles.separator} />
+<View style={styles.separator} />
 
 <TouchableOpacity
   style={styles.menuButton}
