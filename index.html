@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>ConteMagiqueIA - Histoires magiques pour enfants</title>
+
+  <meta
+    name="description"
+    content="ConteMagiqueIA permet de créer des histoires personnalisées pour enfants avec intelligence artificielle, illustrations et narration immersive."
+  />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at top, #312e81 0%, #111827 45%, #020617 100%);
+      color: white;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      width: min(1100px, 92%);
+      margin: auto;
+    }
+
+    header {
+      padding: 28px 0;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .brand {
+      font-size: 24px;
+      font-weight: 900;
+      color: #ffb703;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
+
+    .nav-links a {
+      color: #e2e8f0;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .nav-links a:hover {
+      color: #ffb703;
+    }
+
+    .hero {
+      min-height: 68vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 70px 0;
+    }
+
+    .hero-content {
+      max-width: 820px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(255, 183, 3, 0.14);
+      border: 1px solid rgba(255, 183, 3, 0.55);
+      color: #ffcf4a;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      font-size: clamp(42px, 8vw, 76px);
+      line-height: 1.05;
+      margin-bottom: 22px;
+      font-weight: 900;
+    }
+
+    .highlight {
+      color: #ffb703;
+    }
+
+    .subtitle {
+      color: #cbd5e1;
+      font-size: clamp(18px, 3vw, 22px);
+      max-width: 720px;
+      margin: 0 auto 34px;
+    }
+
+    .cta {
+      display: inline-block;
+      background: #ffb703;
+      color: #111827;
+      text-decoration: none;
+      font-weight: 900;
+      padding: 16px 26px;
+      border-radius: 16px;
+      margin: 6px;
+    }
+
+    .cta.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    .section {
+      padding: 70px 0;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 34px;
+      margin-bottom: 12px;
+      font-weight: 900;
+    }
+
+    .section-subtitle {
+      text-align: center;
+      color: #cbd5e1;
+      max-width: 700px;
+      margin: 0 auto 38px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 26px;
+      backdrop-filter: blur(8px);
+    }
+
+    .card-icon {
+      font-size: 38px;
+      margin-bottom: 14px;
+    }
+
+    .card h3 {
+      margin-bottom: 10px;
+      font-size: 21px;
+    }
+
+    .card p {
+      color: #cbd5e1;
+    }
+
+    .legal-box {
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 24px;
+      padding: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .legal-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .legal-links a {
+      color: #ffcf4a;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      margin-top: 40px;
+      padding: 28px 0;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    @media (max-width: 800px) {
+      nav {
+        flex-direction: column;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        min-height: auto;
+        padding-top: 50px;
+      }
+
+      .nav-links {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <a href="/" class="brand">✨ ConteMagiqueIA</a>
+
+        <div class="nav-links">
+          <a href="#application">L'application</a>
+          <a href="#securite">Sécurité</a>
+          <a href="#legal">Informations légales</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-content">
+        <div class="badge">Une nouvelle façon de raconter des histoires ✨</div>
+
+        <h1>
+          Des histoires <span class="highlight">magiques</span><br />
+          créées pour les enfants
+        </h1>
+
+        <p class="subtitle">
+          ConteMagiqueIA transforme l'imagination en histoires personnalisées,
+          avec narration, illustrations et univers immersifs adaptés aux enfants.
+        </p>
+
+        <a href="#application" class="cta">Découvrir l'application</a>
+
+        <a
+          href="politique-confidentialite.html"
+          class="cta secondary"
+        >
+          Politique de confidentialité
+        </a>
+      </div>
+    </section>
+
+    <section class="section" id="application">
+      <div class="container">
+        <h2 class="section-title">Une histoire unique à chaque création</h2>
+
+        <p class="section-subtitle">
+          L'enfant ou le parent donne une idée, puis ConteMagiqueIA crée une
+          aventure adaptée avec texte, voix et illustrations.
+        </p>
+
+        <div class="cards">
+          <div class="card">
+            <div class="card-icon">✨</div>
+            <h3>Histoires personnalisées</h3>
+            <p>
+              Chaque histoire est générée à partir de l'idée donnée par
+              l'utilisateur.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">🎨</div>
+            <h3>Illustrations immersives</h3>
+            <p>
+              Les scènes peuvent être accompagnées d'illustrations adaptées à
+              l'univers de l'histoire.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-icon">🔊</div>
+            <h3>Narration audio</h3>
+            <p>
+              Une narration accompagne les histoires pour offrir une expérience
+              plus vivante et reposante.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="securite">
+      <div class="container">
+        <h2 class="section-title">Pensée pour un usage familial</h2>
+
+        <p class="section-subtitle">
+          ConteMagiqueIA est conçue pour proposer une expérience adaptée aux
+          enfants, sous la responsabilité et la supervision des parents ou
+          responsables légaux.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="legal">
+      <div class="container">
+        <div class="legal-box">
+          <h2 class="section-title">Informations légales</h2>
+
+          <p class="section-subtitle">
+            Consulte les documents relatifs à ConteMagiqueIA.
+          </p>
+
+          <div class="legal-links">
+            <a href="politique-confidentialite.html">
+              Politique de confidentialité
+            </a>
+
+            <a href="delete-account.html">
+              Suppression de compte
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      © 2026 ConteMagiqueIA — Tous droits réservés.
+      <br />
+      Contact : contact@contemagiqueia.fr
+    </div>
+  </footer>
+</body>
+</html>

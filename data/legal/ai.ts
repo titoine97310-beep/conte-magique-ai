@@ -29,15 +29,28 @@ Ces contenus peuvent notamment concerner :
 • certains éléments audio ;
 • certains contenus de personnalisation.
 
+4. Transparence conformément au règlement européen sur l’intelligence artificielle
 
-4. Absence de conscience ou de jugement humain
+ConteMagiqueIA informe clairement les utilisateurs lorsqu’un contenu est généré ou manipulé à l’aide d’un système d’intelligence artificielle.
+
+Selon la nature du contenu et les obligations applicables, ConteMagiqueIA peut mettre en œuvre des mécanismes permettant notamment :
+
+• d’indiquer qu’un contenu a été généré par intelligence artificielle ;
+• d’identifier l’origine artificielle de certains contenus ;
+• d’utiliser des mécanismes techniques de marquage lorsqu’ils sont requis et techniquement applicables ;
+• d’éviter qu’un contenu généré automatiquement soit présenté de manière trompeuse comme provenant nécessairement d’un être humain.
+
+ConteMagiqueIA tient compte des obligations de transparence prévues par le règlement européen sur l’intelligence artificielle et de leurs évolutions.
+
+
+5. Absence de conscience ou de jugement humain
 
 Les systèmes d’intelligence artificielle utilisés par ConteMagiqueIA ne disposent ni de conscience, ni d’intention, ni de jugement humain.
 
 Ils produisent des résultats à partir de modèles statistiques et de technologies automatisées.
 
 
-5. Limites des contenus générés
+6. Limites des contenus générés
 
 Les contenus générés peuvent comporter :
 
@@ -51,7 +64,7 @@ Les contenus générés peuvent comporter :
 ConteMagiqueIA ne garantit donc pas l’exactitude, l’unicité ou la perfection de chaque contenu généré.
 
 
-6. Utilisation familiale et enfants
+7. Utilisation familiale et enfants
 
 ConteMagiqueIA est principalement destinée à un usage familial.
 
@@ -60,7 +73,7 @@ Lorsqu’un enfant utilise l’application, la présence ou la supervision d’u
 L’intelligence artificielle ne doit pas être considérée comme un substitut à l’accompagnement éducatif, affectif ou parental.
 
 
-7. Filtrage des demandes
+8. Filtrage des demandes
 
 ConteMagiqueIA peut mettre en œuvre des mécanismes de filtrage afin de limiter les demandes manifestement :
 
@@ -74,7 +87,7 @@ ConteMagiqueIA peut mettre en œuvre des mécanismes de filtrage afin de limiter
 • inadaptées à un public familial.
 
 
-8. Refus de certaines générations
+9. Refus de certaines générations
 
 Certaines demandes peuvent être refusées automatiquement ou manuellement lorsqu’elles sont susceptibles de présenter un risque pour :
 
@@ -86,7 +99,7 @@ Certaines demandes peuvent être refusées automatiquement ou manuellement lorsq
 • le respect des politiques des fournisseurs d’intelligence artificielle.
 
 
-9. Protection contre les contenus inadaptés
+10. Protection contre les contenus inadaptés
 
 ConteMagiqueIA cherche à mettre en œuvre des mesures raisonnables afin de limiter la génération de contenus inappropriés.
 
@@ -95,7 +108,7 @@ Cependant, aucun système automatisé ne permet de garantir l’absence absolue 
 Les utilisateurs sont invités à signaler tout contenu qu’ils jugent problématique.
 
 
-10. Signalement d’un contenu
+11. Signalement d’un contenu
 
 Tout utilisateur peut signaler un contenu inadapté ou préoccupant en contactant :
 
@@ -109,7 +122,7 @@ Le signalement peut préciser :
 • toute information permettant de comprendre la situation.
 
 
-11. Données envoyées aux services d’intelligence artificielle
+12. Données envoyées aux services d’intelligence artificielle
 
 Certaines informations saisies par l’utilisateur peuvent être transmises à des prestataires d’intelligence artificielle lorsqu’elles sont nécessaires à la génération du contenu demandé.
 
@@ -118,7 +131,7 @@ ConteMagiqueIA cherche à limiter ces transmissions au strict nécessaire.
 Les utilisateurs ne doivent pas saisir inutilement de données sensibles ou confidentielles.
 
 
-12. Données relatives aux enfants
+13. Données relatives aux enfants
 
 Il est recommandé de ne pas transmettre dans les demandes de génération :
 
@@ -133,7 +146,7 @@ Il est recommandé de ne pas transmettre dans les demandes de génération :
 L’utilisation d’un prénom seul ou d’un pseudonyme est préférable lorsque cela suffit à personnaliser l’histoire.
 
 
-13. Prestataires d’intelligence artificielle
+14. Prestataires d’intelligence artificielle
 
 ConteMagiqueIA peut recourir à différents prestataires spécialisés pour la génération de texte, d’image ou d’audio.
 
@@ -149,7 +162,7 @@ Ces prestataires peuvent évoluer en fonction :
 Les fournisseurs peuvent notamment inclure OpenAI ou d’autres services équivalents lorsque leurs technologies sont utilisées.
 
 
-14. Évolution des modèles
+15. Évolution des modèles
 
 Les modèles d’intelligence artificielle utilisés peuvent évoluer avec le temps.
 
@@ -161,21 +174,21 @@ Une même demande peut donc produire un résultat différent :
 • en fonction des paramètres de génération.
 
 
-15. Supervision humaine
+16. Supervision humaine
 
 ConteMagiqueIA peut mettre en place des procédures de contrôle, de signalement et d’amélioration continue.
 
 Les utilisateurs sont invités à exercer leur propre jugement, notamment avant de présenter un contenu à un enfant.
 
 
-16. Contenus éducatifs
+17. Contenus éducatifs
 
 Les contenus générés peuvent parfois aborder des thèmes éducatifs.
 
 Cependant, sauf mention explicite contraire, ConteMagiqueIA n’est pas un service professionnel d’enseignement et les contenus générés ne doivent pas être considérés comme une source pédagogique garantie.
 
 
-17. Conseils professionnels
+18. Conseils professionnels
 
 ConteMagiqueIA n’a pas vocation à fournir des conseils :
 
@@ -188,7 +201,7 @@ ConteMagiqueIA n’a pas vocation à fournir des conseils :
 Toute information de cette nature générée accidentellement doit être vérifiée auprès d’un professionnel compétent.
 
 
-18. Propriété intellectuelle
+19. Propriété intellectuelle
 
 Les questions relatives aux droits applicables aux contenus générés par intelligence artificielle peuvent dépendre :
 
@@ -200,7 +213,7 @@ Les questions relatives aux droits applicables aux contenus générés par intel
 Les règles d’utilisation des contenus sont précisées dans les CGU et le Contrat de licence utilisateur.
 
 
-19. Marques, personnages et œuvres protégées
+20. Marques, personnages et œuvres protégées
 
 L’utilisateur ne doit pas utiliser ConteMagiqueIA dans le but de reproduire illicitement :
 
@@ -213,7 +226,7 @@ L’utilisateur ne doit pas utiliser ConteMagiqueIA dans le but de reproduire il
 ConteMagiqueIA peut appliquer des restrictions destinées à limiter certains usages portant atteinte à des droits de propriété intellectuelle.
 
 
-20. Identité de personnes réelles
+21. Identité de personnes réelles
 
 Les utilisateurs ne doivent pas utiliser ConteMagiqueIA afin de créer des contenus destinés à :
 
@@ -224,7 +237,7 @@ Les utilisateurs ne doivent pas utiliser ConteMagiqueIA afin de créer des conte
 • créer une représentation trompeuse portant atteinte à ses droits.
 
 
-21. Utilisation abusive
+22. Utilisation abusive
 
 Il est interdit d’utiliser les systèmes d’intelligence artificielle de ConteMagiqueIA afin de :
 
@@ -235,7 +248,7 @@ Il est interdit d’utiliser les systèmes d’intelligence artificielle de Cont
 • générer volontairement des contenus manifestement interdits.
 
 
-22. Sécurité par conception
+23. Sécurité par conception
 
 ConteMagiqueIA cherche à intégrer des principes de sécurité dès la conception de ses fonctionnalités d’intelligence artificielle.
 
@@ -249,7 +262,7 @@ Cela peut notamment comprendre :
 • la surveillance des incidents.
 
 
-23. Protection de la vie privée par conception
+24. Protection de la vie privée par conception
 
 ConteMagiqueIA cherche également à appliquer des principes de protection des données dès la conception.
 
@@ -261,14 +274,14 @@ Cela implique notamment :
 • la suppression ou l’anonymisation lorsque cela est approprié.
 
 
-24. Biais et représentations
+25. Biais et représentations
 
 Les systèmes d’intelligence artificielle peuvent refléter certains biais issus de leurs données d’entraînement ou de leur fonctionnement.
 
 ConteMagiqueIA cherche à limiter les résultats discriminatoires ou inappropriés, sans pouvoir garantir leur disparition absolue.
 
 
-25. Diversité et inclusion
+26. Diversité et inclusion
 
 ConteMagiqueIA cherche à proposer une expérience respectueuse des différences et à éviter les contenus discriminatoires fondés notamment sur :
 
@@ -281,7 +294,7 @@ ConteMagiqueIA cherche à proposer une expérience respectueuse des différences
 • toute autre caractéristique protégée par la loi.
 
 
-26. Fiabilité des illustrations
+27. Fiabilité des illustrations
 
 Les illustrations générées automatiquement peuvent présenter :
 
@@ -293,7 +306,7 @@ Les illustrations générées automatiquement peuvent présenter :
 ConteMagiqueIA peut utiliser des techniques destinées à améliorer la cohérence visuelle, sans garantir une identité parfaite entre toutes les images.
 
 
-27. Fiabilité de la narration audio
+28. Fiabilité de la narration audio
 
 Les voix synthétiques peuvent présenter :
 
@@ -305,7 +318,7 @@ Les voix synthétiques peuvent présenter :
 Ces variations sont inhérentes aux technologies utilisées.
 
 
-28. Amélioration continue
+29. Amélioration continue
 
 ConteMagiqueIA peut analyser les incidents, erreurs techniques et signalements afin d’améliorer :
 
@@ -315,7 +328,7 @@ ConteMagiqueIA peut analyser les incidents, erreurs techniques et signalements a
 • les mesures de protection des enfants.
 
 
-29. Absence d’entraînement garanti par ConteMagiqueIA
+30. Absence d’entraînement garanti par ConteMagiqueIA
 
 ConteMagiqueIA ne développe pas nécessairement elle-même les modèles fondamentaux utilisés.
 
@@ -324,12 +337,12 @@ Les conditions relatives à l’utilisation des données par les fournisseurs d�
 ConteMagiqueIA cherche à sélectionner des services adaptés à un usage professionnel et à respecter les obligations applicables en matière de protection des données.
 
 
-30. Modification des fournisseurs
+31. Modification des fournisseurs
 
 ConteMagiqueIA peut changer de fournisseur d’intelligence artificielle sans que cela constitue nécessairement une modification substantielle du service, sous réserve du respect des obligations légales et contractuelles applicables.
 
 
-31. Évolution réglementaire
+32. Évolution réglementaire
 
 Les règles applicables à l’intelligence artificielle évoluent rapidement.
 
@@ -342,7 +355,7 @@ ConteMagiqueIA peut modifier ses pratiques et la présente politique afin de ten
 • des exigences des plateformes de distribution.
 
 
-32. Responsabilité des utilisateurs
+33. Responsabilité des utilisateurs
 
 L’utilisateur doit utiliser les fonctionnalités d’intelligence artificielle de manière responsable.
 
@@ -353,14 +366,14 @@ Il demeure responsable :
 • de la vérification d’un contenu avant une utilisation sensible.
 
 
-33. Responsabilité de ConteMagiqueIA
+34. Responsabilité de ConteMagiqueIA
 
 ConteMagiqueIA met en œuvre des moyens raisonnables pour proposer un service adapté à sa destination.
 
 Cependant, aucun système d’intelligence artificielle ne peut garantir une absence totale d’erreur ou de contenu indésirable.
 
 
-34. Documents associés
+35. Documents associés
 
 La présente politique doit être lue conjointement avec :
 
@@ -371,15 +384,32 @@ La présente politique doit être lue conjointement avec :
 • la Charte de protection des enfants.
 
 
-35. Mise à jour
+36. Mise à jour
 
 La présente Politique relative à l’intelligence artificielle peut être mise à jour en fonction de l’évolution de ConteMagiqueIA et des technologies utilisées.
 
 
-36. Contact
+37. Contact
 
 Pour toute question concernant l’utilisation de l’intelligence artificielle dans ConteMagiqueIA :
 
+ConteMagiqueIA
+
 E-mail :
 contact@contemagiqueia.fr
+
+Téléphone professionnel :
++33 6 28 83 56 34
+
+Site internet :
+https://contemagiqueia.fr
+
+
+38. Version
+
+Version :
+1.0
+
+Dernière mise à jour :
+12 août 2026
 `;

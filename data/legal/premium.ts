@@ -223,18 +223,27 @@ Les justificatifs, reçus ou factures liés aux transactions effectuées via Goo
 
 26. Droit de rétractation
 
-Les droits de rétractation relatifs aux contenus et services numériques dépendent de la législation applicable et des circonstances de l’achat.
+Les achats de contenus et services numériques sont soumis aux dispositions applicables du droit de la consommation.
 
-Lorsque l’exécution d’un contenu numérique commence immédiatement avec l’accord du consommateur, certaines règles particulières peuvent s’appliquer.
+Lorsqu’un contenu numérique sans support matériel commence à être fourni avant l’expiration du délai légal de rétractation, la perte éventuelle du droit de rétractation suppose notamment que le consommateur ait donné son consentement exprès au commencement de l’exécution avant la fin de ce délai et reconnu la perte de son droit de rétractation, lorsque ces conditions sont requises par la réglementation applicable.
 
-Les modalités proposées par Google Play ou l’App Store peuvent également être applicables.
+Lorsque l’achat est réalisé par l’intermédiaire de Google Play, de l’App Store ou d’une autre plateforme autorisée, les procédures et droits applicables proposés par cette plateforme peuvent également s’appliquer.
+
+Aucune disposition des présentes Conditions Premium ne prive le consommateur des droits impératifs qui lui sont reconnus par la loi.
 
 
 27. Remboursements
 
-Les demandes de remboursement d’un achat effectué via Google Play ou l’App Store peuvent être soumises aux procédures de la plateforme concernée.
+Les demandes de remboursement concernant un achat effectué via Google Play, l’App Store ou une autre plateforme de paiement peuvent être traitées conformément aux procédures et règles de la plateforme concernée.
 
-ConteMagiqueIA peut également examiner certaines situations particulières lorsqu’elle dispose des moyens techniques et juridiques nécessaires.
+ConteMagiqueIA peut également examiner une réclamation concernant notamment :
+
+• un crédit débité à tort ;
+• un achat validé mais non crédité ;
+• un dysfonctionnement empêchant l’utilisation normale du produit acheté ;
+• toute autre situation dans laquelle les droits légaux du consommateur sont susceptibles de s’appliquer.
+
+Aucune clause des présentes Conditions Premium n’exclut un remboursement, une remise en conformité ou tout autre recours lorsque celui-ci est imposé par la législation applicable.
 
 
 28. Achat accidentel
@@ -395,8 +404,38 @@ Les présentes Conditions Premium sont régies par le droit français, sous rés
 
 48. Contact
 
+Pour toute question concernant les présentes Conditions Premium, un carnet, un achat ou un problème de facturation :
+
 ConteMagiqueIA
+
+Société par actions simplifiée unipersonnelle (SASU)
+
+Capital social :
+1 000 euros
+
+RCS :
+108 460 189 R.C.S. Le Mans
+
+Siège social :
+8 Lieu-Dit les Hermelières
+72300 La Chapelle-d'Aligné
+France
 
 E-mail :
 contact@contemagiqueia.fr
+
+Téléphone professionnel :
++33 6 28 83 56 34
+
+Site internet :
+https://contemagiqueia.fr
+
+
+49. Version
+
+Version :
+1.0
+
+Dernière mise à jour :
+12 août 2026
 `;

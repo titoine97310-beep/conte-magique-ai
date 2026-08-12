@@ -309,6 +309,34 @@ Pour toute question relative à la licence d’utilisation :
 
 ConteMagiqueIA
 
+Société par actions simplifiée unipersonnelle (SASU)
+
+Capital social :
+1 000 euros
+
+RCS :
+108 460 189 R.C.S. Le Mans
+
+Siège social :
+8 Lieu-Dit les Hermelières
+72300 La Chapelle-d'Aligné
+France
+
 E-mail :
 contact@contemagiqueia.fr
+
+Téléphone professionnel :
++33 6 28 83 56 34
+
+Site internet :
+https://contemagiqueia.fr
+
+
+37. Version
+
+Version :
+1.0
+
+Dernière mise à jour :
+12 août 2026
 `;

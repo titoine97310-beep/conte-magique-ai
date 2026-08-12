@@ -200,9 +200,13 @@ ConteMagiqueIA ne peut garantir la disponibilité permanente de services exploit
 
 19. Achats
 
-Lorsque les paiements réels sont activés, les achats sont effectués via les plateformes ou prestataires autorisés.
+Lorsque les paiements réels sont activés, les achats sont effectués via les plateformes ou prestataires autorisés, notamment Google Play ou Apple App Store.
+
+Les caractéristiques essentielles de l’offre, son prix et le nombre d’histoires incluses sont indiqués avant la validation de l’achat.
 
 Les conditions applicables aux carnets payants sont détaillées dans les Conditions Premium disponibles dans le Centre juridique.
+
+Les achats numériques sont également soumis aux conditions de la plateforme de paiement utilisée.
 
 
 20. Prix
@@ -214,21 +218,32 @@ Ils peuvent évoluer.
 Toute modification de prix ne remet pas en cause les achats déjà définitivement réalisés, sauf disposition légale contraire.
 
 
-21. Propriété intellectuelle de l’application
+21. Rétractation et remboursements
+
+Les achats réalisés à distance sont soumis aux dispositions applicables du droit de la consommation.
+
+Lorsqu’un contenu numérique sans support matériel commence à être fourni avant la fin du délai légal de rétractation, la perte éventuelle du droit de rétractation suppose notamment que le consommateur ait donné son consentement exprès au commencement de l’exécution avant la fin de ce délai, reconnu la perte de son droit de rétractation et reçu la confirmation correspondante lorsque la réglementation l’exige.
+
+Les demandes de remboursement sont traitées conformément à la législation applicable ainsi qu’aux règles de la plateforme de paiement utilisée.
+
+Aucune disposition des présentes CGU ne prive le consommateur d’un droit ou d’une garantie dont il bénéficie en vertu de la loi.
+
+
+22. Propriété intellectuelle de l’application
 
 ConteMagiqueIA, son code, son architecture, son interface, son identité visuelle, son logo, ses éléments graphiques, ses textes propriétaires et ses fonctionnalités sont protégés par les règles applicables en matière de propriété intellectuelle.
 
 L’utilisation de l’application ne transfère aucun droit de propriété sur ces éléments à l’utilisateur.
 
 
-22. Licence d’utilisation
+23. Licence d’utilisation
 
 ConteMagiqueIA accorde à l’utilisateur un droit personnel, limité, non exclusif et non cessible d’utiliser l’application conformément à sa destination.
 
 Les règles détaillées relatives à cette licence figurent dans le Contrat de licence utilisateur disponible dans le Centre juridique.
 
 
-23. Restrictions techniques
+24. Restrictions techniques
 
 Sauf lorsque la loi l’autorise expressément, il est interdit de :
 
@@ -242,14 +257,14 @@ Sauf lorsque la loi l’autorise expressément, il est interdit de :
 • exploiter les services afin de créer un service concurrent.
 
 
-24. Contenus créés par l’utilisateur
+25. Contenus créés par l’utilisateur
 
 L’utilisateur reste responsable des informations, textes et instructions qu’il fournit à l’application.
 
 Il s’engage à ne pas transmettre de contenu dont il ne possède pas les droits nécessaires lorsque cette transmission serait illicite.
 
 
-25. Contenus générés
+26. Contenus générés
 
 Les droits pouvant s’appliquer aux histoires, images ou autres contenus générés dépendent notamment :
 
@@ -261,33 +276,33 @@ Les droits pouvant s’appliquer aux histoires, images ou autres contenus géné
 L’utilisateur bénéficie au minimum du droit d’utiliser les contenus générés dans les limites prévues par les présentes CGU et par les règles applicables.
 
 
-26. Utilisation personnelle
+27. Utilisation personnelle
 
 Sauf indication contraire, les contenus générés sont destinés principalement à une utilisation personnelle et familiale.
 
 Toute exploitation commerciale importante peut nécessiter une vérification préalable des droits applicables.
 
 
-27. Partage
+28. Partage
 
 Lorsque la fonctionnalité de partage est disponible, l’utilisateur peut partager certains contenus sous sa propre responsabilité.
 
 Il lui appartient de vérifier qu’aucune donnée personnelle sensible ou information confidentielle n’est incluse dans le contenu partagé.
 
 
-28. Protection des données personnelles
+29. Protection des données personnelles
 
 Les traitements de données personnelles réalisés dans le cadre de ConteMagiqueIA sont décrits dans la Politique de confidentialité accessible depuis le Centre juridique.
 
 
-29. Suppression du compte
+30. Suppression du compte
 
 L’utilisateur peut demander la suppression de son compte depuis les fonctions prévues dans l’application.
 
 Cette suppression peut entraîner la perte définitive de certaines données et histoires associées au compte.
 
 
-30. Sécurité
+31. Sécurité
 
 L’utilisateur s’engage à ne pas tenter :
 
@@ -298,14 +313,14 @@ L’utilisateur s’engage à ne pas tenter :
 • de perturber volontairement le fonctionnement du service.
 
 
-31. Responsabilité de l’utilisateur
+32. Responsabilité de l’utilisateur
 
 L’utilisateur est responsable de son utilisation de l’application et des contenus qu’il demande, utilise ou partage.
 
 Il lui appartient de respecter les lois applicables ainsi que les droits des tiers.
 
 
-32. Responsabilité de ConteMagiqueIA
+33. Responsabilité de ConteMagiqueIA
 
 ConteMagiqueIA met en œuvre des moyens raisonnables afin d’assurer le fonctionnement de ses services.
 
@@ -319,19 +334,19 @@ Toutefois, sauf disposition légale impérative, ConteMagiqueIA ne peut être te
 • de la perte d’informations lorsque celle-ci ne résulte pas d’une faute engageant sa responsabilité.
 
 
-33. Force majeure
+34. Force majeure
 
 ConteMagiqueIA ne pourra être tenue responsable d’un retard ou d’une inexécution résultant d’un événement présentant les caractéristiques de la force majeure au sens du droit applicable.
 
 
-34. Mise à jour de l’application
+35. Mise à jour de l’application
 
 ConteMagiqueIA peut proposer ou imposer certaines mises à jour nécessaires au maintien de la sécurité ou au bon fonctionnement du service.
 
 Une ancienne version peut ne plus être compatible avec les services en ligne.
 
 
-35. Évolution des fonctionnalités
+36. Évolution des fonctionnalités
 
 ConteMagiqueIA peut faire évoluer son application afin notamment :
 
@@ -343,7 +358,7 @@ ConteMagiqueIA peut faire évoluer son application afin notamment :
 • de respecter de nouvelles obligations légales.
 
 
-36. Modification des CGU
+37. Modification des CGU
 
 Les présentes CGU peuvent être mises à jour.
 
@@ -352,34 +367,58 @@ Lorsque les modifications sont importantes et que la réglementation l’exige, 
 La version applicable est celle publiée dans l’application à la date de consultation.
 
 
-37. Nullité partielle
+38. Nullité partielle
 
 Si une disposition des présentes CGU est déclarée invalide ou inapplicable, les autres dispositions restent applicables.
 
 
-38. Absence de renonciation
+39. Absence de renonciation
 
 Le fait pour ConteMagiqueIA de ne pas appliquer immédiatement une disposition des présentes CGU ne constitue pas une renonciation à l’appliquer ultérieurement.
 
 
-39. Droit applicable
+40. Droit applicable
 
 Les présentes CGU sont régies par le droit français, sous réserve des règles impératives éventuellement applicables au consommateur dans son pays de résidence.
 
 
-40. Litiges
+41. Litiges
 
 En cas de difficulté, l’utilisateur est invité à contacter ConteMagiqueIA afin de rechercher une solution amiable.
 
 Les règles relatives à la compétence juridictionnelle et aux droits des consommateurs restent applicables conformément à la législation en vigueur.
 
 
-41. Contact
+42. Contact
 
 Pour toute question relative aux présentes Conditions Générales d’Utilisation :
 
 ConteMagiqueIA
 
+Société par actions simplifiée unipersonnelle (SASU)
+
+RCS :
+108 460 189 R.C.S. Le Mans
+
+Siège social :
+8 Lieu-Dit les Hermelières
+72300 La Chapelle-d'Aligné
+France
+
 E-mail :
 contact@contemagiqueia.fr
+
+Téléphone professionnel :
++33 6 28 83 56 34
+
+Site internet :
+https://contemagiqueia.fr
+
+43. Version
+
+Version :
+1.0
+
+Dernière mise à jour :
+12 août 2026
 `;

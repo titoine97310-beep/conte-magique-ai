@@ -1,9 +1,10 @@
 export const mentionsContent = `
+
 1. Éditeur de l’application
 
 L’application ConteMagiqueIA est éditée par :
 
-ConteMagiqueIA SASU
+ConteMagiqueIA
 
 Forme juridique :
 Société par actions simplifiée unipersonnelle (SASU)
@@ -12,37 +13,50 @@ Capital social :
 1 000 euros
 
 Siège social :
-À compléter après immatriculation définitive.
+8 Lieu-Dit les Hermelières
+72300 La Chapelle-d'Aligné
+France
 
 SIREN :
-À compléter après immatriculation.
+108 460 189
 
 RCS :
-À compléter après immatriculation.
+108 460 189 R.C.S. Le Mans
+
+Numéro de gestion :
+2026 B 01005
+
+Date d’immatriculation :
+11 août 2026
+
+Code APE :
+62.01Z
 
 Numéro de TVA intracommunautaire :
-À compléter si applicable.
+Non renseigné à ce jour.
 
 Adresse e-mail :
 contact@contemagiqueia.fr
 
+Site internet :
+https://contemagiqueia.fr
 
 2. Directeur de la publication
 
-Le directeur de la publication est le Président de ConteMagiqueIA SASU.
+Le directeur de la publication est le Président de ConteMagiqueIA.
 
 Nom :
 Antoine GASPARD
 
-
 3. Application concernée
 
-Les présentes Mentions légales concernent l’application mobile ConteMagiqueIA ainsi que, le cas échéant, les services numériques et le site internet associés à l’application.
-
+Les présentes Mentions légales concernent l’application mobile ConteMagiqueIA ainsi que les services numériques et le site internet associés à l’application.
 
 4. Objet de ConteMagiqueIA
 
-ConteMagiqueIA est une application permettant notamment :
+ConteMagiqueIA exerce notamment des activités d’édition, de conception, de développement, d’exploitation et de commercialisation de logiciels, applications mobiles, plateformes numériques et solutions utilisant l’intelligence artificielle.
+
+L’application permet notamment :
 
 • la création d’histoires personnalisées ;
 • la génération de textes à l’aide de technologies d’intelligence artificielle ;
@@ -52,8 +66,15 @@ ConteMagiqueIA est une application permettant notamment :
 • l’utilisation de carnets Texte ou Illustrés ;
 • l’accès à différentes fonctionnalités destinées principalement aux familles.
 
+5. Hébergement du site internet
 
-5. Hébergement et infrastructure technique
+Le site internet contemagiqueia.fr est hébergé par :
+
+OVHcloud
+
+Le site repose sur une infrastructure d’hébergement fournie par OVHcloud.
+
+6. Hébergement et infrastructure technique de l’application
 
 ConteMagiqueIA peut s’appuyer sur plusieurs prestataires techniques pour assurer le fonctionnement de l’application.
 
@@ -70,8 +91,7 @@ Selon les services utilisés, ces prestataires peuvent notamment intervenir pour
 
 Les prestataires utilisés peuvent évoluer au cours de la vie de l’application.
 
-
-6. Firebase et Google
+7. Firebase et Google
 
 ConteMagiqueIA peut utiliser les services Firebase proposés par Google, notamment pour :
 
@@ -83,17 +103,15 @@ ConteMagiqueIA peut utiliser les services Firebase proposés par Google, notamme
 
 L’utilisation de ces services est soumise aux conditions applicables des prestataires concernés.
 
+8. OpenAI et services d’intelligence artificielle
 
-7. OpenAI et services d’intelligence artificielle
-
-ConteMagiqueIA peut utiliser les services d’OpenAI ou d’autres prestataires spécialisés en intelligence artificielle afin de générer certaines histoires, illustrations ou fonctionnalités associées.
+ConteMagiqueIA peut utiliser les services d’OpenAI ou d’autres prestataires spécialisés en intelligence artificielle afin de générer certaines histoires, illustrations, narrations ou fonctionnalités associées.
 
 Ces prestataires restent responsables de leurs propres infrastructures et sont soumis à leurs propres conditions contractuelles.
 
+9. Render et services backend
 
-8. Render et services backend
-
-Certains services techniques de ConteMagiqueIA peuvent être exécutés sur des infrastructures de type backend hébergées notamment auprès de prestataires tels que Render.
+Certains services techniques de ConteMagiqueIA peuvent être exécutés sur des infrastructures backend hébergées notamment auprès de prestataires tels que Render.
 
 Ces services peuvent intervenir notamment dans :
 
@@ -101,8 +119,7 @@ Ces services peuvent intervenir notamment dans :
 • les échanges avec des API externes ;
 • certaines opérations serveur nécessaires au fonctionnement de l’application.
 
-
-9. Distribution de l’application
+10. Distribution de l’application
 
 ConteMagiqueIA peut être distribuée notamment par :
 
@@ -112,8 +129,7 @@ ConteMagiqueIA peut être distribuée notamment par :
 
 Les plateformes de distribution sont indépendantes de ConteMagiqueIA et appliquent leurs propres conditions d’utilisation.
 
-
-10. Propriété intellectuelle
+11. Propriété intellectuelle
 
 L’ensemble des éléments constituant ConteMagiqueIA peut être protégé par les règles applicables en matière de propriété intellectuelle.
 
@@ -132,15 +148,13 @@ Cela concerne notamment :
 
 Sauf autorisation préalable écrite, toute reproduction, adaptation ou exploitation non autorisée peut constituer une atteinte aux droits de ConteMagiqueIA ou de leurs titulaires respectifs.
 
-
-11. Technologies et contenus de tiers
+12. Technologies et contenus de tiers
 
 L’application peut intégrer ou utiliser des technologies, bibliothèques, logiciels, services ou contenus appartenant à des tiers.
 
 Ces éléments restent la propriété de leurs titulaires respectifs et peuvent être soumis à leurs propres licences.
 
-
-12. Contenus générés par intelligence artificielle
+13. Contenus générés par intelligence artificielle
 
 Certaines histoires, images, narrations ou autres productions disponibles dans ConteMagiqueIA sont générées automatiquement.
 
@@ -153,8 +167,7 @@ Les droits applicables peuvent notamment dépendre :
 • des contenus fournis par l’utilisateur ;
 • de la nature du contenu généré.
 
-
-13. Responsabilité éditoriale
+14. Responsabilité éditoriale
 
 ConteMagiqueIA s’efforce de fournir des informations exactes et des services fonctionnels.
 
@@ -166,8 +179,7 @@ Toutefois, l’éditeur ne peut garantir :
 • l’absence d’interruption technique ;
 • la compatibilité avec tous les appareils.
 
-
-14. Services automatisés
+15. Services automatisés
 
 Les histoires, illustrations et narrations peuvent être produites à l’aide de systèmes automatisés.
 
@@ -180,15 +192,13 @@ Ces systèmes peuvent générer des résultats :
 
 Les contenus proposés ont principalement une vocation créative, récréative et familiale.
 
-
-15. Liens et services externes
+16. Liens et services externes
 
 L’application peut contenir des liens ou permettre l’accès à des services exploités par des tiers.
 
 ConteMagiqueIA n’exerce pas de contrôle permanent sur les services externes et ne peut être tenue responsable de leur contenu ou de leur fonctionnement, sauf disposition légale contraire.
 
-
-16. Données personnelles
+17. Données personnelles
 
 ConteMagiqueIA peut traiter certaines données personnelles dans le cadre du fonctionnement de l’application.
 
@@ -200,37 +210,31 @@ Les informations relatives :
 • aux durées de conservation ;
 • aux droits des utilisateurs ;
 
-sont détaillées dans la Politique de confidentialité accessible depuis le Centre juridique de l’application.
+sont détaillées dans la Politique de confidentialité accessible depuis le Centre juridique de l’application et sur le site internet.
 
-
-17. Cookies et technologies similaires
+18. Cookies et technologies similaires
 
 Lorsque le site internet ou certains services associés utilisent des cookies ou technologies similaires, une information spécifique peut être mise à disposition de l’utilisateur conformément à la réglementation applicable.
 
-
-18. Conditions Générales d’Utilisation
+19. Conditions Générales d’Utilisation
 
 L’utilisation de ConteMagiqueIA est régie par les Conditions Générales d’Utilisation disponibles dans le Centre juridique de l’application.
 
-
-19. Contrat de licence utilisateur
+20. Contrat de licence utilisateur
 
 L’utilisation du logiciel ConteMagiqueIA est également encadrée par le Contrat de licence utilisateur final (EULA).
 
-
-20. Conditions applicables aux carnets payants
+21. Conditions applicables aux carnets payants
 
 Les achats de carnets Texte, Illustrés ou d’autres produits numériques proposés par ConteMagiqueIA sont soumis aux Conditions Premium ainsi qu’aux règles de la plateforme de paiement utilisée.
 
-
-21. Protection des enfants
+22. Protection des enfants
 
 ConteMagiqueIA accorde une attention particulière aux usages familiaux et à la protection des mineurs.
 
 Les engagements spécifiques de ConteMagiqueIA sont détaillés dans la Charte de protection des enfants accessible depuis le Centre juridique.
 
-
-22. Contact
+23. Contact
 
 Pour toute question concernant ConteMagiqueIA :
 
@@ -238,10 +242,12 @@ E-mail :
 contact@contemagiqueia.fr
 
 Adresse postale :
-À compléter après immatriculation définitive.
+ConteMagiqueIA
+8 Lieu-Dit les Hermelières
+72300 La Chapelle-d'Aligné
+France
 
-
-23. Signalement d’un contenu
+24. Signalement d’un contenu
 
 Si un utilisateur estime qu’un contenu généré ou accessible depuis ConteMagiqueIA est inapproprié, il peut contacter l’éditeur à l’adresse :
 
@@ -253,8 +259,7 @@ Le signalement doit idéalement préciser :
 • le contenu concerné ;
 • toute information permettant d’identifier la situation.
 
-
-24. Signalement d’une vulnérabilité de sécurité
+25. Signalement d’une vulnérabilité de sécurité
 
 Toute personne découvrant de bonne foi une vulnérabilité de sécurité peut contacter :
 
@@ -262,22 +267,23 @@ contact@contemagiqueia.fr
 
 Il est demandé de ne pas exploiter la vulnérabilité au-delà de ce qui est strictement nécessaire pour démontrer son existence.
 
-
-25. Droit applicable
+26. Droit applicable
 
 Les présentes Mentions légales sont régies par le droit français.
 
-
-26. Mise à jour
+27. Mise à jour
 
 Les présentes Mentions légales peuvent être modifiées notamment afin de tenir compte :
 
-• de l’immatriculation définitive de la société ;
 • d’un changement d’adresse ;
 • d’une évolution de l’infrastructure ;
 • d’un changement de prestataire ;
 • de nouvelles fonctionnalités ;
 • d’évolutions législatives ou réglementaires.
 
-La date et la version du document sont indiquées dans l’application.
+Version :
+1.0
+
+Dernière mise à jour :
+12 août 2026
 `;

@@ -14,6 +14,13 @@ type CreateUserProfileParams = {
   uid: string;
   displayName: string;
   email: string;
+
+  legal?: {
+    termsAccepted: boolean;
+    termsVersion: string;
+    privacyAcknowledged: boolean;
+    privacyVersion: string;
+  };
 };
 
 const USERS_COLLECTION = "users";
@@ -30,6 +37,7 @@ export async function createUserProfile({
   uid,
   displayName,
   email,
+  legal,
 }: CreateUserProfileParams): Promise<UserProfile> {
   const userReference = getUserReference(uid);
   const existingProfile = await getDoc(userReference);
@@ -58,6 +66,15 @@ export async function createUserProfile({
       },
     },
 
+    legal: {
+      termsAccepted: legal?.termsAccepted ?? false,
+      termsVersion: legal?.termsVersion ?? "",
+      privacyAcknowledged:
+        legal?.privacyAcknowledged ?? false,
+      privacyVersion: legal?.privacyVersion ?? "",
+      acceptedAt: legal?.termsAccepted ? now : null,
+    },
+
     createdAt: now,
     lastLogin: now,
     lastStoryCreatedAt: null,
@@ -74,7 +91,9 @@ export async function createUserProfile({
 export async function getUserProfile(
   uid: string
 ): Promise<UserProfile | null> {
-  const userSnapshot = await getDoc(getUserReference(uid));
+  const userSnapshot = await getDoc(
+    getUserReference(uid)
+  );
 
   if (!userSnapshot.exists()) {
     return null;
@@ -101,10 +120,13 @@ export async function updateUserDisplayName(
   uid: string,
   displayName: string
 ): Promise<void> {
-  const cleanedDisplayName = displayName.trim();
+  const cleanedDisplayName =
+    displayName.trim();
 
   if (!cleanedDisplayName) {
-    throw new Error("Le nom ne peut pas être vide.");
+    throw new Error(
+      "Le nom ne peut pas être vide."
+    );
   }
 
   await updateDoc(getUserReference(uid), {
@@ -125,45 +147,71 @@ export async function addStories(
   amount: number,
   countAsPurchase = true
 ): Promise<number> {
-  if (!Number.isInteger(amount) || amount <= 0) {
+  if (
+    !Number.isInteger(amount) ||
+    amount <= 0
+  ) {
     throw new Error(
       "Le nombre d'histoires à ajouter doit être un entier supérieur à zéro."
     );
   }
 
-  const userReference = getUserReference(uid);
+  const userReference =
+    getUserReference(uid);
 
-  return runTransaction(db, async (transaction) => {
-    const userSnapshot = await transaction.get(userReference);
+  return runTransaction(
+    db,
+    async (transaction) => {
+      const userSnapshot =
+        await transaction.get(
+          userReference
+        );
 
-    if (!userSnapshot.exists()) {
-      throw new Error("Profil utilisateur introuvable.");
+      if (!userSnapshot.exists()) {
+        throw new Error(
+          "Profil utilisateur introuvable."
+        );
+      }
+
+      const profile =
+        userSnapshot.data() as UserProfile;
+
+      const currentPack =
+        profile.packs?.[packType];
+
+      if (!currentPack) {
+        throw new Error(
+          "Carnet utilisateur introuvable."
+        );
+      }
+
+      const newStoriesRemaining =
+        currentPack.storiesRemaining +
+        amount;
+
+      const updates: Record<
+        string,
+        number
+      > = {
+        [`packs.${packType}.storiesRemaining`]:
+          newStoriesRemaining,
+      };
+
+      if (countAsPurchase) {
+        updates[
+          `packs.${packType}.purchases`
+        ] =
+          currentPack.purchases + 1;
+      }
+
+      transaction.update(
+        userReference,
+        updates
+      );
+
+      return newStoriesRemaining;
     }
-
-    const profile = userSnapshot.data() as UserProfile;
-    const currentPack = profile.packs?.[packType];
-
-    if (!currentPack) {
-      throw new Error("Carnet utilisateur introuvable.");
-    }
-
-    const newStoriesRemaining =
-      currentPack.storiesRemaining + amount;
-
-    const updates: Record<string, number> = {
-      [`packs.${packType}.storiesRemaining`]:
-        newStoriesRemaining,
-    };
-
-    if (countAsPurchase) {
-      updates[`packs.${packType}.purchases`] =
-        currentPack.purchases + 1;
-    }
-
-    transaction.update(userReference, updates);
-
-    return newStoriesRemaining;
-  });
+  );
 }
 
 /**
@@ -174,7 +222,8 @@ export async function hasStories(
   uid: string,
   packType: PackType
 ): Promise<boolean> {
-  const profile = await getUserProfile(uid);
+  const profile =
+    await getUserProfile(uid);
 
   if (!profile) {
     return false;
@@ -184,7 +233,10 @@ export async function hasStories(
     return true;
   }
 
-  return profile.packs[packType].storiesRemaining > 0;
+  return (
+    profile.packs[packType]
+      .storiesRemaining > 0
+  );
 }
 
 /**
@@ -194,42 +246,58 @@ export async function consumeStory(
   uid: string,
   packType: PackType
 ): Promise<number> {
-  const userReference = getUserReference(uid);
+  const userReference =
+    getUserReference(uid);
 
-  return runTransaction(db, async (transaction) => {
-    const userSnapshot = await transaction.get(userReference);
+  return runTransaction(
+    db,
+    async (transaction) => {
+      const userSnapshot =
+        await transaction.get(
+          userReference
+        );
 
-    if (!userSnapshot.exists()) {
-      throw new Error("Profil utilisateur introuvable.");
-    }
+      if (!userSnapshot.exists()) {
+        throw new Error(
+          "Profil utilisateur introuvable."
+        );
+      }
 
-    const profile = userSnapshot.data() as UserProfile;
+      const profile =
+        userSnapshot.data() as UserProfile;
 
-    if (profile.role === "admin") {
-      return profile.packs[packType].storiesRemaining;
-    }
+      if (profile.role === "admin") {
+        return profile.packs[packType]
+          .storiesRemaining;
+      }
 
-    const currentRemaining =
-      profile.packs[packType].storiesRemaining;
+      const currentRemaining =
+        profile.packs[packType]
+          .storiesRemaining;
 
-    if (currentRemaining <= 0) {
-      throw new Error(
-        "Aucune histoire restante dans ce carnet."
+      if (currentRemaining <= 0) {
+        throw new Error(
+          "Aucune histoire restante dans ce carnet."
+        );
+      }
+
+      const newStoriesRemaining =
+        currentRemaining - 1;
+
+      transaction.update(
+        userReference,
+        {
+          [`packs.${packType}.storiesRemaining`]:
+            newStoriesRemaining,
+
+          lastStoryCreatedAt:
+            new Date().toISOString(),
+        }
       );
+
+      return newStoriesRemaining;
     }
-
-    const newStoriesRemaining =
-      currentRemaining - 1;
-
-    transaction.update(userReference, {
-      [`packs.${packType}.storiesRemaining`]:
-        newStoriesRemaining,
-
-      lastStoryCreatedAt: new Date().toISOString(),
-    });
-
-    return newStoriesRemaining;
-  });
+  );
 }
 
 /**
@@ -238,9 +306,13 @@ export async function consumeStory(
 export async function updateLastStoryCreated(
   uid: string
 ): Promise<void> {
-  await updateDoc(getUserReference(uid), {
-    lastStoryCreatedAt: new Date().toISOString(),
-  });
+  await updateDoc(
+    getUserReference(uid),
+    {
+      lastStoryCreatedAt:
+        new Date().toISOString(),
+    }
+  );
 }
 
 /**
@@ -249,5 +321,7 @@ export async function updateLastStoryCreated(
 export async function deleteUserProfile(
   uid: string
 ): Promise<void> {
-  await deleteDoc(getUserReference(uid));
+  await deleteDoc(
+    getUserReference(uid)
+  );
 }

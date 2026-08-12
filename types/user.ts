@@ -7,6 +7,16 @@ export interface StoryPack {
   purchases: number;
 }
 
+export interface LegalConsent {
+  termsAccepted: boolean;
+  termsVersion: string;
+
+  privacyAcknowledged: boolean;
+  privacyVersion: string;
+
+  acceptedAt: string | null;
+}
+
 export interface UserProfile {
   uid: string;
 
@@ -20,6 +30,8 @@ export interface UserProfile {
     text: StoryPack;
     illustrated: StoryPack;
   };
+
+  legal: LegalConsent;
 
   createdAt: string;
 

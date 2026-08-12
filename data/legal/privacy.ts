@@ -10,15 +10,31 @@ ConteMagiqueIA accorde une attention particulière à la protection de la vie pr
 
 Le responsable des traitements de données personnelles effectués dans le cadre de ConteMagiqueIA est :
 
-ConteMagiqueIA SASU
+ConteMagiqueIA
 
-Adresse du siège social :
-À compléter après immatriculation définitive.
+Société par actions simplifiée unipersonnelle (SASU)
 
-Adresse de contact :
+Capital social :
+1 000 euros
+
+RCS :
+108 460 189 R.C.S. Le Mans
+
+Siège social :
+8 Lieu-Dit les Hermelières
+72300 La Chapelle-d'Aligné
+France
+
+E-mail :
 contact@contemagiqueia.fr
 
-Les informations légales complètes de la société sont accessibles dans la rubrique « Mentions légales » de l’application.
+Téléphone professionnel :
++33 6 28 83 56 34
+
+Site internet :
+https://contemagiqueia.fr
+
+Les informations légales complètes de la société sont accessibles dans la rubrique « Mentions légales ».
 
 
 3. Données susceptibles d’être collectées
@@ -61,7 +77,18 @@ Il est notamment recommandé d’éviter de transmettre :
 Lorsqu’un prénom est utilisé pour personnaliser une histoire, l’utilisation d’un prénom seul ou d’un pseudonyme est recommandée.
 
 
-5. Finalités des traitements
+5. Consentement des mineurs
+
+Lorsque le traitement de données personnelles repose sur le consentement et concerne directement un enfant utilisant un service de la société de l’information, les règles particulières applicables aux mineurs sont respectées.
+
+En France, un enfant âgé de 15 ans ou plus peut, dans les conditions prévues par la réglementation, consentir lui-même à certains traitements fondés sur son consentement.
+
+Pour un enfant âgé de moins de 15 ans, lorsque le consentement constitue la base légale du traitement, l’autorisation du titulaire de l’autorité parentale est requise dans les conditions prévues par la réglementation applicable.
+
+ConteMagiqueIA privilégie néanmoins un usage familial sous la responsabilité d’un parent ou représentant légal.
+
+
+6. Finalités des traitements
 
 Les données peuvent être utilisées afin de :
 
@@ -81,7 +108,7 @@ Les données peuvent être utilisées afin de :
 • respecter les obligations légales applicables.
 
 
-6. Bases légales
+7. Bases légales
 
 Selon les traitements concernés, ConteMagiqueIA peut s’appuyer notamment sur :
 
@@ -91,7 +118,7 @@ Selon les traitements concernés, ConteMagiqueIA peut s’appuyer notamment sur 
 • le respect d’une obligation légale.
 
 
-7. Utilisation de services d’intelligence artificielle
+8. Utilisation de services d’intelligence artificielle
 
 ConteMagiqueIA utilise des technologies d’intelligence artificielle afin de générer certaines histoires, illustrations ou fonctionnalités associées.
 
@@ -102,7 +129,7 @@ ConteMagiqueIA cherche à limiter les informations transmises à celles strictem
 Les utilisateurs sont invités à ne pas inclure de données personnelles sensibles ou confidentielles dans leurs demandes de génération.
 
 
-8. Prestataires et sous-traitants
+9. Prestataires et sous-traitants
 
 Pour assurer son fonctionnement, ConteMagiqueIA peut utiliser différents prestataires techniques, notamment pour :
 
@@ -121,7 +148,7 @@ Ces prestataires peuvent notamment inclure des services tels que Firebase / Goog
 La liste des prestataires peut évoluer en fonction des besoins techniques et de l’évolution de l’application.
 
 
-9. Paiements
+10. Paiements
 
 Lorsque les paiements réels sont activés, les transactions sont traitées par les plateformes de paiement autorisées, notamment Google Play ou l’App Store selon l’appareil utilisé.
 
@@ -130,16 +157,23 @@ ConteMagiqueIA n’a pas vocation à recevoir ni à conserver directement le num
 Les informations relatives aux achats nécessaires à l’activation des carnets peuvent être conservées afin de gérer les droits associés au compte et de prévenir la fraude.
 
 
-10. Conservation des données
+11. Conservation des données
 
-Les données sont conservées pendant une durée adaptée à leur finalité.
+Les données personnelles ne sont pas conservées plus longtemps que nécessaire au regard des finalités pour lesquelles elles sont traitées.
 
-Les données liées au compte peuvent être conservées pendant toute la durée d’existence du compte.
+À titre général :
 
-Lorsqu’un compte est supprimé, les données associées sont supprimées ou anonymisées dans les conditions prévues par la réglementation, sous réserve des informations devant être conservées pour respecter une obligation légale ou défendre les droits de ConteMagiqueIA.
+• les données relatives au compte sont conservées pendant la durée d’existence du compte ;
+• les histoires et contenus sauvegardés sont conservés tant qu’ils restent associés au compte, sauf suppression par l’utilisateur ou nécessité technique ou légale ;
+• les informations techniques et journaux de sécurité sont conservés pendant une durée proportionnée aux besoins de sécurité, de prévention des abus et de diagnostic ;
+• les informations relatives aux transactions peuvent être conservées pendant les durées nécessaires à la gestion des achats, à la prévention de la fraude et au respect des obligations légales, comptables ou fiscales.
+
+Lorsqu’un compte est supprimé, les données qui ne doivent plus être conservées sont supprimées ou anonymisées dans un délai raisonnable, sous réserve des obligations légales applicables.
+
+Lorsque la durée exacte ne peut être déterminée à l’avance, ConteMagiqueIA utilise des critères fondés sur la finalité du traitement, la durée de la relation avec l’utilisateur, les obligations légales et les nécessités de sécurité.
 
 
-11. Suppression du compte
+12. Suppression du compte
 
 L’utilisateur peut demander la suppression de son compte depuis les fonctionnalités prévues dans l’application.
 
@@ -148,7 +182,7 @@ La suppression du compte peut entraîner la suppression définitive des données
 Il est recommandé à l’utilisateur de conserver une copie des contenus importants avant toute suppression définitive.
 
 
-12. Sécurité
+13. Sécurité
 
 ConteMagiqueIA met en œuvre des mesures techniques et organisationnelles raisonnables destinées à protéger les données contre :
 
@@ -161,7 +195,7 @@ ConteMagiqueIA met en œuvre des mesures techniques et organisationnelles raison
 Ces mesures peuvent notamment comprendre l’authentification, la limitation des accès, les communications sécurisées, les mises à jour techniques et les mécanismes de protection proposés par les prestataires utilisés.
 
 
-13. Droits des utilisateurs
+14. Droits des utilisateurs
 
 Conformément à la réglementation applicable, notamment au RGPD, les personnes concernées peuvent disposer de différents droits :
 
@@ -178,26 +212,32 @@ Pour exercer ces droits, l’utilisateur peut contacter :
 contact@contemagiqueia.fr
 
 
-14. Réclamation auprès de la CNIL
+15. Réclamation auprès de la CNIL
 
 Toute personne estimant que ses données personnelles ne sont pas traitées conformément à la réglementation peut introduire une réclamation auprès de la Commission nationale de l’informatique et des libertés (CNIL).
 
 
-15. Transferts internationaux
+16. Transferts internationaux
 
 Certains prestataires techniques peuvent traiter des données en dehors de l’Union européenne ou de l’Espace économique européen.
 
-Lorsque cela est nécessaire, ConteMagiqueIA s’appuie sur les mécanismes juridiques prévus par la réglementation applicable afin d’encadrer ces transferts.
+Lorsque de tels transferts ont lieu, ConteMagiqueIA veille à ce qu’ils reposent sur un mécanisme autorisé par la réglementation applicable, tel que :
+
+• une décision d’adéquation de la Commission européenne ;
+• des clauses contractuelles types approuvées par la Commission européenne ;
+• ou tout autre mécanisme légalement reconnu.
+
+Des garanties complémentaires peuvent être mises en œuvre lorsque cela est nécessaire.
 
 
-16. Absence de vente de données personnelles
+17. Absence de vente de données personnelles
 
 ConteMagiqueIA ne vend pas les données personnelles de ses utilisateurs.
 
 Les données ne sont transmises à des tiers que lorsque cela est nécessaire au fonctionnement du service, au respect d’une obligation légale, à la sécurité du service ou avec l’accord de la personne concernée lorsque celui-ci est requis.
 
 
-17. Évolution de la politique
+18. Évolution de la politique
 
 La présente Politique de confidentialité peut évoluer afin de tenir compte :
 
@@ -210,7 +250,7 @@ La présente Politique de confidentialité peut évoluer afin de tenir compte :
 La version et la date de dernière mise à jour sont indiquées dans l’application.
 
 
-18. Contact
+19. Contact
 
 Pour toute question relative à la protection des données personnelles :
 
@@ -218,4 +258,21 @@ ConteMagiqueIA
 
 E-mail :
 contact@contemagiqueia.fr
+
+Téléphone professionnel :
++33 6 28 83 56 34
+
+Adresse postale :
+8 Lieu-Dit les Hermelières
+72300 La Chapelle-d'Aligné
+France
+
+
+20. Version
+
+Version :
+1.0
+
+Dernière mise à jour :
+12 août 2026
 `;
