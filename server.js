@@ -1,7 +1,14 @@
 import cors from "cors";
+import crypto from "crypto";
 import dotenv from "dotenv";
 import express from "express";
+import fs from "fs";
+import { google } from "googleapis";
 import OpenAI from "openai";
+
+import { cert, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 dotenv.config();
 
@@ -11,10 +18,49 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
-
+  
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const GOOGLE_PLAY_PACKAGE_NAME = "com.contemagiqueia.app";
+
+const GOOGLE_PLAY_PRODUCTS = {
+  carnet_15_textes: {
+    packType: "text",
+    stories: 15,
+  },
+
+  carnet_15_histoires: {
+    packType: "illustrated",
+    stories: 15,
+  },
+};
+
+const googlePlayAuth = new google.auth.GoogleAuth({
+  keyFile: "/etc/secrets/google-play-service-account.json",
+  scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+});
+
+const androidPublisher = google.androidpublisher({
+  version: "v3",
+  auth: googlePlayAuth,
+});
+
+const firebaseServiceAccount = JSON.parse(
+  fs.readFileSync(
+    "/etc/secrets/firebase-service-account.json",
+    "utf8"
+  )
+);
+
+const firebaseAdminApp = initializeApp({
+  credential: cert(firebaseServiceAccount),
+  projectId: "contemagiqueia",
+});
+
+const firebaseAuth = getAuth(firebaseAdminApp);
+const adminDb = getFirestore(firebaseAdminApp);
 
 app.get("/", (req, res) => {
   res.send("Backend ConteMagiqueIA OK");
@@ -478,16 +524,12 @@ Prononce les mots naturellement.
 `;
 
     const response = await openai.audio.speech.create({
-      model: "gpt-4o-mini-tts",
-<<<<<<< HEAD
-      voice: "alloy",
-=======
-      voice: profile.voice,
->>>>>>> e4b3f404ca30d399f874b0ae4d0e08bc0d5a61d9
-      input: text,
-      instructions,
-      response_format: "mp3",
-    });
+  model: "gpt-4o-mini-tts",
+  voice: profile.voice,
+  input: text,
+  instructions,
+  response_format: "mp3",
+});
 
     const buffer = Buffer.from(await response.arrayBuffer());
 
@@ -502,6 +544,180 @@ Prononce les mots naturellement.
       error: "Erreur génération TTS",
       message: e?.message,
       status: e?.status,
+    });
+  }
+});
+
+app.post("/google-play/verify-purchase", async (req, res) => {
+  try {
+    const authorization = req.headers.authorization || "";
+
+    if (!authorization.startsWith("Bearer ")) {
+      return res.status(401).json({
+        error: "Authentification Firebase requise.",
+      });
+    }
+
+    const idToken = authorization.substring(7);
+
+    const decodedToken =
+      await firebaseAuth.verifyIdToken(idToken);
+
+    const uid = decodedToken.uid;
+
+    const { productId, purchaseToken } = req.body;
+
+    if (!productId || !purchaseToken) {
+      return res.status(400).json({
+        error: "productId et purchaseToken sont obligatoires.",
+      });
+    }
+
+    const productConfig =
+      GOOGLE_PLAY_PRODUCTS[productId];
+
+    if (!productConfig) {
+      return res.status(400).json({
+        error: "Produit Google Play inconnu.",
+      });
+    }
+
+    const purchaseResponse =
+      await androidPublisher.purchases.productsv2.getproductpurchasev2({
+        packageName: GOOGLE_PLAY_PACKAGE_NAME,
+        token: purchaseToken,
+      });
+
+    const purchase = purchaseResponse.data;
+
+    const purchaseState =
+      purchase.purchaseStateContext?.purchaseState;
+
+    if (purchaseState !== "PURCHASED") {
+      return res.status(400).json({
+        error: "L'achat n'est pas encore validé.",
+        purchaseState,
+      });
+    }
+
+    const purchasedItem =
+      purchase.productLineItem?.find(
+        (item) => item.productId === productId
+      );
+
+    if (!purchasedItem) {
+      return res.status(400).json({
+        error:
+          "Le produit acheté ne correspond pas au produit demandé.",
+      });
+    }
+
+    const consumptionState =
+      purchasedItem.productOfferDetails?.consumptionState;
+
+    const purchaseHash = crypto
+      .createHash("sha256")
+      .update(purchaseToken)
+      .digest("hex");
+
+    const userRef =
+      adminDb.collection("users").doc(uid);
+
+    const purchaseRef =
+      adminDb
+        .collection("googlePlayPurchases")
+        .doc(purchaseHash);
+
+    let alreadyCredited = false;
+
+    await adminDb.runTransaction(
+      async (transaction) => {
+        const purchaseSnapshot =
+          await transaction.get(purchaseRef);
+
+        if (purchaseSnapshot.exists) {
+          const existingPurchase =
+            purchaseSnapshot.data();
+
+          if (
+            existingPurchase.uid !== uid ||
+            existingPurchase.productId !== productId
+          ) {
+            throw new Error(
+              "Ce paiement a déjà été associé à un autre compte ou produit."
+            );
+          }
+
+          alreadyCredited = true;
+          return;
+        }
+
+        const userSnapshot =
+          await transaction.get(userRef);
+
+        if (!userSnapshot.exists) {
+          throw new Error(
+            "Profil utilisateur introuvable."
+          );
+        }
+
+        transaction.update(userRef, {
+          [`packs.${productConfig.packType}.storiesRemaining`]:
+            FieldValue.increment(
+              productConfig.stories
+            ),
+
+          [`packs.${productConfig.packType}.purchases`]:
+            FieldValue.increment(1),
+        });
+
+        transaction.set(purchaseRef, {
+          uid,
+          productId,
+          packType: productConfig.packType,
+          stories: productConfig.stories,
+          orderId: purchase.orderId || null,
+          creditedAt:
+            new Date().toISOString(),
+          consumed: false,
+        });
+      }
+    );
+
+    if (
+      consumptionState !==
+      "CONSUMPTION_STATE_CONSUMED"
+    ) {
+      await androidPublisher.purchases.products.consume({
+        packageName: GOOGLE_PLAY_PACKAGE_NAME,
+        productId,
+        token: purchaseToken,
+      });
+
+      await purchaseRef.update({
+        consumed: true,
+        consumedAt:
+          new Date().toISOString(),
+      });
+    }
+
+    return res.json({
+      success: true,
+      alreadyCredited,
+      productId,
+      packType: productConfig.packType,
+      stories: productConfig.stories,
+    });
+  } catch (error) {
+    console.error(
+      "Erreur vérification Google Play :",
+      error
+    );
+
+    return res.status(500).json({
+      error:
+        "Impossible de vérifier l'achat Google Play.",
+      message: error?.message,
     });
   }
 });
