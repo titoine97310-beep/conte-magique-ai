@@ -26,9 +26,7 @@ import {
   updateLastLogin,
 } from "../services/userService";
 
-import {
-  setUserMode,
-} from "../services/usageService";
+import { setUserMode } from "../services/usageService";
 
 import { auth } from "../services/firebase";
 
@@ -119,11 +117,18 @@ export default function RegisterScreen() {
       await updateLastLogin(credential.user.uid);
 
       const profile = await getUserProfile(credential.user.uid);
-      const textRemaining = profile?.packs?.text?.storiesRemaining ?? 0;
+
+      const textRemaining =
+        profile?.packs?.text?.storiesRemaining ?? 0;
+
       const illustratedRemaining =
         profile?.packs?.illustrated?.storiesRemaining ?? 0;
 
-      if (profile?.role === "admin" || textRemaining > 0 || illustratedRemaining > 0) {
+      if (
+        profile?.role === "admin" ||
+        textRemaining > 0 ||
+        illustratedRemaining > 0
+      ) {
         router.replace("/create-story");
       } else {
         router.replace("/premium");
@@ -142,7 +147,10 @@ export default function RegisterScreen() {
 
   async function handleRegister() {
     if (!name.trim() || !email.trim() || !password) {
-      Alert.alert("Informations manquantes", "Remplis tous les champs.");
+      Alert.alert(
+        "Informations manquantes",
+        "Remplis tous les champs."
+      );
       return;
     }
 
@@ -166,46 +174,56 @@ export default function RegisterScreen() {
       setLoading(true);
 
       const credential =
-  await createUserWithEmailAndPassword(
-    auth,
-    cleanEmail(),
-    password
-  );
+        await createUserWithEmailAndPassword(
+          auth,
+          cleanEmail(),
+          password
+        );
 
-await updateProfile(credential.user, {
-  displayName: name.trim(),
-});
+      await updateProfile(credential.user, {
+        displayName: name.trim(),
+      });
 
-await createUserProfile({
-  uid: credential.user.uid,
-  displayName: name.trim(),
-  email: credential.user.email ?? cleanEmail(),
-});
+      await createUserProfile({
+        uid: credential.user.uid,
+        displayName: name.trim(),
+        email: credential.user.email ?? cleanEmail(),
 
-await setUserMode();
+        legal: {
+          termsAccepted: true,
+          termsVersion: "2026-08-12",
 
-await addStories(
-  credential.user.uid,
-  "text",
-  2,
-  false
-);
+          privacyAcknowledged: true,
+          privacyVersion: "2026-08-12",
+        },
+      });
 
-Alert.alert(
-  "Bienvenue 🎁",
-  "Ton compte est prêt et tu as reçu 2 histoires texte gratuites. Tu peux aussi acheter un carnet dès maintenant.",
-  [
-    {
-      text: "Créer une histoire",
-      onPress: () => router.replace("/create-story"),
-    },
-    {
-      text: "Voir les carnets",
-      onPress: () => router.replace("/premium"),
-    },
-  ],
-  { cancelable: false }
-);
+      await setUserMode();
+
+      await addStories(
+        credential.user.uid,
+        "text",
+        2,
+        false
+      );
+
+      Alert.alert(
+        "Bienvenue 🎁",
+        "Ton compte est prêt et tu as reçu 2 histoires texte gratuites. Tu peux aussi acheter un carnet dès maintenant.",
+        [
+          {
+            text: "Créer une histoire",
+            onPress: () =>
+              router.replace("/create-story"),
+          },
+          {
+            text: "Voir les carnets",
+            onPress: () =>
+              router.replace("/premium"),
+          },
+        ],
+        { cancelable: false }
+      );
     } catch (error: any) {
       console.log("Erreur inscription :", error);
 
@@ -241,10 +259,16 @@ Alert.alert(
     >
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : undefined
+        }
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={
+            styles.scrollContent
+          }
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -253,11 +277,15 @@ Alert.alert(
             onPress={() => router.replace("/")}
             disabled={loading}
           >
-            <Text style={styles.backText}>← Accueil</Text>
+            <Text style={styles.backText}>
+              ← Accueil
+            </Text>
           </TouchableOpacity>
 
           <Text style={styles.title}>
-            {isLogin ? "Bon retour ✨" : "Crée ton compte ✨"}
+            {isLogin
+              ? "Bon retour ✨"
+              : "Crée ton compte ✨"}
           </Text>
 
           <Text style={styles.subtitle}>
@@ -270,15 +298,19 @@ Alert.alert(
             <TouchableOpacity
               style={[
                 styles.modeButton,
-                isLogin && styles.modeButtonActive,
+                isLogin &&
+                  styles.modeButtonActive,
               ]}
-              onPress={() => changeMode("login")}
+              onPress={() =>
+                changeMode("login")
+              }
               disabled={loading}
             >
               <Text
                 style={[
                   styles.modeText,
-                  isLogin && styles.modeTextActive,
+                  isLogin &&
+                    styles.modeTextActive,
                 ]}
               >
                 Se connecter
@@ -288,15 +320,19 @@ Alert.alert(
             <TouchableOpacity
               style={[
                 styles.modeButton,
-                !isLogin && styles.modeButtonActive,
+                !isLogin &&
+                  styles.modeButtonActive,
               ]}
-              onPress={() => changeMode("register")}
+              onPress={() =>
+                changeMode("register")
+              }
               disabled={loading}
             >
               <Text
                 style={[
                   styles.modeText,
-                  !isLogin && styles.modeTextActive,
+                  !isLogin &&
+                    styles.modeTextActive,
                 ]}
               >
                 Créer un compte
@@ -328,7 +364,9 @@ Alert.alert(
             keyboardType="email-address"
           />
 
-          <View style={styles.passwordContainer}>
+          <View
+            style={styles.passwordContainer}
+          >
             <TextInput
               style={styles.passwordInput}
               placeholder="Mot de passe"
@@ -342,7 +380,11 @@ Alert.alert(
             />
 
             <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
+              onPress={() =>
+                setShowPassword(
+                  !showPassword
+                )
+              }
               disabled={loading}
             >
               <Text style={styles.eyeText}>
@@ -353,10 +395,18 @@ Alert.alert(
 
           {isLogin && (
             <TouchableOpacity
-              onPress={() => router.push("/forgot-password" as any)}
+              onPress={() =>
+                router.push(
+                  "/forgot-password" as any
+                )
+              }
               disabled={loading}
             >
-              <Text style={styles.forgotPassword}>
+              <Text
+                style={
+                  styles.forgotPassword
+                }
+              >
                 Mot de passe oublié ?
               </Text>
             </TouchableOpacity>
@@ -366,32 +416,63 @@ Alert.alert(
             <>
               <TouchableOpacity
                 style={styles.cguRow}
-                onPress={() => setAcceptedCGU(!acceptedCGU)}
+                onPress={() =>
+                  setAcceptedCGU(
+                    !acceptedCGU
+                  )
+                }
                 disabled={loading}
               >
-                <Text style={styles.checkbox}>
-                  {acceptedCGU ? "☑️" : "⬜"}
+                <Text
+                  style={styles.checkbox}
+                >
+                  {acceptedCGU
+                    ? "☑️"
+                    : "⬜"}
                 </Text>
 
-                <Text style={styles.cguText}>
-                  J’accepte les CGU et la politique de confidentialité
+                <Text
+                  style={styles.cguText}
+                >
+                  J’ai lu et j’accepte les
+                  CGU et je reconnais avoir
+                  pris connaissance de la
+                  politique de
+                  confidentialité
                 </Text>
               </TouchableOpacity>
 
-              <View style={styles.legalLinks}>
+              <View
+                style={styles.legalLinks}
+              >
                 <TouchableOpacity
-                  onPress={() => router.push("/cgu")}
+                  onPress={() =>
+                    router.push(
+                      "/legal/cgu" as any
+                    )
+                  }
                   disabled={loading}
                 >
-                  <Text style={styles.link}>Lire les CGU</Text>
+                  <Text
+                    style={styles.link}
+                  >
+                    Lire les CGU
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => router.push("/privacy")}
+                  onPress={() =>
+                    router.push(
+                      "/legal/privacy" as any
+                    )
+                  }
                   disabled={loading}
                 >
-                  <Text style={styles.link}>
-                    Politique de confidentialité
+                  <Text
+                    style={styles.link}
+                  >
+                    Politique de
+                    confidentialité
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -399,15 +480,25 @@ Alert.alert(
           )}
 
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              loading &&
+                styles.buttonDisabled,
+            ]}
             onPress={handleContinue}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#111" />
+              <ActivityIndicator
+                color="#111"
+              />
             ) : (
-              <Text style={styles.buttonText}>
-                {isLogin ? "Se connecter" : "Créer mon compte"}
+              <Text
+                style={styles.buttonText}
+              >
+                {isLogin
+                  ? "Se connecter"
+                  : "Créer mon compte"}
               </Text>
             )}
           </TouchableOpacity>
@@ -415,7 +506,11 @@ Alert.alert(
           <TouchableOpacity
             style={styles.switchButton}
             onPress={() =>
-              changeMode(isLogin ? "register" : "login")
+              changeMode(
+                isLogin
+                  ? "register"
+                  : "login"
+              )
             }
             disabled={loading}
           >
@@ -423,8 +518,15 @@ Alert.alert(
               {isLogin
                 ? "Pas encore de compte ? "
                 : "Tu as déjà un compte ? "}
-              <Text style={styles.switchTextImportant}>
-                {isLogin ? "Créer un compte" : "Se connecter"}
+
+              <Text
+                style={
+                  styles.switchTextImportant
+                }
+              >
+                {isLogin
+                  ? "Créer un compte"
+                  : "Se connecter"}
               </Text>
             </Text>
           </TouchableOpacity>
@@ -477,7 +579,8 @@ const styles = StyleSheet.create({
 
   modeContainer: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor:
+      "rgba(255,255,255,0.1)",
     borderRadius: 16,
     padding: 4,
     marginBottom: 22,

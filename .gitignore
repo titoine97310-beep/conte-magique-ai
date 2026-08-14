@@ -79,3 +79,4 @@ expo-env.d.ts
 *.p8
 *.p12
 *.mobileprovision
+.expo/

@@ -684,23 +684,6 @@ app.post("/google-play/verify-purchase", async (req, res) => {
       }
     );
 
-    if (
-      consumptionState !==
-      "CONSUMPTION_STATE_CONSUMED"
-    ) {
-      await androidPublisher.purchases.products.consume({
-        packageName: GOOGLE_PLAY_PACKAGE_NAME,
-        productId,
-        token: purchaseToken,
-      });
-
-      await purchaseRef.update({
-        consumed: true,
-        consumedAt:
-          new Date().toISOString(),
-      });
-    }
-
     return res.json({
       success: true,
       alreadyCredited,
