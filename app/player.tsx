@@ -3,9 +3,12 @@ import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,10 +18,18 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getCurrentStory, setCurrentStory } from "../services/currentStory";
+import { auth, db } from "../services/firebase";
 import { toggleFavoriteStory } from "../services/storageService";
 
 
 const TTS_URL = "https://conte-magique-ai.onrender.com/tts";
+
+const REPORT_REASONS = [
+  "Contenu inapproprié ou choquant",
+  "Violence ou contenu dangereux",
+  "Contenu à caractère sexuel",
+  "Autre problème",
+] as const;
 
 export default function PlayerScreen() {
   useKeepAwake();
@@ -33,6 +44,8 @@ export default function PlayerScreen() {
   const [bedtimeMode, setBedtimeMode] = useState(false);
   const [ambienceEnabled, setAmbienceEnabled] = useState(true);
   const [iaReading, setIaReading] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportSending, setReportSending] = useState(false);
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const ttsSoundRef = useRef<Audio.Sound | null>(null);
@@ -302,6 +315,57 @@ sound.setOnPlaybackStatusUpdate((status) => {
 
     setCurrentStory({ ...story, favorite: newFavorite });
     await toggleFavoriteStory(story.id);
+  }
+
+  function openReportModal() {
+    setReportModalVisible(true);
+  }
+
+  function closeReportModal() {
+    if (!reportSending) {
+      setReportModalVisible(false);
+    }
+  }
+
+  async function submitReport(reason: (typeof REPORT_REASONS)[number]) {
+    if (reportSending) return;
+
+    try {
+      setReportSending(true);
+
+      await addDoc(collection(db, "reports"), {
+        type: "ai_generated_content",
+        status: "new",
+        reason,
+        storyId: story?.id || null,
+        storyTitle: story?.title || null,
+        sceneIndex: index,
+        sceneNumber: index + 1,
+        sceneText: current?.text || "",
+        imageUrl: current?.imageUrl || null,
+        imagePrompt: current?.imagePrompt || null,
+        imageStyle: story?.imageStyle || null,
+        narrator: story?.narrator || null,
+        userId: auth.currentUser?.uid || null,
+        createdAt: serverTimestamp(),
+      });
+
+      setReportModalVisible(false);
+
+      Alert.alert(
+        "Signalement envoyé",
+        "Merci. Ce contenu a bien été signalé et pourra être examiné."
+      );
+    } catch (error) {
+      console.log("Erreur signalement :", error);
+
+      Alert.alert(
+        "Erreur",
+        "Impossible d'envoyer le signalement pour le moment. Réessaie plus tard."
+      );
+    } finally {
+      setReportSending(false);
+    }
   }
 
   useEffect(() => {
@@ -628,9 +692,53 @@ sound.setOnPlaybackStatusUpdate((status) => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.homeButton} onPress={goHome}>
-          <Text style={styles.homeText}>Accueil</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomActionRow}>
+          <TouchableOpacity style={styles.homeButton} onPress={goHome}>
+            <Text style={styles.homeText}>Accueil</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.reportButton} onPress={openReportModal}>
+            <Text style={styles.reportButtonText}>🚩 Signaler</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Modal
+          visible={reportModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={closeReportModal}
+        >
+          <View style={styles.reportOverlay}>
+            <View style={styles.reportModal}>
+              <Text style={styles.reportTitle}>Signaler ce contenu</Text>
+              <Text style={styles.reportSubtitle}>
+                Choisis le motif qui correspond le mieux au problème rencontré.
+              </Text>
+
+              {REPORT_REASONS.map((reason) => (
+                <TouchableOpacity
+                  key={reason}
+                  style={styles.reportReasonButton}
+                  onPress={() => submitReport(reason)}
+                  disabled={reportSending}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.reportReasonText}>{reason}</Text>
+                </TouchableOpacity>
+              ))}
+
+              <TouchableOpacity
+                style={styles.reportCancelButton}
+                onPress={closeReportModal}
+                disabled={reportSending}
+              >
+                <Text style={styles.reportCancelText}>
+                  {reportSending ? "Envoi..." : "Annuler"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -769,9 +877,14 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "900",
   },
-  homeButton: {
+  bottomActionRow: {
+    flexDirection: "row",
+    gap: 10,
     marginTop: 10,
     marginBottom: 6,
+  },
+  homeButton: {
+    flex: 1,
     backgroundColor: "white",
     padding: 11,
     borderRadius: 14,
@@ -780,6 +893,66 @@ const styles = StyleSheet.create({
   homeText: {
     color: "#111",
     fontWeight: "900",
+  },
+  reportButton: {
+    flex: 1,
+    backgroundColor: "#7F1D1D",
+    padding: 11,
+    borderRadius: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+  },
+  reportButtonText: {
+    color: "white",
+    fontWeight: "900",
+  },
+  reportOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  reportModal: {
+    backgroundColor: "white",
+    borderRadius: 24,
+    padding: 20,
+  },
+  reportTitle: {
+    color: "#111827",
+    fontSize: 22,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  reportSubtitle: {
+    color: "#4B5563",
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  reportReasonButton: {
+    backgroundColor: "#F3F4F6",
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  reportReasonText: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  reportCancelButton: {
+    marginTop: 4,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  reportCancelText: {
+    color: "#6B7280",
+    fontSize: 15,
+    fontWeight: "800",
   },
   fullscreenContainer: {
     flex: 1,
