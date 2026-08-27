@@ -1,21 +1,19 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import {
-  ErrorCode,
-  useIAP,
-} from "expo-iap";
+import { ErrorCode, useIAP } from "expo-iap";
 
 import { auth } from "../services/firebase";
 import { setUserMode } from "../services/usageService";
@@ -23,7 +21,9 @@ import { setUserMode } from "../services/usageService";
 const BACKEND_URL =
   "https://conte-magique-ai.onrender.com";
 
-const TEXT_PRODUCT_ID = "carnet_15_textes";
+const TEXT_PRODUCT_ID =
+  "carnet_15_textes";
+
 const ILLUSTRATED_PRODUCT_ID =
   "carnet_15_histoires";
 
@@ -31,6 +31,11 @@ const PRODUCT_IDS = [
   TEXT_PRODUCT_ID,
   ILLUSTRATED_PRODUCT_ID,
 ];
+
+const STORE_NAME =
+  Platform.OS === "ios"
+    ? "l’App Store"
+    : "Google Play";
 
 export default function PremiumScreen() {
   const [processing, setProcessing] =
@@ -43,10 +48,11 @@ export default function PremiumScreen() {
     requestPurchase,
     finishTransaction,
   } = useIAP({
-
     onPurchaseSuccess: async (purchase) => {
       console.log(
-        "✅ Achat Google Play reçu :",
+        Platform.OS === "ios"
+          ? "✅ Achat Apple reçu :"
+          : "✅ Achat Google Play reçu :",
         purchase.productId
       );
 
@@ -62,46 +68,107 @@ export default function PremiumScreen() {
           );
         }
 
+        const productId =
+          purchase.productId;
+
         const purchaseToken =
           purchase.purchaseToken;
 
-        if (!purchaseToken) {
+        const transactionId =
+          purchase.transactionId;
+
+        if (!productId) {
           throw new Error(
-            "Google Play n'a pas fourni de purchaseToken."
+            "Achat reçu sans productId."
+          );
+        }
+
+        if (
+          Platform.OS === "android" &&
+          !purchaseToken
+        ) {
+          throw new Error(
+            "Achat Google Play reçu sans purchaseToken."
+          );
+        }
+
+        if (
+          Platform.OS === "ios" &&
+          !transactionId
+        ) {
+          throw new Error(
+            "Achat Apple reçu sans transactionId."
           );
         }
 
         /*
-         * Récupération d'un Firebase ID token.
-         * Le backend utilisera ce token pour identifier
-         * réellement l'utilisateur.
+         * Firebase permet au serveur
+         * d'identifier réellement
+         * l'utilisateur connecté.
          */
         const firebaseIdToken =
-          await currentUser.getIdToken(true);
+          await currentUser.getIdToken(
+            true
+          );
 
-        const response = await fetch(
-          `${BACKEND_URL}/google-play/verify-purchase`,
-          {
-            method: "POST",
+        /*
+         * Android :
+         * Google Play
+         *
+         * iPhone / iPad :
+         * Apple App Store
+         */
+        const verifyUrl =
+          Platform.OS === "ios"
+            ? `${BACKEND_URL}/apple/verify-purchase`
+            : `${BACKEND_URL}/google-play/verify-purchase`;
 
-            headers: {
-              "Content-Type":
-                "application/json",
+        /*
+         * Apple et Google n'utilisent pas
+         * la même preuve d'achat.
+         */
+        const body =
+          Platform.OS === "ios"
+            ? {
+                productId,
+                transactionId,
+              }
+            : {
+                productId,
+                purchaseToken,
+              };
 
-              Authorization:
-                `Bearer ${firebaseIdToken}`,
-            },
+        const response =
+          await fetch(
+            verifyUrl,
+            {
+              method: "POST",
 
-            body: JSON.stringify({
-              productId:
-                purchase.productId,
-              purchaseToken,
-            }),
-          }
-        );
+              headers: {
+                "Content-Type":
+                  "application/json",
 
-        const result =
-          await response.json();
+                Authorization:
+                  `Bearer ${firebaseIdToken}`,
+              },
+
+              body:
+                JSON.stringify(
+                  body
+                ),
+            }
+          );
+
+        let result: any = null;
+
+        try {
+          result =
+            await response.json();
+        } catch {
+          throw new Error(
+            "Le serveur a répondu dans un format inattendu."
+          );
+        }
 
         if (!response.ok) {
           console.log(
@@ -116,20 +183,29 @@ export default function PremiumScreen() {
           );
         }
 
-        if (!result.success) {
+        if (!result?.success) {
           throw new Error(
             "Le serveur n'a pas confirmé l'achat."
           );
         }
 
         /*
-         * Le serveur a :
-         * - vérifié Google Play
-         * - identifié l'utilisateur Firebase
-         * - crédité Firestore
+         * À ce stade :
          *
-         * Maintenant seulement nous terminons
-         * la transaction Google Play.
+         * - Apple ou Google a confirmé
+         *   l'achat ;
+         *
+         * - Firebase a identifié
+         *   l'utilisateur ;
+         *
+         * - Firestore a ajouté les
+         *   15 histoires ;
+         *
+         * - le serveur protège contre
+         *   le double crédit.
+         *
+         * On termine seulement maintenant
+         * la transaction côté store.
          */
         await finishTransaction({
           purchase,
@@ -139,7 +215,7 @@ export default function PremiumScreen() {
         await setUserMode();
 
         if (
-          purchase.productId ===
+          productId ===
           TEXT_PRODUCT_ID
         ) {
           Alert.alert(
@@ -147,7 +223,9 @@ export default function PremiumScreen() {
             "15 histoires en texte ont été ajoutées à ton compte.",
             [
               {
-                text: "Créer une histoire",
+                text:
+                  "Créer une histoire",
+
                 onPress: () =>
                   router.replace(
                     "/create-story"
@@ -160,7 +238,7 @@ export default function PremiumScreen() {
         }
 
         if (
-          purchase.productId ===
+          productId ===
           ILLUSTRATED_PRODUCT_ID
         ) {
           Alert.alert(
@@ -168,7 +246,9 @@ export default function PremiumScreen() {
             "15 histoires illustrées ont été ajoutées à ton compte.",
             [
               {
-                text: "Créer une histoire",
+                text:
+                  "Créer une histoire",
+
                 onPress: () =>
                   router.replace(
                     "/create-story"
@@ -192,8 +272,9 @@ export default function PremiumScreen() {
 
         Alert.alert(
           "Achat non finalisé",
+
           error?.message ||
-            "Impossible de valider l'achat. Ne relance pas immédiatement le paiement."
+            `Impossible de valider l'achat avec ${STORE_NAME}. Ne relance pas immédiatement le paiement.`
         );
       } finally {
         setProcessing(false);
@@ -202,7 +283,10 @@ export default function PremiumScreen() {
 
     onPurchaseError: (error) => {
       console.log(
-        "Erreur Google Play :",
+        Platform.OS === "ios"
+          ? "Erreur App Store :"
+          : "Erreur Google Play :",
+
         error
       );
 
@@ -217,15 +301,17 @@ export default function PremiumScreen() {
 
       Alert.alert(
         "Paiement impossible",
+
         error.message ||
-          "Google Play n'a pas pu effectuer le paiement."
+          `${STORE_NAME} n'a pas pu effectuer le paiement.`
       );
     },
   });
 
   /*
-   * Récupération des deux produits configurés
-   * dans Google Play Console.
+   * Récupère les deux produits depuis
+   * Google Play sur Android
+   * ou l'App Store sur iOS.
    */
   useEffect(() => {
     if (!connected) {
@@ -237,40 +323,60 @@ export default function PremiumScreen() {
       type: "in-app",
     }).catch((error) => {
       console.error(
-        "Erreur chargement produits Google Play :",
+        `Erreur chargement produits ${STORE_NAME} :`,
         error
       );
     });
-  }, [connected, fetchProducts]);
+  }, [
+    connected,
+    fetchProducts,
+  ]);
 
   function redirectToRegister() {
     Alert.alert(
       "Compte requis",
+
       "Crée gratuitement ton compte pour acheter et conserver tes carnets.",
+
       [
         {
-          text: "Créer mon compte",
+          text:
+            "Créer mon compte",
+
           onPress: () =>
             router.replace({
-              pathname: "/register",
+              pathname:
+                "/register",
+
               params: {
-                mode: "register",
+                mode:
+                  "register",
               },
             } as any),
         },
+
         {
-          text: "J’ai déjà un compte",
+          text:
+            "J’ai déjà un compte",
+
           onPress: () =>
             router.replace({
-              pathname: "/register",
+              pathname:
+                "/register",
+
               params: {
-                mode: "login",
+                mode:
+                  "login",
               },
             } as any),
         },
+
         {
-          text: "Annuler",
-          style: "cancel",
+          text:
+            "Annuler",
+
+          style:
+            "cancel",
         },
       ]
     );
@@ -289,8 +395,9 @@ export default function PremiumScreen() {
 
     if (!connected) {
       Alert.alert(
-        "Google Play indisponible",
-        "La connexion à Google Play n'est pas encore prête. Réessaie dans quelques secondes."
+        `${STORE_NAME} indisponible`,
+
+        `La connexion à ${STORE_NAME} n'est pas encore prête. Réessaie dans quelques secondes.`
       );
 
       return;
@@ -301,19 +408,21 @@ export default function PremiumScreen() {
     }
 
     /*
-     * Vérifie également que Google Play
-     * nous renvoie réellement ce produit.
+     * Vérifie que le produit existe
+     * réellement dans le store.
      */
     const storeProduct =
       products.find(
         (product) =>
-          product.id === productId
+          product.id ===
+          productId
       );
 
     if (!storeProduct) {
       Alert.alert(
         "Produit indisponible",
-        "Ce carnet n'est pas disponible sur Google Play pour le moment."
+
+        `Ce carnet n'est pas disponible sur ${STORE_NAME} pour le moment.`
       );
 
       return;
@@ -323,22 +432,26 @@ export default function PremiumScreen() {
       setProcessing(true);
 
       /*
-       * requestPurchase déclenche l'interface Google Play.
-       * Le résultat final arrivera ensuite dans
-       * onPurchaseSuccess / onPurchaseError.
+       * expo-iap choisira automatiquement
+       * le store correspondant à la
+       * plateforme.
        */
       await requestPurchase({
         request: {
           google: {
-            skus: [productId],
+            skus: [
+              productId,
+            ],
           },
 
           apple: {
-            sku: productId,
+            sku:
+              productId,
           },
         },
 
-        type: "in-app",
+        type:
+          "in-app",
       });
     } catch (error: any) {
       setProcessing(false);
@@ -350,8 +463,9 @@ export default function PremiumScreen() {
 
       Alert.alert(
         "Paiement impossible",
+
         error?.message ||
-          "Impossible d'ouvrir Google Play."
+          `Impossible d'ouvrir ${STORE_NAME}.`
       );
     }
   }
@@ -368,14 +482,23 @@ export default function PremiumScreen() {
     );
   }
 
-  function getGooglePlayPrice(
+  /*
+   * Prix renvoyé directement par
+   * Google Play ou Apple.
+   *
+   * Les prix de secours ne sont utilisés
+   * que si le store n'a pas encore
+   * retourné les produits.
+   */
+  function getStorePrice(
     productId: string,
     fallback: string
   ) {
     const product =
       products.find(
         (item) =>
-          item.id === productId
+          item.id ===
+          productId
       );
 
     return (
@@ -390,416 +513,507 @@ export default function PremiumScreen() {
         "#020617",
         "#312E81",
       ]}
-      style={styles.container}
+      style={
+        styles.container
+      }
     >
-      <ScrollView
-        contentContainerStyle={
-          styles.scrollContent
-        }
-        showsVerticalScrollIndicator={
-          false
+      <SafeAreaView
+        style={
+          styles.safeArea
         }
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() =>
-            router.back()
+        <ScrollView
+          contentContainerStyle={
+            styles.scrollContent
           }
-          disabled={processing}
+          showsVerticalScrollIndicator={
+            false
+          }
         >
-          <Text
-            style={styles.backText}
-          >
-            ← Retour
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>
-          Continue la magie ✨
-        </Text>
-
-        <Text
-          style={styles.subtitle}
-        >
-          Choisis ton carnet et
-          continue à créer des
-          histoires personnalisées.
-        </Text>
-
-        <View
-          style={styles.benefitsBox}
-        >
-          <Text
-            style={styles.benefit}
-          >
-            🔊 Narration IA immersive
-          </Text>
-
-          <Text
-            style={styles.benefit}
-          >
-            🌙 Mode dodo magique
-          </Text>
-
-          <Text
-            style={styles.benefit}
-          >
-            💾 Histoires sauvegardées
-          </Text>
-
-          <Text
-            style={styles.benefit}
-          >
-            🎨 Illustrations selon le
-            carnet
-          </Text>
-        </View>
-
-        {!connected && (
-          <View
-            style={
-              styles.storeStatus
-            }
-          >
-            <ActivityIndicator />
-
-            <Text
-              style={
-                styles.storeStatusText
-              }
-            >
-              Connexion à Google Play…
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.card}>
-          <Text
-            style={styles.cardIcon}
-          >
-            📖
-          </Text>
-
-          <Text
-            style={styles.cardTitle}
-          >
-            Carnet Texte
-          </Text>
-
-          <Text
-            style={styles.cardPrice}
-          >
-            {getGooglePlayPrice(
-              TEXT_PRODUCT_ID,
-              "2,99 €"
-            )}
-          </Text>
-
-          <Text
-            style={
-              styles.cardDescription
-            }
-          >
-            15 histoires en texte
-            seul. Idéal pour profiter
-            de la narration sans
-            générer d’illustrations.
-          </Text>
-
           <TouchableOpacity
-            style={[
-              styles.button,
-              (!connected ||
-                processing) &&
-                styles.disabledButton,
-            ]}
-            onPress={buyTextPack}
-            activeOpacity={0.85}
+            style={
+              styles.backButton
+            }
+            onPress={() =>
+              router.back()
+            }
             disabled={
-              !connected ||
               processing
             }
           >
-            {processing ? (
-              <ActivityIndicator />
-            ) : (
-              <Text
-                style={
-                  styles.buttonText
-                }
-              >
-                Choisir le carnet texte
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View
-          style={
-            styles.premiumCard
-          }
-        >
-          <View
-            style={styles.badge}
-          >
             <Text
               style={
-                styles.badgeText
+                styles.backText
               }
             >
-              Le plus magique
+              ← Retour
             </Text>
-          </View>
+          </TouchableOpacity>
 
           <Text
-            style={styles.cardIcon}
+            style={
+              styles.title
+            }
           >
-            🌟
-          </Text>
-
-          <Text
-            style={styles.cardTitle}
-          >
-            Carnet Illustré
-          </Text>
-
-          <Text
-            style={styles.cardPrice}
-          >
-            {getGooglePlayPrice(
-              ILLUSTRATED_PRODUCT_ID,
-              "9,99 €"
-            )}
+            Continue la magie ✨
           </Text>
 
           <Text
             style={
-              styles.cardDescription
+              styles.subtitle
             }
           >
-            15 histoires complètes
-            avec texte et
-            illustrations.
-            L’expérience la plus
-            immersive de
-            ConteMagiqueIA.
+            Choisis ton carnet et
+            continue à créer des
+            histoires personnalisées.
           </Text>
 
-          <TouchableOpacity
-            style={[
-              styles.premiumButton,
-              (!connected ||
-                processing) &&
-                styles.disabledButton,
-            ]}
-            onPress={
-              buyPremiumPack
-            }
-            activeOpacity={0.85}
-            disabled={
-              !connected ||
-              processing
+          <View
+            style={
+              styles.benefitsBox
             }
           >
-            {processing ? (
+            <Text
+              style={
+                styles.benefit
+              }
+            >
+              🔊 Narration IA immersive
+            </Text>
+
+            <Text
+              style={
+                styles.benefit
+              }
+            >
+              🌙 Mode dodo magique
+            </Text>
+
+            <Text
+              style={
+                styles.benefit
+              }
+            >
+              💾 Histoires sauvegardées
+            </Text>
+
+            <Text
+              style={
+                styles.benefit
+              }
+            >
+              🎨 Illustrations selon le
+              carnet
+            </Text>
+          </View>
+
+          {!connected && (
+            <View
+              style={
+                styles.storeStatus
+              }
+            >
               <ActivityIndicator />
-            ) : (
+
               <Text
                 style={
-                  styles.premiumButtonText
+                  styles.storeStatusText
                 }
               >
-                Choisir le carnet
-                illustré
+                Connexion à{" "}
+                {STORE_NAME}…
               </Text>
-            )}
-          </TouchableOpacity>
-        </View>
+            </View>
+          )}
 
-        <Text
-          style={styles.footerText}
-        >
-          Paiement sécurisé par
-          Google Play. Chaque carnet
-          contient 15 créations.
-        </Text>
-      </ScrollView>
+          <View
+            style={
+              styles.card
+            }
+          >
+            <Text
+              style={
+                styles.cardIcon
+              }
+            >
+              📖
+            </Text>
+
+            <Text
+              style={
+                styles.cardTitle
+              }
+            >
+              Carnet Texte
+            </Text>
+
+            <Text
+              style={
+                styles.cardPrice
+              }
+            >
+              {getStorePrice(
+                TEXT_PRODUCT_ID,
+                "2,99 €"
+              )}
+            </Text>
+
+            <Text
+              style={
+                styles.cardDescription
+              }
+            >
+              15 histoires en texte
+              seul. Idéal pour profiter
+              de la narration sans
+              générer d’illustrations.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+
+                (
+                  !connected ||
+                  processing
+                ) &&
+                  styles.disabledButton,
+              ]}
+              onPress={
+                buyTextPack
+              }
+              activeOpacity={
+                0.85
+              }
+              disabled={
+                !connected ||
+                processing
+              }
+            >
+              {processing ? (
+                <ActivityIndicator />
+              ) : (
+                <Text
+                  style={
+                    styles.buttonText
+                  }
+                >
+                  Choisir le carnet texte
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View
+            style={
+              styles.premiumCard
+            }
+          >
+            <View
+              style={
+                styles.badge
+              }
+            >
+              <Text
+                style={
+                  styles.badgeText
+                }
+              >
+                Le plus magique
+              </Text>
+            </View>
+
+            <Text
+              style={
+                styles.cardIcon
+              }
+            >
+              🌟
+            </Text>
+
+            <Text
+              style={
+                styles.cardTitle
+              }
+            >
+              Carnet Illustré
+            </Text>
+
+            <Text
+              style={
+                styles.cardPrice
+              }
+            >
+              {getStorePrice(
+                ILLUSTRATED_PRODUCT_ID,
+                "9,99 €"
+              )}
+            </Text>
+
+            <Text
+              style={
+                styles.cardDescription
+              }
+            >
+              15 histoires complètes
+              avec texte et
+              illustrations.
+              L’expérience la plus
+              immersive de
+              ConteMagiqueIA.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.premiumButton,
+
+                (
+                  !connected ||
+                  processing
+                ) &&
+                  styles.disabledButton,
+              ]}
+              onPress={
+                buyPremiumPack
+              }
+              activeOpacity={
+                0.85
+              }
+              disabled={
+                !connected ||
+                processing
+              }
+            >
+              {processing ? (
+                <ActivityIndicator />
+              ) : (
+                <Text
+                  style={
+                    styles.premiumButtonText
+                  }
+                >
+                  Choisir le carnet
+                  illustré
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <Text
+            style={
+              styles.footerText
+            }
+          >
+            Paiement sécurisé par{" "}
+            {STORE_NAME}. Chaque carnet
+            contient 15 créations.
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
 
-  scrollContent: {
-    padding: 24,
-    paddingTop: 55,
-    paddingBottom: 40,
-  },
+    safeArea: {
+      flex: 1,
+    },
 
-  backButton: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingRight: 18,
-    marginBottom: 15,
-  },
+    scrollContent: {
+      width: "100%",
+      maxWidth: 800,
+      alignSelf: "center",
+      paddingHorizontal: 24,
+      paddingTop: 20,
+      paddingBottom: 40,
+    },
 
-  backText: {
-    color: "#CBD5E1",
-    fontSize: 15,
-    fontWeight: "800",
-  },
+    backButton: {
+      alignSelf: "flex-start",
+      paddingVertical: 8,
+      paddingRight: 18,
+      marginBottom: 15,
+    },
 
-  title: {
-    color: "white",
-    fontSize: 34,
-    fontWeight: "900",
-    marginBottom: 10,
-  },
+    backText: {
+      color: "#CBD5E1",
+      fontSize: 15,
+      fontWeight: "800",
+    },
 
-  subtitle: {
-    color: "#CBD5E1",
-    fontSize: 16,
-    marginBottom: 22,
-    lineHeight: 24,
-  },
+    title: {
+      color: "white",
+      fontSize: 34,
+      fontWeight: "900",
+      marginBottom: 10,
+    },
 
-  benefitsBox: {
-    backgroundColor:
-      "rgba(255,255,255,0.1)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.18)",
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 22,
-  },
+    subtitle: {
+      color: "#CBD5E1",
+      fontSize: 16,
+      marginBottom: 22,
+      lineHeight: 24,
+    },
 
-  benefit: {
-    color: "white",
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
+    benefitsBox: {
+      backgroundColor:
+        "rgba(255,255,255,0.1)",
 
-  storeStatus: {
-    backgroundColor:
-      "rgba(255,255,255,0.10)",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 20,
-    alignItems: "center",
-    gap: 8,
-  },
+      borderWidth: 1,
 
-  storeStatusText: {
-    color: "#CBD5E1",
-    fontSize: 13,
-    fontWeight: "700",
-  },
+      borderColor:
+        "rgba(255,255,255,0.18)",
 
-  card: {
-    backgroundColor: "white",
-    borderRadius: 26,
-    padding: 24,
-    marginBottom: 22,
-    alignItems: "center",
-  },
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 22,
+    },
 
-  premiumCard: {
-    backgroundColor: "#FFB703",
-    borderRadius: 28,
-    padding: 24,
-    marginBottom: 22,
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#FFE8A3",
-  },
+    benefit: {
+      color: "white",
+      fontSize: 15,
+      fontWeight: "700",
+      marginBottom: 8,
+    },
 
-  badge: {
-    backgroundColor: "#111827",
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    marginBottom: 14,
-  },
+    storeStatus: {
+      backgroundColor:
+        "rgba(255,255,255,0.10)",
 
-  badgeText: {
-    color: "#FFB703",
-    fontWeight: "900",
-    fontSize: 13,
-  },
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 20,
+      alignItems: "center",
+      gap: 8,
+    },
 
-  cardIcon: {
-    fontSize: 50,
-    marginBottom: 10,
-  },
+    storeStatusText: {
+      color: "#CBD5E1",
+      fontSize: 13,
+      fontWeight: "700",
+    },
 
-  cardTitle: {
-    fontSize: 26,
-    fontWeight: "900",
-    color: "#111",
-    marginBottom: 6,
-  },
+    card: {
+      backgroundColor:
+        "white",
 
-  cardPrice: {
-    fontSize: 42,
-    fontWeight: "900",
-    color: "#6930C3",
-    marginBottom: 10,
-  },
+      borderRadius: 26,
+      padding: 24,
+      marginBottom: 22,
+      alignItems: "center",
+    },
 
-  cardDescription: {
-    textAlign: "center",
-    fontSize: 16,
-    color: "#333",
-    marginBottom: 24,
-    lineHeight: 24,
-  },
+    premiumCard: {
+      backgroundColor:
+        "#FFB703",
 
-  button: {
-    backgroundColor: "#111827",
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    borderRadius: 18,
-    width: "100%",
-    alignItems: "center",
-  },
+      borderRadius: 28,
+      padding: 24,
+      marginBottom: 22,
+      alignItems: "center",
 
-  buttonText: {
-    color: "white",
-    fontWeight: "900",
-    fontSize: 16,
-    textAlign: "center",
-  },
+      borderWidth: 2,
+      borderColor:
+        "#FFE8A3",
+    },
 
-  premiumButton: {
-    backgroundColor: "#111827",
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    borderRadius: 18,
-    width: "100%",
-    alignItems: "center",
-  },
+    badge: {
+      backgroundColor:
+        "#111827",
 
-  premiumButtonText: {
-    color: "white",
-    fontWeight: "900",
-    fontSize: 16,
-    textAlign: "center",
-  },
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 999,
+      marginBottom: 14,
+    },
 
-  disabledButton: {
-    opacity: 0.55,
-  },
+    badgeText: {
+      color:
+        "#FFB703",
 
-  footerText: {
-    color: "#CBD5E1",
-    fontSize: 12,
-    textAlign: "center",
-    marginBottom: 30,
-    lineHeight: 18,
-  },
-});
+      fontWeight:
+        "900",
+
+      fontSize: 13,
+    },
+
+    cardIcon: {
+      fontSize: 50,
+      marginBottom: 10,
+    },
+
+    cardTitle: {
+      fontSize: 26,
+      fontWeight: "900",
+      color: "#111",
+      marginBottom: 6,
+    },
+
+    cardPrice: {
+      fontSize: 42,
+      fontWeight: "900",
+      color: "#6930C3",
+      marginBottom: 10,
+    },
+
+    cardDescription: {
+      textAlign: "center",
+      fontSize: 16,
+      color: "#333",
+      marginBottom: 24,
+      lineHeight: 24,
+    },
+
+    button: {
+      backgroundColor:
+        "#111827",
+
+      paddingVertical: 16,
+      paddingHorizontal: 28,
+      borderRadius: 18,
+      width: "100%",
+      alignItems: "center",
+    },
+
+    buttonText: {
+      color: "white",
+      fontWeight: "900",
+      fontSize: 16,
+      textAlign: "center",
+    },
+
+    premiumButton: {
+      backgroundColor:
+        "#111827",
+
+      paddingVertical: 16,
+      paddingHorizontal: 28,
+      borderRadius: 18,
+      width: "100%",
+      alignItems: "center",
+    },
+
+    premiumButtonText: {
+      color: "white",
+      fontWeight: "900",
+      fontSize: 16,
+      textAlign: "center",
+    },
+
+    disabledButton: {
+      opacity: 0.55,
+    },
+
+    footerText: {
+      color: "#CBD5E1",
+      fontSize: 12,
+      textAlign: "center",
+      marginBottom: 30,
+      lineHeight: 18,
+    },
+  });

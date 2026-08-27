@@ -3,14 +3,21 @@
     "name": "ConteMagiqueIA",
     "slug": "contemagiqueia",
     "version": "1.0.2",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "contemagiqueia",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.contemagiqueia.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
+
     "android": {
       "versionCode": 4,
       "adaptiveIcon": {
@@ -21,10 +28,12 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.contemagiqueia.app"
     },
+
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
       [
@@ -42,10 +51,12 @@
       "expo-font",
       "expo-iap"
     ],
+
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
+
     "extra": {
       "router": {},
       "eas": {

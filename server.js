@@ -1,3 +1,8 @@
+import {
+  AppStoreServerAPIClient,
+  Environment,
+  SignedDataVerifier,
+} from "@apple/app-store-server-library";
 import cors from "cors";
 import crypto from "crypto";
 import dotenv from "dotenv";
@@ -37,6 +42,7 @@ const GOOGLE_PLAY_PRODUCTS = {
   },
 };
 
+
 const googlePlayAuth = new google.auth.GoogleAuth({
   keyFile: "/etc/secrets/google-play-service-account.json",
   scopes: ["https://www.googleapis.com/auth/androidpublisher"],
@@ -46,6 +52,31 @@ const androidPublisher = google.androidpublisher({
   version: "v3",
   auth: googlePlayAuth,
 });
+
+const APPLE_ISSUER_ID = process.env.APPLE_ISSUER_ID;
+const APPLE_KEY_ID = process.env.APPLE_KEY_ID;
+
+const APPLE_KEY_PATH = APPLE_KEY_ID
+  ? `/etc/secrets/SubscriptionKey_${APPLE_KEY_ID}.p8`
+  : null;
+
+function getApplePrivateKey() {
+  if (!APPLE_ISSUER_ID) {
+    throw new Error("APPLE_ISSUER_ID manquant.");
+  }
+
+  if (!APPLE_KEY_ID) {
+    throw new Error("APPLE_KEY_ID manquant.");
+  }
+
+  if (!APPLE_KEY_PATH || !fs.existsSync(APPLE_KEY_PATH)) {
+    throw new Error(
+      `Clé privée Apple introuvable : ${APPLE_KEY_PATH}`
+    );
+  }
+
+  return fs.readFileSync(APPLE_KEY_PATH, "utf8");
+}
 
 const firebaseServiceAccount = JSON.parse(
   fs.readFileSync(
@@ -61,6 +92,18 @@ const firebaseAdminApp = initializeApp({
 
 const firebaseAuth = getAuth(firebaseAdminApp);
 const adminDb = getFirestore(firebaseAdminApp);
+
+function createAppleClient(environment) {
+  const privateKey = getApplePrivateKey();
+
+  return new AppStoreServerAPIClient(
+    privateKey,
+    APPLE_KEY_ID,
+    APPLE_ISSUER_ID,
+    APPLE_BUNDLE_ID,
+    environment
+  );
+}
 
 app.get("/", (req, res) => {
   res.send("Backend ConteMagiqueIA OK");
@@ -549,6 +592,11 @@ Prononce les mots naturellement.
 });
 
 app.post("/google-play/verify-purchase", async (req, res) => {
+  console.log("🛒 Requête Google Play reçue");
+console.log("🛒 productId :", req.body?.productId);
+console.log("🛒 purchaseToken présent :", !!req.body?.purchaseToken);
+console.log("🔥 Authorization présente :", !!req.headers.authorization);
+
   try {
     const authorization = req.headers.authorization || "";
 
@@ -704,6 +752,345 @@ app.post("/google-play/verify-purchase", async (req, res) => {
     });
   }
 });
+
+const APPLE_APP_ID = 6805620727;
+
+const APPLE_ROOT_CA_URLS = [
+  "https://www.apple.com/appleca/AppleIncRootCertificate.cer",
+  "https://www.apple.com/certificateauthority/AppleRootCA-G2.cer",
+  "https://www.apple.com/certificateauthority/AppleRootCA-G3.cer",
+];
+
+let appleRootCertificatesCache = null;
+
+async function getAppleRootCertificates() {
+  if (appleRootCertificatesCache) {
+    return appleRootCertificatesCache;
+  }
+
+  const certificates = await Promise.all(
+    APPLE_ROOT_CA_URLS.map(async (url) => {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          `Impossible de télécharger un certificat Apple (${response.status}).`
+        );
+      }
+
+      return Buffer.from(await response.arrayBuffer());
+    })
+  );
+
+  appleRootCertificatesCache = certificates;
+
+  return certificates;
+}
+
+async function createAppleVerifier(environment) {
+  const rootCertificates =
+    await getAppleRootCertificates();
+
+  return new SignedDataVerifier(
+    rootCertificates,
+    true,
+    environment,
+    APPLE_BUNDLE_ID,
+    environment === Environment.PRODUCTION
+      ? APPLE_APP_ID
+      : undefined
+  );
+}
+
+async function verifyAppleTransaction(transactionId) {
+  const environments = [
+    Environment.PRODUCTION,
+    Environment.SANDBOX,
+  ];
+
+  let lastError = null;
+
+  for (const environment of environments) {
+    try {
+      const client =
+        createAppleClient(environment);
+
+      const response =
+        await client.getTransactionInfo(
+          transactionId
+        );
+
+      if (!response?.signedTransactionInfo) {
+        throw new Error(
+          "Apple n'a retourné aucune transaction signée."
+        );
+      }
+
+      const verifier =
+        await createAppleVerifier(environment);
+
+      const transaction =
+        await verifier.verifyAndDecodeTransaction(
+          response.signedTransactionInfo
+        );
+
+      return {
+        transaction,
+        environment,
+      };
+    } catch (error) {
+      lastError = error;
+
+      console.log(
+        `Échec vérification Apple ${environment} :`,
+        error?.message || error
+      );
+    }
+  }
+
+  throw (
+    lastError ||
+    new Error(
+      "Impossible de vérifier la transaction Apple."
+    )
+  );
+}
+
+app.post(
+  "/apple/verify-purchase",
+  async (req, res) => {
+    console.log("🍎 Requête Apple reçue");
+    console.log(
+      "🍎 productId :",
+      req.body?.productId
+    );
+    console.log(
+      "🍎 transactionId présent :",
+      !!req.body?.transactionId
+    );
+
+    try {
+      const authorization =
+        req.headers.authorization || "";
+
+      if (
+        !authorization.startsWith("Bearer ")
+      ) {
+        return res.status(401).json({
+          error:
+            "Authentification Firebase requise.",
+        });
+      }
+
+      const idToken =
+        authorization.substring(7);
+
+      const decodedToken =
+        await firebaseAuth.verifyIdToken(
+          idToken
+        );
+
+      const uid = decodedToken.uid;
+
+      const {
+        productId,
+        transactionId,
+      } = req.body;
+
+      if (!productId || !transactionId) {
+        return res.status(400).json({
+          error:
+            "productId et transactionId sont obligatoires.",
+        });
+      }
+
+      const productConfig =
+        APPLE_PRODUCTS[productId];
+
+      if (!productConfig) {
+        return res.status(400).json({
+          error:
+            "Produit Apple inconnu.",
+        });
+      }
+
+      const {
+        transaction,
+        environment,
+      } = await verifyAppleTransaction(
+        String(transactionId)
+      );
+
+      if (
+        transaction.bundleId !==
+        APPLE_BUNDLE_ID
+      ) {
+        return res.status(400).json({
+          error:
+            "La transaction ne correspond pas à ConteMagiqueIA.",
+        });
+      }
+
+      if (
+        transaction.productId !==
+        productId
+      ) {
+        return res.status(400).json({
+          error:
+            "Le produit acheté ne correspond pas au produit demandé.",
+        });
+      }
+
+      if (!transaction.transactionId) {
+        return res.status(400).json({
+          error:
+            "Identifiant de transaction Apple manquant.",
+        });
+      }
+
+      if (transaction.revocationDate) {
+        return res.status(400).json({
+          error:
+            "Cette transaction Apple a été révoquée ou remboursée.",
+        });
+      }
+
+      const verifiedTransactionId =
+        String(
+          transaction.transactionId
+        );
+
+      const purchaseHash = crypto
+        .createHash("sha256")
+        .update(verifiedTransactionId)
+        .digest("hex");
+
+      const userRef =
+        adminDb
+          .collection("users")
+          .doc(uid);
+
+      const purchaseRef =
+        adminDb
+          .collection("applePurchases")
+          .doc(purchaseHash);
+
+      let alreadyCredited = false;
+
+      await adminDb.runTransaction(
+        async (firestoreTransaction) => {
+          const purchaseSnapshot =
+            await firestoreTransaction.get(
+              purchaseRef
+            );
+
+          if (
+            purchaseSnapshot.exists
+          ) {
+            const existingPurchase =
+              purchaseSnapshot.data();
+
+            if (
+              existingPurchase.uid !== uid ||
+              existingPurchase.productId !==
+                productId
+            ) {
+              throw new Error(
+                "Cette transaction Apple a déjà été associée à un autre compte ou produit."
+              );
+            }
+
+            alreadyCredited = true;
+            return;
+          }
+
+          const userSnapshot =
+            await firestoreTransaction.get(
+              userRef
+            );
+
+          if (!userSnapshot.exists) {
+            throw new Error(
+              "Profil utilisateur introuvable."
+            );
+          }
+
+          firestoreTransaction.update(
+            userRef,
+            {
+              [`packs.${productConfig.packType}.storiesRemaining`]:
+                FieldValue.increment(
+                  productConfig.stories
+                ),
+
+              [`packs.${productConfig.packType}.purchases`]:
+                FieldValue.increment(1),
+            }
+          );
+
+          firestoreTransaction.set(
+            purchaseRef,
+            {
+              uid,
+              productId,
+              packType:
+                productConfig.packType,
+
+              stories:
+                productConfig.stories,
+
+              transactionId:
+                verifiedTransactionId,
+
+              originalTransactionId:
+                transaction.originalTransactionId
+                  ? String(
+                      transaction.originalTransactionId
+                    )
+                  : null,
+
+              environment:
+                String(environment),
+
+              purchaseDate:
+                transaction.purchaseDate
+                  ? new Date(
+                      transaction.purchaseDate
+                    ).toISOString()
+                  : null,
+
+              creditedAt:
+                new Date().toISOString(),
+            }
+          );
+        }
+      );
+
+      return res.json({
+        success: true,
+        alreadyCredited,
+        productId,
+        packType:
+          productConfig.packType,
+        stories:
+          productConfig.stories,
+        transactionId:
+          verifiedTransactionId,
+      });
+    } catch (error) {
+      console.error(
+        "Erreur vérification Apple :",
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          "Impossible de vérifier l'achat Apple.",
+        message: error?.message,
+      });
+    }
+  }
+);
 
 const PORT = process.env.PORT || 3000;
 
