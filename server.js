@@ -98,6 +98,449 @@ const firebaseAdminApp = initializeApp({
 const firebaseAuth = getAuth(firebaseAdminApp);
 const adminDb = getFirestore(firebaseAdminApp);
 
+async function requireFirebaseUser(req, res) {
+  const authorization =
+    req.headers.authorization || "";
+
+  if (!authorization.startsWith("Bearer ")) {
+    res.status(401).json({
+      error: "Authentification Firebase requise.",
+    });
+
+    return null;
+  }
+
+  try {
+    const idToken = authorization.substring(7);
+
+    const decodedToken =
+      await firebaseAuth.verifyIdToken(idToken);
+
+    return decodedToken;
+  } catch (error) {
+    console.error(
+      "❌ Token Firebase invalide :",
+      error?.message
+    );
+
+    res.status(401).json({
+      error: "Session Firebase invalide.",
+    });
+
+    return null;
+  }
+}
+
+async function reserveVideoCredit(uid, sceneCount,imagesHash) {
+  const userRef =
+    adminDb.collection("users").doc(uid);
+
+  const generationRef =
+    adminDb.collection("videoGenerations").doc();
+
+  await adminDb.runTransaction(
+    async (transaction) => {
+      const userSnapshot =
+        await transaction.get(userRef);
+
+      if (!userSnapshot.exists) {
+        throw new Error(
+          "Profil utilisateur introuvable."
+        );
+      }
+
+      const userData =
+        userSnapshot.data() || {};
+
+      const remaining =
+        userData.videoCredits?.remaining || 0;
+
+      if (remaining <= 0) {
+        const error =
+          new Error("Aucun crédit vidéo disponible.");
+
+        error.code = "NO_VIDEO_CREDIT";
+        throw error;
+      }
+
+      transaction.update(userRef, {
+        "videoCredits.remaining":
+          FieldValue.increment(-1),
+
+        "videoCredits.reserved":
+          FieldValue.increment(1),
+      });
+
+      transaction.set(generationRef, {
+  uid,
+
+  // Un crédit correspond à un dessin animé complet,
+  // et non à une seule scène.
+  type: "full_story_video",
+  appCredits: 1,
+
+  status: "reserved",
+
+  sceneCount,
+  completedScenes: 0,
+
+  model: "gen4.5",
+  secondsPerScene: 5,
+
+  createdAt:
+    FieldValue.serverTimestamp(),
+
+  completedAt: null,
+  refundedAt: null,
+});
+    }
+  );
+
+  return generationRef;
+}
+
+async function refundVideoCredit(
+  uid,
+  generationRef
+) {
+  const userRef =
+    adminDb.collection("users").doc(uid);
+
+  await adminDb.runTransaction(
+    async (transaction) => {
+      const generationSnapshot =
+        await transaction.get(generationRef);
+
+      if (!generationSnapshot.exists) {
+        return;
+      }
+
+      const generation =
+        generationSnapshot.data();
+
+      // Empêche tout double remboursement.
+      if (
+  generation.status !== "reserved" &&
+  generation.status !== "partial"
+) {
+  return;
+}
+
+      if (generation.uid !== uid) {
+        throw new Error(
+          "Utilisateur incorrect pour ce remboursement."
+        );
+      }
+
+      transaction.update(userRef, {
+        "videoCredits.remaining":
+          FieldValue.increment(1),
+
+        "videoCredits.reserved":
+          FieldValue.increment(-1),
+      });
+
+      transaction.update(generationRef, {
+        status: "refunded",
+        refundedAt:
+          FieldValue.serverTimestamp(),
+      });
+    }
+  );
+}
+
+async function completeVideoGeneration(
+  uid,
+  generationRef,
+  videoUrls
+) {
+  const userRef =
+    adminDb.collection("users").doc(uid);
+
+  await adminDb.runTransaction(
+    async (transaction) => {
+      const generationSnapshot =
+        await transaction.get(generationRef);
+
+      if (!generationSnapshot.exists) {
+        throw new Error(
+          "Génération vidéo introuvable."
+        );
+      }
+
+      const generation =
+        generationSnapshot.data();
+
+      // Empêche une double validation.
+      if (
+  generation.status !== "reserved" &&
+  generation.status !== "partial"
+) {
+  return;
+}
+
+      if (generation.uid !== uid) {
+        throw new Error(
+          "Utilisateur incorrect pour cette génération."
+        );
+      }
+
+      transaction.update(userRef, {
+        "videoCredits.reserved":
+          FieldValue.increment(-1),
+
+        "videoCredits.used":
+          FieldValue.increment(1),
+      });
+
+      transaction.update(generationRef, {
+  status: "completed",
+  videoUrls,
+  completedScenes: Array.isArray(videoUrls)
+    ? videoUrls.length
+    : 0,
+  completedAt:
+    FieldValue.serverTimestamp(),
+});
+    }
+  );
+}
+
+async function saveVideoSceneProgress(
+  uid,
+  generationRef,
+  videoUrls
+) {
+  await adminDb.runTransaction(
+    async (transaction) => {
+      const generationSnapshot =
+        await transaction.get(generationRef);
+
+      if (!generationSnapshot.exists) {
+        throw new Error(
+          "Génération vidéo introuvable."
+        );
+      }
+
+      const generation =
+        generationSnapshot.data();
+
+      if (generation.uid !== uid) {
+        throw new Error(
+          "Utilisateur incorrect pour cette génération."
+        );
+      }
+
+      if (
+        generation.status !== "reserved" &&
+        generation.status !== "partial"
+      ) {
+        return;
+      }
+
+      transaction.update(generationRef, {
+        status: "partial",
+        videoUrls,
+        completedScenes: videoUrls.length,
+        nextSceneIndex: videoUrls.length,
+        lastProgressAt:
+          FieldValue.serverTimestamp(),
+      });
+    }
+  );
+}
+
+async function savePartialVideoGeneration(
+  uid,
+  generationRef,
+  videoUrls,
+  failedSceneIndex
+) {
+  await adminDb.runTransaction(
+    async (transaction) => {
+      const generationSnapshot =
+        await transaction.get(generationRef);
+
+      if (!generationSnapshot.exists) {
+        throw new Error(
+          "Génération vidéo introuvable."
+        );
+      }
+
+      const generation =
+        generationSnapshot.data();
+
+      if (generation.uid !== uid) {
+        throw new Error(
+          "Utilisateur incorrect pour cette génération."
+        );
+      }
+
+      if (generation.status !== "reserved") {
+        return;
+      }
+
+      transaction.update(generationRef, {
+        status: "partial",
+
+        videoUrls,
+
+        completedScenes: videoUrls.length,
+
+        nextSceneIndex: failedSceneIndex,
+
+        lastErrorAt:
+          FieldValue.serverTimestamp(),
+      });
+    }
+  );
+}
+
+async function getPartialVideoGeneration(
+  uid,
+  generationId
+) {
+  const generationRef =
+    adminDb
+      .collection("videoGenerations")
+      .doc(generationId);
+
+  const generationSnapshot =
+    await generationRef.get();
+
+  if (!generationSnapshot.exists) {
+    const error = new Error(
+      "Génération vidéo introuvable."
+    );
+    error.code = "VIDEO_GENERATION_NOT_FOUND";
+    throw error;
+  }
+
+  const generation =
+    generationSnapshot.data();
+
+  if (generation.uid !== uid) {
+    const error = new Error(
+      "Cette génération vidéo appartient à un autre utilisateur."
+    );
+    error.code = "VIDEO_GENERATION_FORBIDDEN";
+    throw error;
+  }
+
+  if (generation.status !== "partial") {
+    const error = new Error(
+      "Cette génération vidéo ne peut pas être reprise."
+    );
+    error.code = "VIDEO_GENERATION_NOT_PARTIAL";
+    throw error;
+  }
+
+  const videoUrls =
+    Array.isArray(generation.videoUrls)
+      ? generation.videoUrls
+      : [];
+
+  return {
+    generationRef,
+    generation,
+    videoUrls,
+    nextSceneIndex:
+      Number.isInteger(generation.nextSceneIndex)
+        ? generation.nextSceneIndex
+        : videoUrls.length,
+  };
+}
+
+function isVideoGenerationStale(generation) {
+  const createdAt = generation?.createdAt;
+
+  if (!createdAt) {
+    return false;
+  }
+
+  const createdAtMs =
+    typeof createdAt.toMillis === "function"
+      ? createdAt.toMillis()
+      : new Date(createdAt).getTime();
+
+  if (!Number.isFinite(createdAtMs)) {
+    return false;
+  }
+
+  // Une génération bloquée depuis plus de 30 minutes
+  // est considérée comme ancienne.
+  const STALE_AFTER_MS =
+    30 * 60 * 1000;
+
+  return (
+    Date.now() - createdAtMs >
+    STALE_AFTER_MS
+  );
+}
+
+async function reconcileStaleVideoGeneration(
+  uid,
+  generationRef
+) {
+  const generationSnapshot =
+    await generationRef.get();
+
+  if (!generationSnapshot.exists) {
+    return {
+      action: "not_found",
+    };
+  }
+
+  const generation =
+    generationSnapshot.data();
+
+  if (generation.uid !== uid) {
+    throw new Error(
+      "Utilisateur incorrect pour cette génération."
+    );
+  }
+
+  if (!isVideoGenerationStale(generation)) {
+    return {
+      action: "not_stale",
+    };
+  }
+
+  const videoUrls =
+    Array.isArray(generation.videoUrls)
+      ? generation.videoUrls
+      : [];
+
+  // Des scènes Runway existent déjà :
+  // on conserve la génération pour permettre sa reprise.
+  if (
+    generation.status === "partial" ||
+    videoUrls.length > 0
+  ) {
+    return {
+      action: "keep_for_resume",
+      completedScenes: videoUrls.length,
+    };
+  }
+
+  // Aucun travail Runway terminé :
+  // le crédit peut être rendu.
+  if (generation.status === "reserved") {
+    await refundVideoCredit(
+      uid,
+      generationRef
+    );
+
+    return {
+      action: "refunded",
+    };
+  }
+
+  return {
+    action: "nothing",
+  };
+}
+
 function createAppleClient(environment) {
   const privateKey = getApplePrivateKey();
 
@@ -1101,47 +1544,272 @@ app.post(
 // 🎬 RUNWAY - IMAGE TO VIDEO
 // =========================
 app.post("/video", async (req, res) => {
-  try {
-    const { imageUrl, prompt } = req.body;
+  let generationRef = null;
+  let uid = null;
+  let runwaySucceeded = false;
+  let videoUrls = [];
 
-    if (!imageUrl) {
-      return res.status(400).json({
-        error: "imageUrl manquant",
-      });
+  try {
+        const decodedToken =
+      await requireFirebaseUser(req, res);
+
+    if (!decodedToken) {
+      return;
     }
 
-    console.log("🎬 Génération vidéo Runway...");
+    uid = decodedToken.uid;
 
-    const task = await runway.imageToVideo
-      .create({
-        model: "gen4.5",
-        promptImage: imageUrl,
-        promptText:
-          prompt ||
-          "Gentle children's story animation. Subtle natural movements, soft cinematic camera movement, preserve the original characters, faces, clothing, colors and visual style.",
-        ratio: "720:1280",
-        duration: 5,
-      })
-      .waitForTaskOutput();
+    console.log(
+      "🎬 Demande vidéo autorisée pour :",
+      uid
+    );
+    const {
+  images,
+  prompt,
+  generationId = null,
+} = req.body;
 
-    const videoUrl = task?.output?.[0];
+if (!Array.isArray(images) || images.length === 0) {
+  return res.status(400).json({
+    error: "Aucune image de scène reçue.",
+  });
+}
 
-    if (!videoUrl) {
-      throw new Error(
-        "Runway n'a retourné aucune vidéo"
+if (images.length !== 4 && images.length !== 6) {
+  return res.status(400).json({
+    error:
+      "Le dessin animé doit contenir exactement 4 ou 6 scènes.",
+  });
+}
+
+const sceneCount = images.length;
+const imagesHash = crypto
+  .createHash("sha256")
+  .update(JSON.stringify(images))
+  .digest("hex");
+
+let startSceneIndex = 0;
+
+// ========================================
+// 🔄 REPRISE D'UNE GÉNÉRATION PARTIELLE
+// ========================================
+if (generationId) {
+  const generationRefToCheck =
+  adminDb
+    .collection("videoGenerations")
+    .doc(generationId);
+
+const reconciliation =
+  await reconcileStaleVideoGeneration(
+    uid,
+    generationRefToCheck
+  );
+
+if (reconciliation.action === "refunded") {
+  return res.status(409).json({
+    error:
+      "Cette ancienne génération a été annulée et le crédit vidéo a été remboursé.",
+    code:
+      "VIDEO_GENERATION_REFUNDED",
+  });
+}
+  const partial =
+    await getPartialVideoGeneration(
+      uid,
+      generationId
+    );
+
+  generationRef = partial.generationRef;
+
+  videoUrls = partial.videoUrls;
+
+  startSceneIndex =
+    partial.nextSceneIndex;
+
+  // Sécurité : l'histoire reprise doit avoir
+  // le même nombre de scènes.
+  if (
+    partial.generation.sceneCount !==
+    sceneCount
+  ) {
+    const error = new Error(
+      "Le nombre de scènes ne correspond pas à la génération d'origine."
+    );
+
+    error.code =
+      "VIDEO_SCENE_COUNT_MISMATCH";
+
+    throw error;
+  }
+
+  if (
+  partial.generation.imagesHash !==
+  imagesHash
+) {
+  const error = new Error(
+    "Les images ne correspondent pas à la génération vidéo d'origine."
+  );
+
+  error.code =
+    "VIDEO_IMAGES_MISMATCH";
+
+  throw error;
+}
+
+  console.log(
+    `🔄 Reprise vidéo à la scène ${startSceneIndex + 1}/${sceneCount}`
+  );
+}
+
+// ========================================
+// 🆕 NOUVELLE GÉNÉRATION
+// ========================================
+else {
+  generationRef =
+  await reserveVideoCredit(
+    uid,
+    sceneCount,
+    imagesHash
+  );
+
+  console.log(
+    "💳 Crédit vidéo réservé :",
+    generationRef.id
+  );
+}
+
+    console.log(
+    "💳 Crédit vidéo réservé :",
+    generationRef.id
+    );
+
+    console.log(
+  `🎬 Génération de ${sceneCount} scènes vidéo Runway...`
+);
+
+
+for (
+  let index = startSceneIndex;
+  index < images.length;
+  index++
+) {
+  const imageUrl = images[index];
+
+  if (typeof imageUrl !== "string" || !imageUrl.trim()) {
+    throw new Error(
+      `Image invalide pour la scène ${index + 1}.`
+    );
+  }
+
+  console.log(
+    `🎬 Génération scène ${index + 1}/${sceneCount}...`
+  );
+
+  const task = await runway.imageToVideo
+    .create({
+      model: "gen4.5",
+      promptImage: imageUrl,
+      promptText:
+        prompt ||
+        `Gentle children's story animation.
+Preserve the original characters, faces, clothing, colors, proportions and visual style.
+Locked camera, static framing.
+No zoom, no pan, no dolly, no camera movement.
+Keep all main characters fully visible in the frame throughout the entire video.
+Do not crop heads, bodies or important objects.
+Animate only subtle natural character movements, facial expressions, hair, clothing and environmental details.
+Maintain the exact original composition as much as possible.
+Smooth, soft, child-friendly animation.`,
+      ratio: "720:1280",
+      duration: 5,
+    })
+    .waitForTaskOutput();
+
+  const sceneVideoUrl = task?.output?.[0];
+
+  if (!sceneVideoUrl) {
+    throw new Error(
+      `Runway n'a retourné aucune vidéo pour la scène ${index + 1}.`
+    );
+  }
+
+  videoUrls.push(sceneVideoUrl);
+
+  await saveVideoSceneProgress(
+  uid,
+  generationRef,
+  videoUrls
+);
+
+  console.log(
+    `✅ Scène ${index + 1}/${sceneCount} générée.`
+  );
+}
+
+runwaySucceeded = true;
+
+    await completeVideoGeneration(
+  uid,
+  generationRef,
+  videoUrls
+);
+
+console.log(
+  `✅ Dessin animé complet généré : ${sceneCount} scènes`,
+  generationRef.id
+);
+
+return res.json({
+  success: true,
+  videoUrls,
+  sceneCount,
+  generationId: generationRef.id,
+});
+
+  } catch (error) {
+  console.error(
+    "❌ Erreur génération vidéo Runway :",
+    error
+  );
+
+  if (uid && generationRef && !runwaySucceeded) {
+  try {
+    if (videoUrls.length > 0) {
+      await savePartialVideoGeneration(
+        uid,
+        generationRef,
+        videoUrls,
+        videoUrls.length
+      );
+
+      console.log(
+        `⚠️ Génération partielle sauvegardée : ${videoUrls.length} scène(s) terminée(s).`
+      );
+    } else {
+      await refundVideoCredit(
+        uid,
+        generationRef
+      );
+
+      console.log(
+        "💰 Crédit vidéo remboursé :",
+        generationRef.id
       );
     }
-
-    console.log("✅ Vidéo Runway générée");
-
-    return res.json({
-      videoUrl,
-    });
-  } catch (error) {
+  } catch (creditError) {
     console.error(
-      "❌ Erreur génération vidéo Runway :",
-      error
+      "❌ Erreur gestion crédit vidéo après échec :",
+      creditError
     );
+  }
+}
+
+  if (error?.code === "NO_VIDEO_CREDIT") {
+  return res.status(402).json({
+    error: "Aucun crédit vidéo disponible.",
+    code: "NO_VIDEO_CREDIT",
+  });
+}
 
     if (error instanceof TaskFailedError) {
       console.error(
