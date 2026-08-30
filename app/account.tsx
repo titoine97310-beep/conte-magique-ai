@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import * as Application from "expo-application";
 import { auth } from "../services/firebase";
@@ -459,425 +460,421 @@ function handleLogout() {
   }
 
   const textStoriesRemaining =
-  profile?.packs?.text?.storiesRemaining ?? 0;
+    profile?.packs?.text?.storiesRemaining ?? 0;
 
-const illustratedStoriesRemaining =
-  profile?.packs?.illustrated?.storiesRemaining ?? 0;
+  const illustratedStoriesRemaining =
+    profile?.packs?.illustrated?.storiesRemaining ?? 0;
 
-const textPurchases =
-  profile?.packs?.text?.purchases ?? 0;
+  const textPurchases =
+    profile?.packs?.text?.purchases ?? 0;
 
-const illustratedPurchases =
-  profile?.packs?.illustrated?.purchases ?? 0;
+  const illustratedPurchases =
+    profile?.packs?.illustrated?.purchases ?? 0;
 
   return (
     <LinearGradient
       colors={["#111827", "#312E81", "#020617"]}
       style={styles.container}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#FFB703"
-            colors={["#FFB703"]}
-          />
-        }
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.replace("/")}
-          disabled={loggingOut}
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#FFB703"
+              colors={["#FFB703"]}
+            />
+          }
         >
-          <Text style={styles.backText}>← Accueil</Text>
-        </TouchableOpacity>
-
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
-          </View>
-
-          <Text style={styles.title}>
-            Bonjour {getFirstName()} 👋
-          </Text>
-
-          <Text style={styles.subtitle}>
-            Retrouve ici les informations de ton compte
-            ConteMagiqueIA.
-          </Text>
-        </View>
-
-        {!profile && (
-          <View style={styles.warningCard}>
-            <Text style={styles.warningTitle}>
-              Profil incomplet
-            </Text>
-
-            <Text style={styles.warningText}>
-              Ton compte Firebase existe, mais son profil
-              Firestore n’a pas été trouvé.
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.card}>
-  <Text style={styles.cardTitle}>
-    Mes informations
-  </Text>
-
-  <View style={styles.card}>
-  <Text style={styles.cardTitle}>
-    Mes carnets
-  </Text>
-
-  <View style={styles.infoRow}>
-    <View style={styles.infoIcon}>
-      <Text style={styles.infoIconText}>👤</Text>
-    </View>
-
-    <View style={styles.infoContent}>
-      <Text style={styles.infoLabel}>Nom affiché</Text>
-
-      <Text style={styles.infoValue}>
-        {getDisplayName()}
-      </Text>
-
-      <TouchableOpacity
-        onPress={openEditDisplayNameModal}
-        disabled={loggingOut}
-        style={styles.editNameButton}
-      >
-        <Text style={styles.editNameButtonText}>
-          Modifier
-        </Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-
-  <View style={styles.separator} />
-
-  <View style={styles.infoRow}>
-    <View style={styles.infoIcon}>
-      <Text style={styles.infoIconText}>📧</Text>
-    </View>
-
-    <View style={styles.infoContent}>
-      <Text style={styles.infoLabel}>
-        Adresse e-mail
-      </Text>
-
-      <Text style={styles.infoValue}>
-        {getEmail()}
-      </Text>
-    </View>
-  </View>
-
-  <View style={styles.separator} />
-
-  <View style={styles.infoRow}>
-    <View style={styles.infoIcon}>
-      <Text style={styles.infoIconText}>📅</Text>
-    </View>
-
-    <View style={styles.infoContent}>
-      <Text style={styles.infoLabel}>
-        Compte créé le
-      </Text>
-
-      <Text style={styles.infoValue}>
-        {getCreationDate()}
-      </Text>
-    </View>
-  </View>
-
-  <View style={styles.separator} />
-
-  <View style={styles.infoRow}>
-    <View style={styles.infoIcon}>
-      <Text style={styles.infoIconText}>🪪</Text>
-    </View>
-
-    <View style={styles.infoContent}>
-      <Text style={styles.infoLabel}>
-        Type de compte
-      </Text>
-
-      <Text style={styles.infoValue}>
-        {getRoleLabel()}
-      </Text>
-    </View>
-  </View>
-</View>
-
-          <View style={styles.packRow}>
-            <View style={styles.packIconContainer}>
-              <Text style={styles.packIcon}>✍️</Text>
-            </View>
-
-            <View style={styles.packContent}>
-              <Text style={styles.packName}>
-                Carnet Texte
-              </Text>
-
-              <Text style={styles.packDescription}>
-                Histoires sans illustration
-              </Text>
-
-              <Text style={styles.packRemaining}>
-                {formatStoryCount(textStoriesRemaining)}
-              </Text>
-            </View>
-
-            <View style={styles.packCountBadge}>
-              <Text style={styles.packCountText}>
-                {textStoriesRemaining}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.separator} />
-
-          <View style={styles.packRow}>
-            <View style={styles.packIconContainer}>
-              <Text style={styles.packIcon}>🎨</Text>
-            </View>
-
-            <View style={styles.packContent}>
-              <Text style={styles.packName}>
-                Carnet Illustré
-              </Text>
-
-              <Text style={styles.packDescription}>
-                Histoires avec texte et images
-              </Text>
-
-              <Text style={styles.packRemaining}>
-                {formatStoryCount(
-                  illustratedStoriesRemaining
-                )}
-              </Text>
-            </View>
-
-            <View style={styles.packCountBadge}>
-              <Text style={styles.packCountText}>
-                {illustratedStoriesRemaining}
-              </Text>
-            </View>
-          </View>
-
           <TouchableOpacity
-            style={styles.premiumButton}
-            onPress={() => router.push("/premium" as any)}
+            style={styles.backButton}
+            onPress={() => router.replace("/")}
             disabled={loggingOut}
           >
-            <Text style={styles.premiumButtonText}>
-              Acheter un carnet
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            Mon activité
-          </Text>
-
-          <View style={styles.activityRow}>
-            <View style={styles.infoIcon}>
-              <Text style={styles.infoIconText}>🔑</Text>
-            </View>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>
-                Dernière connexion
-              </Text>
-
-              <Text style={styles.infoValue}>
-                {formatDateTime(profile?.lastLogin)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.separator} />
-
-          <View style={styles.activityRow}>
-            <View style={styles.infoIcon}>
-              <Text style={styles.infoIconText}>📖</Text>
-            </View>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>
-                Dernière histoire créée
-              </Text>
-
-              <Text style={styles.infoValue}>
-                {formatDateTime(
-                  profile?.lastStoryCreatedAt,
-                  "Aucune histoire créée"
-                )}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            Mes achats
-          </Text>
-
-          <View style={styles.purchaseRow}>
-            <View>
-              <Text style={styles.purchaseName}>
-                ✍️ Carnet Texte
-              </Text>
-
-              <Text style={styles.purchaseValue}>
-                {formatPurchaseCount(textPurchases)}
-              </Text>
-            </View>
-
-            <Text style={styles.purchaseNumber}>
-              {textPurchases}
-            </Text>
-          </View>
-
-          <View style={styles.separator} />
-
-          <View style={styles.purchaseRow}>
-            <View>
-              <Text style={styles.purchaseName}>
-                🎨 Carnet Illustré
-              </Text>
-
-              <Text style={styles.purchaseValue}>
-                {formatPurchaseCount(
-                  illustratedPurchases
-                )}
-              </Text>
-            </View>
-
-            <Text style={styles.purchaseNumber}>
-              {illustratedPurchases}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            Mon espace
-          </Text>
-
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() =>
-              router.push("/saved-stories" as any)
-            }
-            disabled={loggingOut}
-          >
-            <Text style={styles.menuIcon}>❤️</Text>
-
-            <Text style={styles.menuText}>
-              Mes histoires
-            </Text>
-
-            <Text style={styles.menuArrow}>›</Text>
+            <Text style={styles.backText}>← Accueil</Text>
           </TouchableOpacity>
 
-          <View style={styles.separator} />
+          <View style={styles.header}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>👤</Text>
+            </View>
 
-          <TouchableOpacity
-  style={styles.menuButton}
-  onPress={() => router.push("/legal" as any)}
-  disabled={loggingOut}
->
-  <Text style={styles.menuIcon}>⚖️</Text>
-
-  <View style={styles.menuTextContainer}>
-    <Text style={styles.menuText}>
-      Centre juridique
-    </Text>
-
-    <Text style={styles.menuSubText}>
-      CGU, confidentialité, mentions légales...
-    </Text>
-  </View>
-
-  <Text style={styles.menuArrow}>›</Text>
-</TouchableOpacity>
-
-<View style={styles.separator} />
-
-<TouchableOpacity
-  style={styles.menuButton}
-  onPress={handleContact}
-  disabled={loggingOut}
->
-  <Text style={styles.menuIcon}>📧</Text>
-
-  <View style={styles.menuTextContainer}>
-    <Text style={styles.menuText}>
-      Nous contacter
-    </Text>
-
-    <Text style={styles.menuSubText}>
-      contact@contemagiqueia.fr
-    </Text>
-  </View>
-
-  <Text style={styles.menuArrow}>›</Text>
-</TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-  style={[
-    styles.deleteAccountButton,
-    deletingAccount && styles.buttonDisabled,
-  ]}
-  onPress={handleDeleteAccount}
-  disabled={loggingOut || deletingAccount}
->
-  {deletingAccount ? (
-    <ActivityIndicator color="#FCA5A5" />
-  ) : (
-    <Text style={styles.deleteAccountButtonText}>
-      🗑️ Supprimer mon compte
-    </Text>
-  )}
-</TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.logoutButton,
-            loggingOut && styles.buttonDisabled,
-          ]}
-          onPress={handleLogout}
-          disabled={loggingOut}
-        >
-          {loggingOut ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.logoutButtonText}>
-              🚪 Se déconnecter
+            <Text style={styles.title}>
+              Bonjour {getFirstName()} 👋
             </Text>
+
+            <Text style={styles.subtitle}>
+              Retrouve ici les informations de ton compte ConteMagiqueIA.
+            </Text>
+          </View>
+
+          {!profile && (
+            <View style={styles.warningCard}>
+              <Text style={styles.warningTitle}>
+                Profil incomplet
+              </Text>
+
+              <Text style={styles.warningText}>
+                Ton compte Firebase existe, mais son profil Firestore n’a pas été trouvé.
+              </Text>
+            </View>
           )}
-        </TouchableOpacity>
 
-                <View style={styles.footerContainer}>
-  <Text style={styles.footerText}>
-    ConteMagiqueIA ✨
-  </Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>
+              Mes informations
+            </Text>
 
-  <Text style={styles.footerVersion}>
-    Version {appVersion} ({buildVersion})
-  </Text>
+            <View style={styles.infoRow}>
+              <View style={styles.infoIcon}>
+                <Text style={styles.infoIconText}>👤</Text>
+              </View>
 
-  <Text style={styles.footerCopyright}>
-    © 2026 ConteMagiqueIA
-  </Text>
-</View>
-      </ScrollView>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Nom affiché</Text>
+
+                <Text style={styles.infoValue}>
+                  {getDisplayName()}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={openEditDisplayNameModal}
+                  disabled={loggingOut}
+                  style={styles.editNameButton}
+                >
+                  <Text style={styles.editNameButtonText}>
+                    Modifier
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.infoRow}>
+              <View style={styles.infoIcon}>
+                <Text style={styles.infoIconText}>📧</Text>
+              </View>
+
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>
+                  Adresse e-mail
+                </Text>
+
+                <Text style={styles.infoValue}>
+                  {getEmail()}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.infoRow}>
+              <View style={styles.infoIcon}>
+                <Text style={styles.infoIconText}>📅</Text>
+              </View>
+
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>
+                  Compte créé le
+                </Text>
+
+                <Text style={styles.infoValue}>
+                  {getCreationDate()}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.infoRow}>
+              <View style={styles.infoIcon}>
+                <Text style={styles.infoIconText}>🪪</Text>
+              </View>
+
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>
+                  Type de compte
+                </Text>
+
+                <Text style={styles.infoValue}>
+                  {getRoleLabel()}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>
+              Mes carnets
+            </Text>
+
+            <View style={styles.packRow}>
+              <View style={styles.packIconContainer}>
+                <Text style={styles.packIcon}>✍️</Text>
+              </View>
+
+              <View style={styles.packContent}>
+                <Text style={styles.packName}>
+                  Carnet Texte
+                </Text>
+
+                <Text style={styles.packDescription}>
+                  Histoires sans illustration
+                </Text>
+
+                <Text style={styles.packRemaining}>
+                  {formatStoryCount(textStoriesRemaining)}
+                </Text>
+              </View>
+
+              <View style={styles.packCountBadge}>
+                <Text style={styles.packCountText}>
+                  {textStoriesRemaining}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.packRow}>
+              <View style={styles.packIconContainer}>
+                <Text style={styles.packIcon}>🎨</Text>
+              </View>
+
+              <View style={styles.packContent}>
+                <Text style={styles.packName}>
+                  Carnet Illustré
+                </Text>
+
+                <Text style={styles.packDescription}>
+                  Histoires avec texte et images
+                </Text>
+
+                <Text style={styles.packRemaining}>
+                  {formatStoryCount(illustratedStoriesRemaining)}
+                </Text>
+              </View>
+
+              <View style={styles.packCountBadge}>
+                <Text style={styles.packCountText}>
+                  {illustratedStoriesRemaining}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.premiumButton}
+              onPress={() => router.push("/premium" as any)}
+              disabled={loggingOut}
+            >
+              <Text style={styles.premiumButtonText}>
+                Acheter un carnet
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>
+              Mon activité
+            </Text>
+
+            <View style={styles.activityRow}>
+              <View style={styles.infoIcon}>
+                <Text style={styles.infoIconText}>🔑</Text>
+              </View>
+
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>
+                  Dernière connexion
+                </Text>
+
+                <Text style={styles.infoValue}>
+                  {formatDateTime(profile?.lastLogin)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.activityRow}>
+              <View style={styles.infoIcon}>
+                <Text style={styles.infoIconText}>📖</Text>
+              </View>
+
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>
+                  Dernière histoire créée
+                </Text>
+
+                <Text style={styles.infoValue}>
+                  {formatDateTime(
+                    profile?.lastStoryCreatedAt,
+                    "Aucune histoire créée"
+                  )}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>
+              Mes achats
+            </Text>
+
+            <View style={styles.purchaseRow}>
+              <View>
+                <Text style={styles.purchaseName}>
+                  ✍️ Carnet Texte
+                </Text>
+
+                <Text style={styles.purchaseValue}>
+                  {formatPurchaseCount(textPurchases)}
+                </Text>
+              </View>
+
+              <Text style={styles.purchaseNumber}>
+                {textPurchases}
+              </Text>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.purchaseRow}>
+              <View>
+                <Text style={styles.purchaseName}>
+                  🎨 Carnet Illustré
+                </Text>
+
+                <Text style={styles.purchaseValue}>
+                  {formatPurchaseCount(illustratedPurchases)}
+                </Text>
+              </View>
+
+              <Text style={styles.purchaseNumber}>
+                {illustratedPurchases}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>
+              Mon espace
+            </Text>
+
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() =>
+                router.push("/saved-stories" as any)
+              }
+              disabled={loggingOut}
+            >
+              <Text style={styles.menuIcon}>❤️</Text>
+
+              <Text style={styles.menuText}>
+                Mes histoires
+              </Text>
+
+              <Text style={styles.menuArrow}>›</Text>
+            </TouchableOpacity>
+
+            <View style={styles.separator} />
+
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => router.push("/legal" as any)}
+              disabled={loggingOut}
+            >
+              <Text style={styles.menuIcon}>⚖️</Text>
+
+              <View style={styles.menuTextContainer}>
+                <Text style={styles.menuText}>
+                  Centre juridique
+                </Text>
+
+                <Text style={styles.menuSubText}>
+                  CGU, confidentialité, mentions légales...
+                </Text>
+              </View>
+
+              <Text style={styles.menuArrow}>›</Text>
+            </TouchableOpacity>
+
+            <View style={styles.separator} />
+
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={handleContact}
+              disabled={loggingOut}
+            >
+              <Text style={styles.menuIcon}>📧</Text>
+
+              <View style={styles.menuTextContainer}>
+                <Text style={styles.menuText}>
+                  Nous contacter
+                </Text>
+
+                <Text style={styles.menuSubText}>
+                  contact@contemagiqueia.fr
+                </Text>
+              </View>
+
+              <Text style={styles.menuArrow}>›</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.deleteAccountButton,
+              deletingAccount && styles.buttonDisabled,
+            ]}
+            onPress={handleDeleteAccount}
+            disabled={loggingOut || deletingAccount}
+          >
+            {deletingAccount ? (
+              <ActivityIndicator color="#FCA5A5" />
+            ) : (
+              <Text style={styles.deleteAccountButtonText}>
+                🗑️ Supprimer mon compte
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.logoutButton,
+              loggingOut && styles.buttonDisabled,
+            ]}
+            onPress={handleLogout}
+            disabled={loggingOut}
+          >
+            {loggingOut ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.logoutButtonText}>
+                🚪 Se déconnecter
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.footerContainer}>
+            <Text style={styles.footerText}>
+              ConteMagiqueIA ✨
+            </Text>
+
+            <Text style={styles.footerVersion}>
+              Version {appVersion} ({buildVersion})
+            </Text>
+
+            <Text style={styles.footerCopyright}>
+              © 2026 ConteMagiqueIA
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
 
       <Modal
         visible={editModalVisible}
@@ -938,6 +935,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  safeArea: {
+    flex: 1,
+  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -953,8 +954,11 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    padding: 22,
-    paddingTop: 55,
+    width: "100%",
+    maxWidth: 800,
+    alignSelf: "center",
+    paddingHorizontal: 22,
+    paddingTop: 20,
     paddingBottom: 45,
   },
 
@@ -1271,6 +1275,7 @@ modalOverlay: {
 
 modalContainer: {
   width: "100%",
+  maxWidth: 560,
   backgroundColor: "#1E293B",
   borderRadius: 22,
   padding: 22,

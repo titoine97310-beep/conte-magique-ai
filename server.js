@@ -3,6 +3,7 @@ import {
   Environment,
   SignedDataVerifier,
 } from "@apple/app-store-server-library";
+import RunwayML, { TaskFailedError } from "@runwayml/sdk";
 import cors from "cors";
 import crypto from "crypto";
 import dotenv from "dotenv";
@@ -26,6 +27,10 @@ app.use(express.json({ limit: "10mb" }));
   
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+
+const runway = new RunwayML({
+  apiKey: process.env.RUNWAY_API_KEY,
 });
 
 const GOOGLE_PLAY_PACKAGE_NAME = "com.contemagiqueia.app";
@@ -1091,6 +1096,66 @@ app.post(
     }
   }
 );
+
+// =========================
+// 🎬 RUNWAY - IMAGE TO VIDEO
+// =========================
+app.post("/video", async (req, res) => {
+  try {
+    const { imageUrl, prompt } = req.body;
+
+    if (!imageUrl) {
+      return res.status(400).json({
+        error: "imageUrl manquant",
+      });
+    }
+
+    console.log("🎬 Génération vidéo Runway...");
+
+    const task = await runway.imageToVideo
+      .create({
+        model: "gen4.5",
+        promptImage: imageUrl,
+        promptText:
+          prompt ||
+          "Gentle children's story animation. Subtle natural movements, soft cinematic camera movement, preserve the original characters, faces, clothing, colors and visual style.",
+        ratio: "720:1280",
+        duration: 5,
+      })
+      .waitForTaskOutput();
+
+    const videoUrl = task?.output?.[0];
+
+    if (!videoUrl) {
+      throw new Error(
+        "Runway n'a retourné aucune vidéo"
+      );
+    }
+
+    console.log("✅ Vidéo Runway générée");
+
+    return res.json({
+      videoUrl,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Erreur génération vidéo Runway :",
+      error
+    );
+
+    if (error instanceof TaskFailedError) {
+      console.error(
+        "Détails Runway :",
+        error.taskDetails
+      );
+    }
+
+    return res.status(500).json({
+      error: "Erreur génération vidéo",
+      details: error?.message,
+    });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 

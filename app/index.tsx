@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { auth } from "../services/firebase";
 
@@ -85,57 +86,65 @@ export default function HomeScreen() {
       colors={["#1B1B3A", "#312E81", "#020617"]}
       style={styles.container}
     >
-      <Image
-        source={require("../assets/images/icon.png")}
-        style={styles.logoImage}
-        resizeMode="contain"
-      />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <Image
+            source={require("../assets/images/icon.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
 
-      <Text style={styles.logo}>ConteMagiqueIA</Text>
+          <Text style={styles.logo}>ConteMagiqueIA</Text>
 
-      <Text style={styles.subtitle}>
-        Crée des histoires magiques avec l’IA, des images et une narration
-        immersive ✨
-      </Text>
-
-      {user && getFirstName() ? (
-        <View style={styles.welcomeContainer}>
-          <Text style={styles.welcomeText}>
-            Bonjour {getFirstName()} 👋
+          <Text style={styles.subtitle}>
+            Crée des histoires magiques avec l’IA, des images et une narration
+            immersive ✨
           </Text>
+
+          {user && getFirstName() ? (
+            <View style={styles.welcomeContainer}>
+              <Text style={styles.welcomeText}>
+                Bonjour {getFirstName()} 👋
+              </Text>
+            </View>
+          ) : null}
+
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => router.push("/create-story")}
+          >
+            <Text style={styles.primaryText}>
+              Créer une histoire
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => router.push("/saved-stories" as any)}
+          >
+            <Text style={styles.secondaryText}>
+              Mes histoires
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.accountButton,
+              checkingAuth && styles.buttonDisabled,
+            ]}
+            onPress={handleAccountPress}
+            disabled={checkingAuth}
+          >
+            {checkingAuth ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.accountText}>
+                {user ? "👤 Mon compte" : "🔐 Se connecter"}
+              </Text>
+            )}
+          </TouchableOpacity>
         </View>
-      ) : null}
-
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={() => router.push("/create-story")}
-      >
-        <Text style={styles.primaryText}>Créer une histoire</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() => router.push("/saved-stories" as any)}
-      >
-        <Text style={styles.secondaryText}>Mes histoires</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.accountButton,
-          checkingAuth && styles.buttonDisabled,
-        ]}
-        onPress={handleAccountPress}
-        disabled={checkingAuth}
-      >
-        {checkingAuth ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.accountText}>
-            {user ? "👤 Mon compte" : "🔐 Se connecter"}
-          </Text>
-        )}
-      </TouchableOpacity>
+      </SafeAreaView>
     </LinearGradient>
   );
 }
@@ -172,6 +181,14 @@ const styles = StyleSheet.create({
   },
 
   container: {
+    flex: 1,
+  },
+
+  safeArea: {
+    flex: 1,
+  },
+
+  content: {
     flex: 1,
     padding: 24,
     justifyContent: "center",

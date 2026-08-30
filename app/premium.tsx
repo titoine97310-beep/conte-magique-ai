@@ -13,7 +13,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ErrorCode, useIAP } from "expo-iap";
+import {
+  ErrorCode,
+  useIAP,
+  type ProductAndroid,
+} from "expo-iap";
 
 import { auth } from "../services/firebase";
 import { setUserMode } from "../services/usageService";
@@ -383,92 +387,136 @@ export default function PremiumScreen() {
   }
 
   async function buyProduct(
-    productId: string
-  ) {
-    const currentUser =
-      auth.currentUser;
+  productId: string
+) {
+  const currentUser =
+    auth.currentUser;
 
-    if (!currentUser) {
-      redirectToRegister();
-      return;
-    }
+  if (!currentUser) {
+    redirectToRegister();
+    return;
+  }
 
-    if (!connected) {
-      Alert.alert(
-        `${STORE_NAME} indisponible`,
+  if (!connected) {
+    Alert.alert(
+      `${STORE_NAME} indisponible`,
+      `La connexion à ${STORE_NAME} n'est pas encore prête. Réessaie dans quelques secondes.`
+    );
 
-        `La connexion à ${STORE_NAME} n'est pas encore prête. Réessaie dans quelques secondes.`
-      );
+    return;
+  }
 
-      return;
-    }
+  if (processing) {
+    return;
+  }
 
-    if (processing) {
-      return;
-    }
+  const storeProduct =
+    products.find(
+      (product) =>
+        product.id === productId
+    );
+
+  if (!storeProduct) {
+    Alert.alert(
+      "Produit indisponible",
+      `Ce carnet n'est pas disponible sur ${STORE_NAME} pour le moment.`
+    );
+
+    return;
+  }
+
+  try {
+    setProcessing(true);
 
     /*
-     * Vérifie que le produit existe
-     * réellement dans le store.
+     * GOOGLE PLAY
+     *
+     * Pour les produits ponctuels,
+     * Google peut retourner plusieurs
+     * offres :
+     *
+     * - l'achat normal
+     * - une remise temporaire
+     *
+     * Pendant la promotion rentrée,
+     * on sélectionne automatiquement
+     * l'offre avec remise disponible.
      */
-    const storeProduct =
-      products.find(
-        (product) =>
-          product.id ===
-          productId
-      );
+    let googleOfferToken:
+  | string
+  | undefined;
 
-    if (!storeProduct) {
-      Alert.alert(
-        "Produit indisponible",
+if (Platform.OS === "android") {
+  const androidProduct =
+    storeProduct as ProductAndroid;
 
-        `Ce carnet n'est pas disponible sur ${STORE_NAME} pour le moment.`
-      );
+  const offers =
+    androidProduct.discountOffers ?? [];
 
-      return;
-    }
+  const discountOffer =
+    offers.find(
+      (offer) =>
+        (offer.percentageDiscountAndroid ??
+          0) > 0
+    );
 
-    try {
-      setProcessing(true);
+  if (discountOffer) {
+    googleOfferToken =
+  discountOffer.offerTokenAndroid ?? undefined;
 
-      /*
-       * expo-iap choisira automatiquement
-       * le store correspondant à la
-       * plateforme.
-       */
-      await requestPurchase({
-        request: {
-          google: {
-            skus: [
-              productId,
-            ],
-          },
+    console.log(
+      "🛒 Offre Google sélectionnée :",
+      {
+        productId,
+        price:
+          discountOffer.displayPrice,
+        discount:
+          discountOffer
+            .percentageDiscountAndroid,
+      }
+    );
+  }
+}
 
-          apple: {
-            sku:
-              productId,
-          },
+    await requestPurchase({
+      request: {
+        google: {
+          skus: [productId],
+
+          /*
+           * Le token est envoyé seulement
+           * lorsqu'il existe.
+           */
+          ...(googleOfferToken
+            ? {
+                offerToken:
+                  googleOfferToken,
+              }
+            : {}),
         },
 
-        type:
-          "in-app",
-      });
-    } catch (error: any) {
-      setProcessing(false);
+        apple: {
+          sku: productId,
+        },
+      },
 
-      console.error(
-        "Erreur lancement paiement :",
-        error
-      );
+      type: "in-app",
+    });
+  } catch (error: any) {
+    setProcessing(false);
 
-      Alert.alert(
-        "Paiement impossible",
+    console.error(
+      "Erreur lancement paiement :",
+      error
+    );
 
-        error?.message ||
-          `Impossible d'ouvrir ${STORE_NAME}.`
-      );
-    }
+    Alert.alert(
+      "Paiement impossible",
+      error?.message ||
+        `Impossible d'ouvrir ${STORE_NAME}.`
+    );
   }
+}
 
   async function buyTextPack() {
     await buyProduct(
@@ -491,21 +539,52 @@ export default function PremiumScreen() {
    * retourné les produits.
    */
   function getStorePrice(
-    productId: string,
-    fallback: string
-  ) {
-    const product =
-      products.find(
-        (item) =>
-          item.id ===
-          productId
-      );
+  productId: string,
+  fallback: string
+) {
+  const product =
+    products.find(
+      (item) =>
+        item.id === productId
+    );
 
+  if (!product) {
+    return fallback;
+  }
+
+  if (Platform.OS === "ios") {
     return (
-      product?.displayPrice ||
+      product.displayPrice ||
       fallback
     );
   }
+
+  const androidProduct =
+    product as ProductAndroid;
+
+  const offers =
+    androidProduct.discountOffers ?? [];
+
+  const discountOffer =
+    offers.find(
+      (offer) =>
+        (offer.percentageDiscountAndroid ??
+          0) > 0
+    );
+
+  if (discountOffer) {
+    return (
+      discountOffer.displayPrice ||
+      product.displayPrice ||
+      fallback
+    );
+  }
+
+  return (
+    product.displayPrice ||
+    fallback
+  );
+}
 
   return (
     <LinearGradient

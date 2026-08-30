@@ -34,6 +34,22 @@ const REPORT_REASONS = [
 export default function PlayerScreen() {
   useKeepAwake();
 
+  useEffect(() => {
+    async function configureAudio() {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+      } catch (error) {
+        console.log("Erreur configuration audio :", error);
+      }
+    }
+
+    configureAudio();
+  }, []);
+
   const story = getCurrentStory();
   const scenes = story?.scenes || [];
 

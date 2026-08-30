@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setCurrentStory } from "../services/currentStory";
 import { generateImage, generateStory } from "../services/openaiService";
@@ -58,7 +59,7 @@ const storyTypes = [
 
 const storyLengths = [
   { id: "short", label: "⚡ Courte", scenes: 4, disabled: false },
-  { id: "medium", label: "📖 Moyenne", scenes: 6, disabled: true },
+  { id: "medium", label: "📖 Moyenne", scenes: 6, disabled: false },
   { id: "long", label: "🌙 Longue", scenes: 8, disabled: true },
 ] as const;
 
@@ -475,8 +476,15 @@ Consignes importantes :
   };
 
   return (
-    <LinearGradient colors={["#0F172A", "#3B0764"]} style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+  <LinearGradient
+    colors={["#0F172A", "#3B0764"]}
+    style={styles.container}
+  >
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         <Text style={styles.title}>Parle à l’IA</Text>
 
         <Text style={styles.subtitle}>Écris ton idée d’histoire ✨</Text>
@@ -684,17 +692,26 @@ Consignes importantes :
         >
           <Text style={styles.backText}>Retour accueil</Text>
         </TouchableOpacity>
-      </ScrollView>
-    </LinearGradient>
-  );
+            </ScrollView>
+    </SafeAreaView>
+  </LinearGradient>
+);
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 24,
-    paddingTop: 70,
-  },
+  flex: 1,
+},
+
+safeArea: {
+  flex: 1,
+},
+
+scrollContent: {
+  paddingHorizontal: 24,
+  paddingTop: 20,
+  paddingBottom: 30,
+},
   title: {
     fontSize: 34,
     fontWeight: "900",

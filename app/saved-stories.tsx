@@ -115,41 +115,51 @@ export default function SavedStoriesScreen() {
   }
 
   async function toggleFavorite(id: number) {
-    try {
-      if (auth.currentUser) {
-        /*
-         * On met à jour Firebase.
-         */
-        const cloudResult = await toggleCloudFavorite(id);
+  try {
+    const story = stories.find((s: any) => s.id === id);
 
-        if (cloudResult === null) {
-          Alert.alert(
-            "Erreur",
-            "Le favori n’a pas pu être synchronisé."
-          );
-
-          return;
-        }
-
-        /*
-         * On met également à jour la copie locale présente
-         * sur le téléphone.
-         */
-        await toggleFavoriteStory(id);
-      } else {
-        await toggleFavoriteStory(id);
-      }
-
-      await load();
-    } catch (error) {
-      console.log("Erreur modification favori :", error);
-
-      Alert.alert(
-        "Erreur",
-        "Impossible de modifier ce favori pour le moment."
-      );
+    if (!story) {
+      return;
     }
+
+    const newFavorite = !story.favorite;
+
+    if (auth.currentUser) {
+      const cloudResult = await toggleCloudFavorite(
+        id,
+        newFavorite
+      );
+
+      if (!cloudResult) {
+        Alert.alert(
+          "Erreur",
+          "Le favori n'a pas pu être synchronisé."
+        );
+        return;
+      }
+    }
+
+    await toggleFavoriteStory(id);
+
+    setStories((currentStories) =>
+      currentStories.map((item: any) =>
+        item.id === id
+          ? {
+              ...item,
+              favorite: newFavorite,
+            }
+          : item
+      )
+    );
+  } catch (error) {
+    console.error("Erreur modification favori :", error);
+
+    Alert.alert(
+      "Erreur",
+      "Impossible de modifier ce favori pour le moment."
+    );
   }
+}
 
   function confirmDelete(id: number) {
     Alert.alert(
@@ -380,8 +390,11 @@ const styles = StyleSheet.create({
     color: "#111",
   },
   listContent: {
-    paddingBottom: 12,
-  },
+  paddingBottom: 12,
+  width: "100%",
+  maxWidth: 800,
+  alignSelf: "center",
+},
   emptyBox: {
     flex: 1,
     justifyContent: "center",
