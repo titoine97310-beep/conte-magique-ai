@@ -131,7 +131,12 @@ async function requireFirebaseUser(req, res) {
   }
 }
 
-async function reserveVideoCredit(uid, sceneCount,imagesHash) {
+async function reserveVideoCredit(
+  uid,
+  sceneCount,
+  imagesHash,
+  videoModel
+) {
   const userRef =
     adminDb.collection("users").doc(uid);
 
@@ -184,7 +189,7 @@ async function reserveVideoCredit(uid, sceneCount,imagesHash) {
   sceneCount,
   completedScenes: 0,
 
-  model: "gen4.5",
+  model: videoModel,
   secondsPerScene: 5,
 
   createdAt:
@@ -1569,6 +1574,11 @@ app.post("/video", async (req, res) => {
   generationId = null,
 } = req.body;
 
+const videoModel =
+  req.body?.videoModel === "gen4_turbo"
+    ? "gen4_turbo"
+    : "gen4.5";
+
 if (!Array.isArray(images) || images.length === 0) {
   return res.status(400).json({
     error: "Aucune image de scène reçue.",
@@ -1618,6 +1628,19 @@ if (reconciliation.action === "refunded") {
       uid,
       generationId
     );
+
+    // Sécurité : une génération reprise doit utiliser
+    // le même modèle Runway que la génération d'origine.
+    if (
+      partial.generation.model &&
+      partial.generation.model !== videoModel
+    ) {
+      return res.status(409).json({
+        error:
+          "Le modèle vidéo ne correspond pas à la génération d'origine.",
+        code: "VIDEO_MODEL_MISMATCH",
+      });
+    }
 
   generationRef = partial.generationRef;
 
@@ -1669,7 +1692,8 @@ else {
   await reserveVideoCredit(
     uid,
     sceneCount,
-    imagesHash
+    imagesHash,
+    videoModel
   );
 
   console.log(
@@ -1707,7 +1731,7 @@ for (
 
   const task = await runway.imageToVideo
     .create({
-      model: "gen4.5",
+      model: videoModel,
       promptImage: imageUrl,
       promptText:
         prompt ||
