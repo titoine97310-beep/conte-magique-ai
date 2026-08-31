@@ -24,7 +24,10 @@ export async function generateStory(
   return await response.json();
 }
 
-export async function generateImage(prompt: string) {
+export async function generateImage(
+  prompt: string,
+  referenceImage?: string | null
+) {
   const response = await fetch(`${BACKEND_URL}/image`, {
     method: "POST",
     headers: {
@@ -32,6 +35,7 @@ export async function generateImage(prompt: string) {
     },
     body: JSON.stringify({
       prompt,
+      referenceImage: referenceImage || null,
     }),
   });
 

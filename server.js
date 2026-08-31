@@ -10,7 +10,7 @@ import dotenv from "dotenv";
 import express from "express";
 import fs from "fs";
 import { google } from "googleapis";
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 
 import { cert, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -949,7 +949,7 @@ Style premium, cohérent entre les scènes.
 
 app.post("/image", async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, referenceImage } = req.body;
 
     if (!prompt?.trim()) {
       return res.status(400).json({
@@ -974,12 +974,70 @@ Scène à générer :
 ${safePrompt}
 `;
 
-    const result = await openai.images.generate({
-      model: "gpt-image-1",
-      prompt: finalPrompt,
-      size: "1024x1024",
-      quality: "medium",
-    });
+    let result;
+
+    if (referenceImage) {
+      const match = referenceImage.match(
+        /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/
+      );
+
+      if (!match) {
+        return res.status(400).json({
+          error: "Format de photo de référence invalide",
+        });
+      }
+
+      const mimeType = match[1];
+      const base64Data = match[2];
+
+      const extension =
+        mimeType === "image/png"
+          ? "png"
+          : mimeType === "image/webp"
+          ? "webp"
+          : "jpg";
+
+      const imageBuffer = Buffer.from(base64Data, "base64");
+
+      const referenceFile = await toFile(
+        imageBuffer,
+        `reference.${extension}`,
+        {
+          type: mimeType === "image/jpg" ? "image/jpeg" : mimeType,
+        }
+      );
+
+      result = await openai.images.edit({
+        model: "gpt-image-1",
+        image: referenceFile,
+        prompt: `
+Utilise la photo fournie uniquement comme référence visuelle.
+
+Transforme l'enfant et/ou son doudou présents sur la photo en personnages illustrés adaptés à une histoire pour enfants.
+
+Conserve autant que possible :
+- les principales caractéristiques visuelles de l'enfant
+- la couleur et la forme du doudou
+- les vêtements et accessoires importants
+- une apparence cohérente avec la photo de référence
+
+Ne produis pas une photographie réaliste.
+Crée une illustration douce, familiale et adaptée aux enfants.
+
+${finalPrompt}
+`,
+        size: "1024x1024",
+        quality: "medium",
+        input_fidelity: "high",
+      });
+    } else {
+      result = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt: finalPrompt,
+        size: "1024x1024",
+        quality: "medium",
+      });
+    }
 
     const base64 = result.data?.[0]?.b64_json;
 

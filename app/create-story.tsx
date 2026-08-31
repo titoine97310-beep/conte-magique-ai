@@ -1,9 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -122,6 +124,10 @@ export default function CreateStoryScreen() {
 
   const [prompt, setPrompt] = useState("");
   const [imageStyle, setImageStyle] = useState<ImageStyle>("cartoon");
+  const [referencePhoto, setReferencePhoto] = useState<string | null>(null);
+  const [referencePhotoBase64, setReferencePhotoBase64] =
+  useState<string | null>(null);
+
   const [storyType, setStoryType] = useState<StoryType>("magic");
   const [storyLength, setStoryLength] = useState<StoryLength>("short");
   const [narrator, setNarrator] =
@@ -264,6 +270,125 @@ export default function CreateStoryScreen() {
     });
   }, []);
 
+  async function choosePhotoFromGallery() {
+  try {
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Autorisation nécessaire",
+        "Autorise l'accès aux photos pour choisir une photo."
+      );
+      return;
+    }
+
+    const result =
+      await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      const uri = result.assets[0].uri;
+
+      setReferencePhoto(uri);
+      setReferencePhotoBase64(result.assets[0].base64 ?? null);
+
+      // Une photo d'enfant ne doit pas être utilisée
+      // avec le mode Réaliste.
+      if (imageStyle === "realistic") {
+        setImageStyle("cartoon");
+
+        Alert.alert(
+          "Style Cartoon activé 🎨",
+          "Le style Réaliste est indisponible lorsqu'une photo est utilisée."
+        );
+      }
+    }
+  } catch (error) {
+    console.log("Erreur sélection photo :", error);
+
+    Alert.alert(
+      "Erreur",
+      "Impossible de sélectionner la photo."
+    );
+  }
+}
+
+async function takeReferencePhoto() {
+  try {
+    const permission =
+      await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Autorisation nécessaire",
+        "Autorise l'accès à l'appareil photo pour prendre une photo."
+      );
+      return;
+    }
+
+    const result =
+      await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      const uri = result.assets[0].uri;
+
+      setReferencePhoto(uri);
+      setReferencePhotoBase64(result.assets[0].base64 ?? null);
+
+      if (imageStyle === "realistic") {
+        setImageStyle("cartoon");
+
+        Alert.alert(
+          "Style Cartoon activé 🎨",
+          "Le style Réaliste est indisponible lorsqu'une photo est utilisée."
+        );
+      }
+    }
+  } catch (error) {
+    console.log("Erreur appareil photo :", error);
+
+    Alert.alert(
+      "Erreur",
+      "Impossible de prendre la photo."
+    );
+  }
+}
+
+function openPhotoSelector() {
+  if (loading) return;
+
+  Alert.alert(
+    "📷 Ajouter une photo",
+    "Ajoute une photo de l'enfant, de son doudou ou des deux pour personnaliser les illustrations.",
+    [
+      {
+        text: "Prendre une photo",
+        onPress: takeReferencePhoto,
+      },
+      {
+        text: "Choisir dans la galerie",
+        onPress: choosePhotoFromGallery,
+      },
+      {
+        text: "Annuler",
+        style: "cancel",
+      },
+    ]
+  );
+}
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       Alert.alert("Erreur", "Écris une idée avant de générer une histoire.");
@@ -401,7 +526,14 @@ Consignes importantes :
 - aucun personnage connu, aucune marque, aucun logo
 `;
 
-        const imageUrl = await generateImage(styledImagePrompt);
+        const referenceImage = referencePhotoBase64
+  ? `data:image/jpeg;base64,${referencePhotoBase64}`
+  : null;
+
+const imageUrl = await generateImage(
+  styledImagePrompt,
+  referenceImage
+);
 
         scenesWithImages.push({
           ...scenes[i],
@@ -549,31 +681,88 @@ Consignes importantes :
           onChangeText={setPrompt}
           multiline
         />
+        <TouchableOpacity
+  style={styles.photoButton}
+  onPress={openPhotoSelector}
+  disabled={loading}
+>
+  <Text style={styles.photoButtonText}>
+    {referencePhoto
+      ? "📷 Changer la photo"
+      : "📷 Ajouter une photo à mon histoire"}
+  </Text>
+</TouchableOpacity>
+
+{referencePhoto && (
+  <View style={styles.photoPreviewCard}>
+    <Image
+      source={{ uri: referencePhoto }}
+      style={styles.photoPreview}
+      resizeMode="cover"
+    />
+
+    <Text style={styles.photoPreviewText}>
+      Photo de référence ajoutée
+    </Text>
+  </View>
+)}
+
+{referencePhoto && (
+  <TouchableOpacity
+    style={styles.removePhotoButton}
+    onPress={() => {
+  setReferencePhoto(null);
+  setReferencePhotoBase64(null);
+}}
+    disabled={loading}
+  >
+    <Text style={styles.removePhotoButtonText}>
+      Supprimer la photo
+    </Text>
+  </TouchableOpacity>
+)}
 
         <Text style={styles.sectionTitle}>Style des images</Text>
 
         <View style={styles.grid}>
           {imageStyles.map((item) => {
-            const isActive = imageStyle === item.id;
+  const isActive = imageStyle === item.id;
+  const isRealisticBlocked =
+    Boolean(referencePhoto) && item.id === "realistic";
 
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.optionButton, isActive && styles.optionActive]}
-                onPress={() => setImageStyle(item.id)}
-                disabled={loading}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    isActive && styles.optionTextActive,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+  return (
+    <TouchableOpacity
+      key={item.id}
+      style={[
+        styles.optionButton,
+        isActive && styles.optionActive,
+        isRealisticBlocked && styles.optionDisabled,
+      ]}
+      onPress={() => {
+        if (isRealisticBlocked) {
+          Alert.alert(
+            "Style indisponible",
+            "🔒 Le style Réaliste est indisponible lorsqu'une photo est utilisée."
+          );
+          return;
+        }
+
+        setImageStyle(item.id);
+      }}
+      disabled={loading}
+    >
+      <Text
+        style={[
+          styles.optionText,
+          isActive && styles.optionTextActive,
+        ]}
+      >
+        {item.label}
+        {isRealisticBlocked ? " 🔒" : ""}
+      </Text>
+    </TouchableOpacity>
+  );
+})}
         </View>
 
         <Text style={styles.sectionTitle}>Type d’histoire</Text>
@@ -945,5 +1134,53 @@ narratorSubtitle: {
 
 narratorSubtitleActive: {
   color: "#333",
+},
+
+photoButton: {
+  backgroundColor: "rgba(255,255,255,0.14)",
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.25)",
+  paddingVertical: 14,
+  borderRadius: 16,
+  alignItems: "center",
+  marginBottom: 10,
+},
+
+photoButtonText: {
+  color: "white",
+  fontSize: 15,
+  fontWeight: "900",
+},
+
+removePhotoButton: {
+  alignItems: "center",
+  marginBottom: 18,
+},
+
+removePhotoButtonText: {
+  color: "#FCA5A5",
+  fontSize: 13,
+  fontWeight: "800",
+},
+
+photoPreviewCard: {
+  backgroundColor: "rgba(255,255,255,0.10)",
+  borderRadius: 16,
+  padding: 10,
+  marginBottom: 18,
+  alignItems: "center",
+},
+
+photoPreview: {
+  width: 150,
+  height: 150,
+  borderRadius: 16,
+  marginBottom: 8,
+},
+
+photoPreviewText: {
+  color: "#E2E8F0",
+  fontSize: 13,
+  fontWeight: "800",
 },
 });
