@@ -37,16 +37,59 @@ const GOOGLE_PLAY_PACKAGE_NAME = "com.contemagiqueia.app";
 
 const GOOGLE_PLAY_PRODUCTS = {
   carnet_15_textes: {
+    type: "story",
     packType: "text",
     stories: 15,
   },
 
   carnet_15_histoires: {
+    type: "story",
     packType: "illustrated",
     stories: 15,
   },
+
+  dessin_anime_4_scenes: {
+    type: "video",
+    videoType: "short",
+    scenes: 4,
+    credits: 1,
+  },
+
+  dessin_anime_6_scenes: {
+    type: "video",
+    videoType: "medium",
+    scenes: 6,
+    credits: 1,
+  },
 };
 
+const APPLE_PRODUCTS = {
+  carnet_15_textes: {
+    type: "story",
+    packType: "text",
+    stories: 15,
+  },
+
+  carnet_15_histoires: {
+    type: "story",
+    packType: "illustrated",
+    stories: 15,
+  },
+
+  dessin_anime_4_scenes: {
+    type: "video",
+    videoType: "short",
+    scenes: 4,
+    credits: 1,
+  },
+
+  dessin_anime_6_scenes: {
+    type: "video",
+    videoType: "medium",
+    scenes: 6,
+    credits: 1,
+  },
+};
 
 const googlePlayAuth = new google.auth.GoogleAuth({
   keyFile: "/etc/secrets/google-play-service-account.json",
@@ -143,6 +186,24 @@ async function reserveVideoCredit(
   const generationRef =
     adminDb.collection("videoGenerations").doc();
 
+  // 4 scènes = crédit Court
+  // 6 scènes = crédit Moyen
+  const videoType =
+    sceneCount === 4
+      ? "short"
+      : sceneCount === 6
+        ? "medium"
+        : null;
+
+  if (!videoType) {
+    const error = new Error(
+      "Nombre de scènes non compatible avec un crédit vidéo."
+    );
+
+    error.code = "INVALID_VIDEO_SCENE_COUNT";
+    throw error;
+  }
+
   await adminDb.runTransaction(
     async (transaction) => {
       const userSnapshot =
@@ -158,46 +219,53 @@ async function reserveVideoCredit(
         userSnapshot.data() || {};
 
       const remaining =
-        userData.videoCredits?.remaining || 0;
+        userData.videoCredits?.[videoType]
+          ?.remaining || 0;
 
       if (remaining <= 0) {
-        const error =
-          new Error("Aucun crédit vidéo disponible.");
+        const error = new Error(
+          videoType === "short"
+            ? "Aucun crédit dessin animé Court disponible."
+            : "Aucun crédit dessin animé Moyen disponible."
+        );
 
         error.code = "NO_VIDEO_CREDIT";
         throw error;
       }
 
       transaction.update(userRef, {
-        "videoCredits.remaining":
+        [`videoCredits.${videoType}.remaining`]:
           FieldValue.increment(-1),
 
-        "videoCredits.reserved":
+        [`videoCredits.${videoType}.reserved`]:
           FieldValue.increment(1),
       });
 
       transaction.set(generationRef, {
-  uid,
+        uid,
 
-  // Un crédit correspond à un dessin animé complet,
-  // et non à une seule scène.
-  type: "full_story_video",
-  appCredits: 1,
+        type: "full_story_video",
+        videoType,
+        appCredits: 1,
 
-  status: "reserved",
+        status: "reserved",
 
-  sceneCount,
-  completedScenes: 0,
+        sceneCount,
+        completedScenes: 0,
 
-  model: videoModel,
-  secondsPerScene: 5,
+        // Permet de vérifier que la reprise
+        // concerne bien les mêmes images.
+        imagesHash,
 
-  createdAt:
-    FieldValue.serverTimestamp(),
+        model: videoModel,
+        secondsPerScene: 5,
 
-  completedAt: null,
-  refundedAt: null,
-});
+        createdAt:
+          FieldValue.serverTimestamp(),
+
+        completedAt: null,
+        refundedAt: null,
+      });
     }
   );
 
@@ -237,13 +305,25 @@ async function refundVideoCredit(
         );
       }
 
-      transaction.update(userRef, {
-        "videoCredits.remaining":
-          FieldValue.increment(1),
+      const videoType =
+  generation.videoType;
 
-        "videoCredits.reserved":
-          FieldValue.increment(-1),
-      });
+if (
+  videoType !== "short" &&
+  videoType !== "medium"
+) {
+  throw new Error(
+    "Type de crédit vidéo invalide pour le remboursement."
+  );
+}
+
+transaction.update(userRef, {
+  [`videoCredits.${videoType}.remaining`]:
+    FieldValue.increment(1),
+
+  [`videoCredits.${videoType}.reserved`]:
+    FieldValue.increment(-1),
+});
 
       transaction.update(generationRef, {
         status: "refunded",
@@ -290,13 +370,25 @@ async function completeVideoGeneration(
         );
       }
 
-      transaction.update(userRef, {
-        "videoCredits.reserved":
-          FieldValue.increment(-1),
+      const videoType =
+  generation.videoType;
 
-        "videoCredits.used":
-          FieldValue.increment(1),
-      });
+if (
+  videoType !== "short" &&
+  videoType !== "medium"
+) {
+  throw new Error(
+    "Type de crédit vidéo invalide pour la validation."
+  );
+}
+
+transaction.update(userRef, {
+  [`videoCredits.${videoType}.reserved`]:
+    FieldValue.increment(-1),
+
+  [`videoCredits.${videoType}.used`]:
+    FieldValue.increment(1),
+});
 
       transaction.update(generationRef, {
   status: "completed",
@@ -1162,36 +1254,82 @@ console.log("🔥 Authorization présente :", !!req.headers.authorization);
           );
         }
 
-        transaction.update(userRef, {
-          [`packs.${productConfig.packType}.storiesRemaining`]:
-            FieldValue.increment(
-              productConfig.stories
-            ),
+        if (productConfig.type === "video") {
+  transaction.update(userRef, {
+    [`videoCredits.${productConfig.videoType}.remaining`]:
+      FieldValue.increment(
+        productConfig.credits
+      ),
 
-          [`packs.${productConfig.packType}.purchases`]:
-            FieldValue.increment(1),
-        });
+    [`videoCredits.${productConfig.videoType}.purchases`]:
+      FieldValue.increment(1),
+  });
+} else {
+  transaction.update(userRef, {
+    [`packs.${productConfig.packType}.storiesRemaining`]:
+      FieldValue.increment(
+        productConfig.stories
+      ),
+
+    [`packs.${productConfig.packType}.purchases`]:
+      FieldValue.increment(1),
+  });
+}
 
         transaction.set(purchaseRef, {
-          uid,
-          productId,
-          packType: productConfig.packType,
-          stories: productConfig.stories,
-          orderId: purchase.orderId || null,
-          creditedAt:
-            new Date().toISOString(),
-          consumed: false,
-        });
-      }
-    );
+  uid,
+  productId,
+
+  type: productConfig.type,
+
+  packType:
+    productConfig.packType || null,
+
+  stories:
+    productConfig.stories || 0,
+
+  videoType:
+    productConfig.videoType || null,
+
+  scenes:
+    productConfig.scenes || 0,
+
+  videoCredits:
+    productConfig.credits || 0,
+
+  orderId:
+    purchase.orderId || null,
+
+  creditedAt:
+    new Date().toISOString(),
+
+  consumed: false,
+});
+    }
+  );
 
     return res.json({
-      success: true,
-      alreadyCredited,
-      productId,
-      packType: productConfig.packType,
-      stories: productConfig.stories,
-    });
+  success: true,
+  alreadyCredited,
+  productId,
+
+  type: productConfig.type,
+
+  packType:
+    productConfig.packType || null,
+
+  stories:
+    productConfig.stories || 0,
+
+  videoType:
+    productConfig.videoType || null,
+
+  scenes:
+    productConfig.scenes || 0,
+
+  videoCredits:
+    productConfig.credits || 0,
+});
   } catch (error) {
     console.error(
       "Erreur vérification Google Play :",
@@ -1468,68 +1606,97 @@ app.post(
             );
           }
 
-          firestoreTransaction.update(
-            userRef,
-            {
-              [`packs.${productConfig.packType}.storiesRemaining`]:
-                FieldValue.increment(
-                  productConfig.stories
-                ),
+          if (productConfig.type === "video") {
+  firestoreTransaction.update(
+    userRef,
+    {
+      [`videoCredits.${productConfig.videoType}.remaining`]:
+        FieldValue.increment(
+          productConfig.credits
+        ),
 
-              [`packs.${productConfig.packType}.purchases`]:
-                FieldValue.increment(1),
-            }
-          );
+      [`videoCredits.${productConfig.videoType}.purchases`]:
+        FieldValue.increment(1),
+    }
+  );
+} else {
+  firestoreTransaction.update(
+    userRef,
+    {
+      [`packs.${productConfig.packType}.storiesRemaining`]:
+        FieldValue.increment(
+          productConfig.stories
+        ),
+
+      [`packs.${productConfig.packType}.purchases`]:
+        FieldValue.increment(1),
+    }
+  );
+}
 
           firestoreTransaction.set(
-            purchaseRef,
-            {
-              uid,
-              productId,
-              packType:
-                productConfig.packType,
+  purchaseRef,
+  {
+    uid,
+    productId,
 
-              stories:
-                productConfig.stories,
+    type: productConfig.type,
 
-              transactionId:
-                verifiedTransactionId,
+    packType:
+      productConfig.packType || null,
 
-              originalTransactionId:
-                transaction.originalTransactionId
-                  ? String(
-                      transaction.originalTransactionId
-                    )
-                  : null,
+    stories:
+      productConfig.stories || 0,
 
-              environment:
-                String(environment),
+    videoType:
+      productConfig.videoType || null,
 
-              purchaseDate:
-                transaction.purchaseDate
-                  ? new Date(
-                      transaction.purchaseDate
-                    ).toISOString()
-                  : null,
+    scenes:
+      productConfig.scenes || 0,
 
-              creditedAt:
-                new Date().toISOString(),
-            }
-          );
+    videoCredits:
+      productConfig.credits || 0,
+
+    transactionId:
+      verifiedTransactionId,
+
+    environment:
+      environment || null,
+
+    creditedAt:
+      new Date().toISOString(),
+
+    consumed: false,
+  }
+);
         }
       );
 
       return res.json({
-        success: true,
-        alreadyCredited,
-        productId,
-        packType:
-          productConfig.packType,
-        stories:
-          productConfig.stories,
-        transactionId:
-          verifiedTransactionId,
-      });
+  success: true,
+  alreadyCredited,
+  productId,
+
+  type: productConfig.type,
+
+  packType:
+    productConfig.packType || null,
+
+  stories:
+    productConfig.stories || 0,
+
+  videoType:
+    productConfig.videoType || null,
+
+  scenes:
+    productConfig.scenes || 0,
+
+  videoCredits:
+    productConfig.credits || 0,
+
+  transactionId:
+    verifiedTransactionId,
+});
     } catch (error) {
       console.error(
         "Erreur vérification Apple :",
@@ -1575,9 +1742,9 @@ app.post("/video", async (req, res) => {
 } = req.body;
 
 const videoModel =
-  req.body?.videoModel === "gen4_turbo"
-    ? "gen4_turbo"
-    : "gen4.5";
+  req.body?.videoModel === "gen4.5"
+    ? "gen4.5"
+    : "gen4_turbo";
 
 if (!Array.isArray(images) || images.length === 0) {
   return res.status(400).json({

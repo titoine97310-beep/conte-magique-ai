@@ -31,9 +31,17 @@ const TEXT_PRODUCT_ID =
 const ILLUSTRATED_PRODUCT_ID =
   "carnet_15_histoires";
 
+const VIDEO_SHORT_PRODUCT_ID =
+  "dessin_anime_4_scenes";
+
+const VIDEO_MEDIUM_PRODUCT_ID =
+  "dessin_anime_6_scenes";
+
 const PRODUCT_IDS = [
   TEXT_PRODUCT_ID,
   ILLUSTRATED_PRODUCT_ID,
+  VIDEO_SHORT_PRODUCT_ID,
+  VIDEO_MEDIUM_PRODUCT_ID,
 ];
 
 const STORE_NAME =
@@ -263,6 +271,44 @@ export default function PremiumScreen() {
 
           return;
         }
+
+        if (
+  productId ===
+  VIDEO_SHORT_PRODUCT_ID
+) {
+  Alert.alert(
+    "Dessin animé Court activé 🎬",
+    "1 crédit pour un dessin animé de 4 scènes a été ajouté à ton compte.",
+    [
+      {
+        text: "Continuer",
+        onPress: () =>
+          router.back(),
+      },
+    ]
+  );
+
+  return;
+}
+
+if (
+  productId ===
+  VIDEO_MEDIUM_PRODUCT_ID
+) {
+  Alert.alert(
+    "Dessin animé Moyen activé 🎬",
+    "1 crédit pour un dessin animé de 6 scènes a été ajouté à ton compte.",
+    [
+      {
+        text: "Continuer",
+        onPress: () =>
+          router.back(),
+      },
+    ]
+  );
+
+  return;
+}
 
         Alert.alert(
           "Achat validé 🎉",
@@ -529,6 +575,18 @@ if (Platform.OS === "android") {
       ILLUSTRATED_PRODUCT_ID
     );
   }
+
+  async function buyShortVideo() {
+  await buyProduct(
+    VIDEO_SHORT_PRODUCT_ID
+  );
+}
+
+async function buyMediumVideo() {
+  await buyProduct(
+    VIDEO_MEDIUM_PRODUCT_ID
+  );
+}
 
   /*
    * Prix renvoyé directement par
@@ -878,6 +936,100 @@ if (Platform.OS === "android") {
             </TouchableOpacity>
           </View>
 
+          <View style={styles.videoCard}>
+  <View style={styles.videoBadge}>
+    <Text style={styles.videoBadgeText}>
+      🎬 4 scènes
+    </Text>
+  </View>
+
+  <Text style={styles.cardIcon}>
+    🎬
+  </Text>
+
+  <Text style={styles.cardTitle}>
+    Dessin animé Court
+  </Text>
+
+  <Text style={styles.cardPrice}>
+    {getStorePrice(
+      VIDEO_SHORT_PRODUCT_ID,
+      "4,99 €"
+    )}
+  </Text>
+
+  <Text style={styles.cardDescription}>
+    Transforme une histoire illustrée de 4 scènes
+    en dessin animé d’environ 20 secondes.
+  </Text>
+
+  <TouchableOpacity
+    style={[
+      styles.videoPurchaseButton,
+      (!connected || processing) &&
+        styles.disabledButton,
+    ]}
+    onPress={buyShortVideo}
+    activeOpacity={0.85}
+    disabled={!connected || processing}
+  >
+    {processing ? (
+      <ActivityIndicator />
+    ) : (
+      <Text style={styles.videoPurchaseButtonText}>
+        🎬 Acheter le dessin animé Court
+      </Text>
+    )}
+  </TouchableOpacity>
+</View>
+
+<View style={styles.videoCard}>
+  <View style={styles.videoBadge}>
+    <Text style={styles.videoBadgeText}>
+      🎬 6 scènes
+    </Text>
+  </View>
+
+  <Text style={styles.cardIcon}>
+    🎬
+  </Text>
+
+  <Text style={styles.cardTitle}>
+    Dessin animé Moyen
+  </Text>
+
+  <Text style={styles.cardPrice}>
+    {getStorePrice(
+      VIDEO_MEDIUM_PRODUCT_ID,
+      "6,99 €"
+    )}
+  </Text>
+
+  <Text style={styles.cardDescription}>
+    Transforme une histoire illustrée de 6 scènes
+    en dessin animé d’environ 30 secondes.
+  </Text>
+
+  <TouchableOpacity
+    style={[
+      styles.videoPurchaseButton,
+      (!connected || processing) &&
+        styles.disabledButton,
+    ]}
+    onPress={buyMediumVideo}
+    activeOpacity={0.85}
+    disabled={!connected || processing}
+  >
+    {processing ? (
+      <ActivityIndicator />
+    ) : (
+      <Text style={styles.videoPurchaseButtonText}>
+        🎬 Acheter le dessin animé Moyen
+      </Text>
+    )}
+  </TouchableOpacity>
+</View>
+
           <Text
             style={
               styles.footerText
@@ -1083,6 +1235,46 @@ const styles =
       fontSize: 16,
       textAlign: "center",
     },
+
+    videoCard: {
+  backgroundColor: "#EDE9FE",
+  borderRadius: 28,
+  padding: 24,
+  marginBottom: 22,
+  alignItems: "center",
+  borderWidth: 2,
+  borderColor: "#C4B5FD",
+},
+
+videoBadge: {
+  backgroundColor: "#7C3AED",
+  paddingHorizontal: 14,
+  paddingVertical: 7,
+  borderRadius: 999,
+  marginBottom: 14,
+},
+
+videoBadgeText: {
+  color: "white",
+  fontWeight: "900",
+  fontSize: 13,
+},
+
+videoPurchaseButton: {
+  backgroundColor: "#7C3AED",
+  paddingVertical: 16,
+  paddingHorizontal: 28,
+  borderRadius: 18,
+  width: "100%",
+  alignItems: "center",
+},
+
+videoPurchaseButtonText: {
+  color: "white",
+  fontWeight: "900",
+  fontSize: 16,
+  textAlign: "center",
+},
 
     disabledButton: {
       opacity: 0.55,

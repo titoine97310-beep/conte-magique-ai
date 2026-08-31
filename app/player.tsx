@@ -3,7 +3,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -23,6 +23,8 @@ import { toggleFavoriteStory } from "../services/storageService";
 
 
 const TTS_URL = "https://conte-magique-ai.onrender.com/tts";
+const VIDEO_URL =
+  "https://conte-magique-ai.onrender.com/video";
 
 const REPORT_REASONS = [
   "Contenu inapproprié ou choquant",
@@ -62,6 +64,8 @@ export default function PlayerScreen() {
   const [iaReading, setIaReading] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [reportSending, setReportSending] = useState(false);
+  const [videoModalVisible, setVideoModalVisible] = useState(false);
+const [videoGenerating, setVideoGenerating] = useState(false);
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const ttsSoundRef = useRef<Audio.Sound | null>(null);
@@ -511,6 +515,187 @@ sound.setOnPlaybackStatusUpdate((status) => {
     }
   }
 
+  async function getVideoCreditsRemaining(
+  sceneCount: number
+) {
+  const user = auth.currentUser;
+
+  if (!user) return 0;
+
+  const videoType =
+    sceneCount === 4
+      ? "short"
+      : sceneCount === 6
+        ? "medium"
+        : null;
+
+  if (!videoType) {
+    return 0;
+  }
+
+  const userRef =
+    doc(db, "users", user.uid);
+
+  const userSnap =
+    await getDoc(userRef);
+
+  if (!userSnap.exists()) {
+    return 0;
+  }
+
+  const data = userSnap.data();
+
+  return Number(
+    data?.videoCredits?.[videoType]
+      ?.remaining || 0
+  );
+}
+
+  async function openVideoModal() {
+  if (videoGenerating) return;
+
+  if (scenes.length !== 4 && scenes.length !== 6) {
+    Alert.alert(
+      "Dessin animé indisponible",
+      "Seules les histoires de 4 ou 6 scènes peuvent être transformées en dessin animé pour le moment."
+    );
+    return;
+  }
+
+  const missingImage = scenes.some(
+  (scene: { imageUrl?: string | null }) => !scene?.imageUrl
+);
+
+  if (missingImage) {
+    Alert.alert(
+      "Illustrations manquantes",
+      "Toutes les scènes doivent avoir une illustration avant de créer le dessin animé."
+    );
+    return;
+  }
+
+  try {
+  const remaining =
+  await getVideoCreditsRemaining(
+    scenes.length
+  );
+
+  if (remaining <= 0) {
+    Alert.alert(
+      "Aucun crédit vidéo",
+      "Tu n'as pas encore de crédit pour créer un dessin animé.",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Obtenir un crédit",
+          onPress: () => router.push("/premium"),
+        },
+      ]
+    );
+
+    return;
+  }
+} catch (error) {
+  console.error("Erreur vérification crédits vidéo :", error);
+
+  Alert.alert(
+    "Erreur",
+    "Impossible de vérifier tes crédits vidéo. Réessaie dans quelques instants."
+  );
+
+  return;
+}
+
+  setVideoModalVisible(true);
+}
+
+function closeVideoModal() {
+  if (!videoGenerating) {
+    setVideoModalVisible(false);
+  }
+}
+
+  async function createAnimatedVideo() {
+  if (videoGenerating) return;
+
+  const user = auth.currentUser;
+
+  if (!user) {
+    Alert.alert(
+      "Connexion requise",
+      "Connecte-toi pour créer ton dessin animé."
+    );
+    return;
+  }
+
+  try {
+    setVideoGenerating(true);
+
+    const token = await user.getIdToken();
+
+    const images = scenes.map(
+      (scene: { imageUrl?: string | null }) =>
+        scene.imageUrl
+    );
+
+    if (images.some((image: string | null | undefined) => !image)) {
+      throw new Error(
+        "Une ou plusieurs illustrations sont manquantes."
+      );
+    }
+
+    const response = await fetch(VIDEO_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        images,
+        videoModel: "gen4_turbo",
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          "Impossible de créer le dessin animé."
+      );
+    }
+
+    console.log(
+      "🎬 Dessin animé généré :",
+      data
+    );
+
+    setVideoModalVisible(false);
+
+    Alert.alert(
+      "Dessin animé créé 🎉",
+      `${data?.sceneCount || scenes.length} scènes ont été animées avec succès.`
+    );
+  } catch (error) {
+    console.error(
+      "Erreur création dessin animé :",
+      error
+    );
+
+    Alert.alert(
+      "Création impossible",
+      error instanceof Error
+        ? error.message
+        : "Une erreur est survenue pendant la création du dessin animé."
+    );
+  } finally {
+    setVideoGenerating(false);
+  }
+}
+
   async function stopVoice() {
     iaRunRef.current += 1;
 
@@ -708,6 +893,20 @@ sound.setOnPlaybackStatusUpdate((status) => {
           </TouchableOpacity>
         </View>
 
+        {index === scenes.length - 1 && (
+  <TouchableOpacity
+    style={styles.videoButton}
+    onPress={openVideoModal}
+    disabled={videoGenerating}
+  >
+    <Text style={styles.videoButtonText}>
+      {videoGenerating
+        ? "🎬 Création en cours..."
+        : "🎬 Créer mon dessin animé"}
+    </Text>
+  </TouchableOpacity>
+)}
+
         <View style={styles.bottomActionRow}>
           <TouchableOpacity style={styles.homeButton} onPress={goHome}>
             <Text style={styles.homeText}>Accueil</Text>
@@ -717,6 +916,55 @@ sound.setOnPlaybackStatusUpdate((status) => {
             <Text style={styles.reportButtonText}>🚩 Signaler</Text>
           </TouchableOpacity>
         </View>
+
+        <Modal
+  visible={videoModalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={closeVideoModal}
+>
+  <View style={styles.videoOverlay}>
+    <View style={styles.videoModal}>
+      <Text style={styles.videoModalTitle}>
+        🎬 Créer mon dessin animé
+      </Text>
+
+      <Text style={styles.videoModalText}>
+        Ton histoire contient {scenes.length} scènes.
+      </Text>
+
+      <Text style={styles.videoModalText}>
+        Durée estimée : environ {scenes.length * 5} secondes.
+      </Text>
+
+      <Text style={styles.videoCreditText}>
+        1 crédit vidéo
+      </Text>
+
+      <TouchableOpacity
+  style={styles.videoConfirmButton}
+  disabled={videoGenerating}
+  onPress={createAnimatedVideo}
+>
+        <Text style={styles.videoConfirmButtonText}>
+          {videoGenerating
+            ? "Création en cours..."
+            : "Créer le dessin animé"}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.videoCancelButton}
+        onPress={closeVideoModal}
+        disabled={videoGenerating}
+      >
+        <Text style={styles.videoCancelButtonText}>
+          Annuler
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
 
         <Modal
           visible={reportModalVisible}
@@ -1055,4 +1303,81 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
+
+  videoButton: {
+  marginTop: 12,
+  backgroundColor: "#7C3AED",
+  paddingVertical: 14,
+  borderRadius: 16,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+videoButtonText: {
+  color: "white",
+  fontSize: 16,
+  fontWeight: "900",
+  textAlign: "center",
+},
+
+videoOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.72)",
+  justifyContent: "center",
+  padding: 24,
+},
+
+videoModal: {
+  backgroundColor: "white",
+  borderRadius: 24,
+  padding: 22,
+},
+
+videoModalTitle: {
+  fontSize: 22,
+  fontWeight: "900",
+  color: "#111827",
+  marginBottom: 14,
+  textAlign: "center",
+},
+
+videoModalText: {
+  fontSize: 15,
+  color: "#4B5563",
+  marginBottom: 8,
+  textAlign: "center",
+},
+
+videoCreditText: {
+  fontSize: 20,
+  fontWeight: "900",
+  color: "#7C3AED",
+  marginTop: 10,
+  marginBottom: 18,
+  textAlign: "center",
+},
+
+videoConfirmButton: {
+  backgroundColor: "#7C3AED",
+  paddingVertical: 14,
+  borderRadius: 16,
+  alignItems: "center",
+},
+
+videoConfirmButtonText: {
+  color: "white",
+  fontWeight: "900",
+  fontSize: 16,
+},
+
+videoCancelButton: {
+  marginTop: 10,
+  paddingVertical: 12,
+  alignItems: "center",
+},
+
+videoCancelButtonText: {
+  color: "#6B7280",
+  fontWeight: "800",
+},
 });
