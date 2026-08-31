@@ -127,6 +127,8 @@ export default function CreateStoryScreen() {
   const [referencePhoto, setReferencePhoto] = useState<string | null>(null);
   const [referencePhotoBase64, setReferencePhotoBase64] =
   useState<string | null>(null);
+  const [referencePhotoMimeType, setReferencePhotoMimeType] =
+  useState<string>("image/jpeg");
 
   const [storyType, setStoryType] = useState<StoryType>("magic");
   const [storyLength, setStoryLength] = useState<StoryLength>("short");
@@ -297,6 +299,9 @@ export default function CreateStoryScreen() {
 
       setReferencePhoto(uri);
       setReferencePhotoBase64(result.assets[0].base64 ?? null);
+      setReferencePhotoMimeType(
+  result.assets[0].mimeType || "image/jpeg"
+);
 
       // Une photo d'enfant ne doit pas être utilisée
       // avec le mode Réaliste.
@@ -487,7 +492,25 @@ function openPhotoSelector() {
       const sceneCount =
         storyLength === "short" ? 4 : storyLength === "medium" ? 6 : 8;
 
-      const storyData = await generateStory(prompt, storyType, sceneCount);
+      const storyPrompt = referencePhoto
+        ? `
+      ${prompt}
+
+      IMPORTANT :
+      Une photo de référence a été ajoutée par le parent.
+      L'enfant et/ou son doudou présents sur cette photo doivent devenir les personnages principaux de l'histoire.
+
+      L'histoire doit parler naturellement de l'enfant et de son doudou lorsqu'ils sont concernés.
+      Ne pas inventer de caractéristiques physiques précises qui ne sont pas données dans le texte.
+      Les illustrations utiliseront ensuite la photo pour reproduire leur apparence.
+      `
+        : prompt;
+
+      const storyData = await generateStory(
+        storyPrompt,
+        storyType,
+        sceneCount
+      );
       const scenes = storyData.scenes || [];
       const selectedStylePrompt = getStylePrompt(imageStyle);
       const charactersDescription = storyData.characters || "";
@@ -527,7 +550,7 @@ Consignes importantes :
 `;
 
         const referenceImage = referencePhotoBase64
-  ? `data:image/jpeg;base64,${referencePhotoBase64}`
+  ? `data:${referencePhotoMimeType};base64,${referencePhotoBase64}`
   : null;
 
 const imageUrl = await generateImage(
