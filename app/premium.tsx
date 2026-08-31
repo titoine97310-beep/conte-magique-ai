@@ -954,7 +954,7 @@ async function buyMediumVideo() {
   <Text style={styles.cardPrice}>
     {getStorePrice(
       VIDEO_SHORT_PRODUCT_ID,
-      "4,99 €"
+      "6,99 €"
     )}
   </Text>
 
@@ -1001,7 +1001,7 @@ async function buyMediumVideo() {
   <Text style={styles.cardPrice}>
     {getStorePrice(
       VIDEO_MEDIUM_PRODUCT_ID,
-      "6,99 €"
+      "9,99 €"
     )}
   </Text>
 

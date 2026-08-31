@@ -351,6 +351,9 @@ async function takeReferencePhoto() {
 
       setReferencePhoto(uri);
       setReferencePhotoBase64(result.assets[0].base64 ?? null);
+      setReferencePhotoMimeType(
+        result.assets[0].mimeType || "image/jpeg"
+      );
 
       if (imageStyle === "realistic") {
         setImageStyle("cartoon");
@@ -535,6 +538,18 @@ ${selectedStylePrompt}
 
 Personnages principaux de cette histoire :
 ${charactersDescription}
+
+${referencePhoto ? `
+IMPORTANT — COHÉRENCE AVEC LA PHOTO DE RÉFÉRENCE :
+- utiliser exactement le même enfant et le même doudou que sur la photo de référence
+- conserver leurs caractéristiques principales d'une scène à l'autre
+- conserver la même couleur de cheveux, le même visage et les mêmes éléments distinctifs
+- conserver fidèlement la forme et les couleurs du doudou
+- ne pas remplacer le doudou par un autre jouet
+- ne pas modifier arbitrairement l'apparence de l'enfant
+- transformer l'ensemble dans le style illustré choisi, sans rendu photoréaliste
+- l'enfant et le doudou doivent rester immédiatement reconnaissables dans toutes les scènes
+` : ""}
 
 Scène à illustrer :
 ${scenes[i].imagePrompt}
