@@ -1183,7 +1183,6 @@ ${finalPrompt}
 `,
         size: "1024x1024",
         quality: "medium",
-        input_fidelity: "high",
       });
     } else {
       result = await openai.images.generate({
