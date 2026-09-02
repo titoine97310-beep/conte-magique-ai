@@ -1,16 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 
-import {
-  getDownloadURL,
-  ref,
-  uploadString,
-} from "firebase/storage";
-
-import {
-  auth,
-  storage,
-} from "./firebase";
+import { auth } from "./firebase";
 
 import { saveStoryToCloud } from "./storyCloudService";
 
@@ -98,7 +89,6 @@ async function uploadStoryImageToCloud(
       console.log(
         "☁️ Upload image ignoré : utilisateur non connecté."
       );
-
       return null;
     }
 
@@ -106,12 +96,22 @@ async function uploadStoryImageToCloud(
       return null;
     }
 
+    /*
+     * Une image déjà hébergée n'a pas besoin
+     * d'être envoyée une nouvelle fois.
+     */
+    if (
+      imageUrl.startsWith("https://") ||
+      imageUrl.startsWith("http://")
+    ) {
+      return imageUrl;
+    }
+
     let base64: string;
     let contentType = "image/png";
 
     /*
-     * Cas principal :
-     * l'image générée par l'IA arrive directement en Base64.
+     * Image générée par OpenAI.
      */
     if (imageUrl.startsWith("data:image")) {
       const parts = imageUrl.split(",");
@@ -121,78 +121,74 @@ async function uploadStoryImageToCloud(
       }
 
       base64 = parts[1];
-      contentType = getMimeTypeFromDataUri(imageUrl);
+      contentType =
+        getMimeTypeFromDataUri(imageUrl);
     }
 
     /*
-     * Si l'image existe déjà sous forme de fichier local,
-     * on la relit en Base64 avant l'envoi vers Storage.
+     * Image déjà enregistrée localement.
      */
     else if (imageUrl.startsWith("file://")) {
-      base64 = await FileSystem.readAsStringAsync(
-        imageUrl,
-        {
-          encoding: FileSystem.EncodingType.Base64,
-        }
-      );
-    }
-
-    /*
-     * Si on reçoit déjà une URL Firebase / HTTP,
-     * on la conserve telle quelle.
-     *
-     * Cela évite de réuploader inutilement
-     * une image déjà hébergée.
-     */
-    else if (
-      imageUrl.startsWith("https://") ||
-      imageUrl.startsWith("http://")
-    ) {
-      return imageUrl;
+      base64 =
+        await FileSystem.readAsStringAsync(
+          imageUrl,
+          {
+            encoding:
+              FileSystem.EncodingType.Base64,
+          }
+        );
     }
 
     else {
       console.log(
-        "☁️ Format image non reconnu pour Storage :",
+        "☁️ Format image non reconnu :",
         imageUrl.substring(0, 30)
       );
-
       return null;
     }
 
-    const extension =
-      contentType === "image/jpeg"
-        ? "jpg"
-        : contentType === "image/webp"
-          ? "webp"
-          : "png";
+    const token = await user.getIdToken();
 
-    const storagePath =
-      `users/${user.uid}/stories/${storyId}/` +
-      `scene-${index}.${extension}`;
-
-    const imageRef = ref(
-      storage,
-      storagePath
-    );
-
-    await uploadString(
-      imageRef,
-      base64,
-      "base64",
+    const response = await fetch(
+      "https://conte-magique-ai.onrender.com/story-image/upload",
       {
-        contentType,
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: JSON.stringify({
+          storyId,
+          sceneIndex: index,
+          imageBase64: base64,
+          contentType,
+        }),
       }
     );
 
-    const downloadUrl =
-      await getDownloadURL(imageRef);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          data?.error ||
+          "Erreur upload Firebase Storage."
+      );
+    }
+
+    if (!data?.imageUrl) {
+      throw new Error(
+        "Le backend n'a retourné aucune URL d'image."
+      );
+    }
 
     console.log(
       `☁️ Illustration ${index + 1} sauvegardée dans Storage.`
     );
 
-    return downloadUrl;
+    return data.imageUrl;
   } catch (error) {
     console.error(
       `❌ Erreur upload illustration ${index + 1} :`,

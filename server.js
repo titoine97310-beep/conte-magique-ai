@@ -15,6 +15,7 @@ import OpenAI, { toFile } from "openai";
 import { cert, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 dotenv.config();
 
@@ -136,10 +137,12 @@ const firebaseServiceAccount = JSON.parse(
 const firebaseAdminApp = initializeApp({
   credential: cert(firebaseServiceAccount),
   projectId: "contemagiqueia",
+  storageBucket: "contemagiqueia.firebasestorage.app",
 });
 
 const firebaseAuth = getAuth(firebaseAdminApp);
 const adminDb = getFirestore(firebaseAdminApp);
+const adminStorage = getStorage(firebaseAdminApp);
 
 async function requireFirebaseUser(req, res) {
   const authorization =
@@ -653,6 +656,117 @@ function createAppleClient(environment) {
 app.get("/", (req, res) => {
   res.send("Backend ConteMagiqueIA OK");
 });
+// =========================
+// ☁️ FIREBASE STORAGE - IMAGES HISTOIRES
+// =========================
+app.post("/story-image/upload", async (req, res) => {
+  try {
+    const decodedToken =
+      await requireFirebaseUser(req, res);
+
+    if (!decodedToken) {
+      return;
+    }
+
+    const uid = decodedToken.uid;
+
+    const {
+      storyId,
+      sceneIndex,
+      imageBase64,
+      contentType = "image/png",
+    } = req.body;
+
+    if (
+      !storyId ||
+      !Number.isInteger(sceneIndex) ||
+      !imageBase64
+    ) {
+      return res.status(400).json({
+        error:
+          "storyId, sceneIndex et imageBase64 sont obligatoires.",
+      });
+    }
+
+    const allowedContentTypes = [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+    ];
+
+    if (!allowedContentTypes.includes(contentType)) {
+      return res.status(400).json({
+        error: "Type d'image non autorisé.",
+      });
+    }
+
+    const extension =
+      contentType === "image/jpeg"
+        ? "jpg"
+        : contentType === "image/webp"
+          ? "webp"
+          : "png";
+
+    const cleanBase64 = imageBase64.includes(",")
+      ? imageBase64.split(",")[1]
+      : imageBase64;
+
+    const imageBuffer = Buffer.from(
+      cleanBase64,
+      "base64"
+    );
+
+    if (!imageBuffer.length) {
+      return res.status(400).json({
+        error: "Image Base64 invalide.",
+      });
+    }
+
+    const bucket = adminStorage.bucket();
+
+    const storagePath =
+      `users/${uid}/stories/${storyId}/` +
+      `scene-${sceneIndex}.${extension}`;
+
+    const file = bucket.file(storagePath);
+
+    await file.save(imageBuffer, {
+      metadata: {
+        contentType,
+        cacheControl: "public,max-age=31536000",
+      },
+      resumable: false,
+    });
+
+    const [downloadUrl] =
+      await file.getSignedUrl({
+        action: "read",
+        expires: "03-01-2500",
+      });
+
+    console.log(
+      `☁️ Illustration ${sceneIndex + 1} sauvegardée :`,
+      storagePath
+    );
+
+    return res.json({
+      success: true,
+      imageUrl: downloadUrl,
+      storagePath,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Erreur upload image histoire :",
+      error
+    );
+
+    return res.status(500).json({
+      error:
+        "Impossible de sauvegarder l'illustration.",
+      message: error?.message,
+    });
+  }
+});
 function detectRequestedLanguage(prompt = "") {
   const text = prompt.toLowerCase();
 
@@ -1008,21 +1122,62 @@ ${safePrompt}
       );
 
       result = await openai.images.edit({
-        model: "gpt-image-1",
+        model: "gpt-image-2",
         image: referenceFile,
         prompt: `
-Utilise la photo fournie uniquement comme référence visuelle.
+Utilise la photo fournie comme référence visuelle principale et obligatoire.
 
-Transforme l'enfant et/ou son doudou présents sur la photo en personnages illustrés adaptés à une histoire pour enfants.
+OBJECTIF PRIORITAIRE :
+Conserver les mêmes personnes et les mêmes éléments visuels importants dans toutes les illustrations de cette histoire.
 
-Conserve autant que possible :
-- les principales caractéristiques visuelles de l'enfant
-- la couleur et la forme du doudou
-- les vêtements et accessoires importants
-- une apparence cohérente avec la photo de référence
+Si plusieurs enfants, adultes, animaux ou objets importants sont visibles sur la photo :
+- conserve-les tous lorsqu'ils sont nécessaires dans la scène
+- ne fusionne jamais deux personnes
+- ne change pas leur identité visuelle
+- ne remplace pas une personne par une autre
+- ne modifie pas leur âge apparent
 
+IDENTITÉ DES PERSONNAGES :
+Conserve au maximum :
+- la forme générale du visage
+- la couleur de peau
+- la coiffure
+- la couleur et la longueur des cheveux
+- les proportions générales
+- les traits distinctifs visibles
+
+VÊTEMENTS ET ACCESSOIRES :
+Les vêtements doivent rester cohérents avec la photo de référence et entre toutes les scènes.
+Conserve :
+- les mêmes couleurs principales
+- le même type de haut
+- le même type de bas
+- les mêmes chaussures lorsqu'elles sont visibles
+- le même sac à dos
+- les mêmes accessoires importants
+
+IMPORTANT :
+- ne change pas arbitrairement les couleurs des vêtements
+- n'ajoute pas de lettres, logos, symboles ou dessins différents d'une scène à l'autre
+- si un motif précis est difficile à reproduire, utilise un motif simple et cohérent plutôt que d'en inventer un nouveau à chaque scène
+- garde les sacs à dos et accessoires reconnaissables d'une scène à l'autre
+
+DOUDOU / OBJET IMPORTANT :
+Si un doudou ou un objet important est visible :
+- conserve sa forme
+- conserve ses couleurs
+- conserve ses proportions
+- ne le remplace pas par un autre objet
+
+COHÉRENCE ENTRE LES SCÈNES :
+Cette illustration appartient à une série.
+Les personnages doivent donner l'impression d'être exactement les mêmes personnages que dans les autres scènes.
+La scène, l'action, la pose et le décor peuvent changer, mais l'identité visuelle des personnages ne doit pas changer.
+
+STYLE :
+Transforme les personnes photographiées en personnages illustrés.
 Ne produis pas une photographie réaliste.
-Crée une illustration douce, familiale et adaptée aux enfants.
+Garde une illustration douce, familiale, premium et adaptée aux enfants.
 
 ${finalPrompt}
 `,
@@ -1032,7 +1187,7 @@ ${finalPrompt}
       });
     } else {
       result = await openai.images.generate({
-        model: "gpt-image-1",
+        model: "gpt-image-2",
         prompt: finalPrompt,
         size: "1024x1024",
         quality: "medium",
