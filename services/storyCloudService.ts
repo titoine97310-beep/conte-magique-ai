@@ -6,10 +6,16 @@ import {
     orderBy,
     query,
     setDoc,
-    updateDoc,
+    updateDoc
 } from "firebase/firestore";
 
-import { auth, db } from "./firebase";
+import {
+    deleteObject,
+    listAll,
+    ref,
+} from "firebase/storage";
+
+import { auth, db, storage } from "./firebase";
 
 /**
  * Retourne la collection des histoires
@@ -195,6 +201,19 @@ export async function toggleCloudFavorite(
   }
 }
 
+async function deleteStorageFolder(folderRef: any) {
+  const result = await listAll(folderRef);
+
+  await Promise.all(
+    result.items.map((itemRef) =>
+      deleteObject(itemRef)
+    )
+  );
+
+  for (const prefix of result.prefixes) {
+    await deleteStorageFolder(prefix);
+  }
+}
 /**
  * Supprime une histoire appartenant à
  * l'utilisateur actuellement connecté.
@@ -214,6 +233,7 @@ export async function deleteCloudStory(
 
     const storyId = String(id);
 
+    // Référence du document Firestore
     const storyRef = doc(
       db,
       "users",
@@ -222,6 +242,33 @@ export async function deleteCloudStory(
       storyId
     );
 
+    // Référence du dossier Firebase Storage de l'histoire
+    const storyFolderRef = ref(
+      storage,
+      `users/${user.uid}/stories/${storyId}`
+    );
+
+    /*
+     * Supprime toutes les illustrations
+     * Firebase Storage de cette histoire.
+     */
+    try {
+      await deleteStorageFolder(storyFolderRef);
+
+      console.log(
+        "🗑️ Illustrations supprimées de Firebase Storage :",
+        storyId
+      );
+    } catch (storageError) {
+      console.log(
+        "ℹ️ Aucun fichier Storage à supprimer ou suppression impossible :",
+        storageError
+      );
+    }
+
+    /*
+     * Supprime ensuite le document Firestore.
+     */
     await deleteDoc(storyRef);
 
     console.log(
@@ -231,7 +278,10 @@ export async function deleteCloudStory(
 
     return true;
   } catch (error) {
-    console.error("❌ Erreur deleteCloudStory :", error);
+    console.error(
+      "❌ Erreur deleteCloudStory :",
+      error
+    );
     return false;
   }
 }

@@ -47,67 +47,136 @@ export default function SavedStoriesScreen() {
   }, [authReady]);
 
   async function load() {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      let data: any[] = [];
+    let data: any[] = [];
 
-      if (auth.currentUser) {
-        /*
-         * Utilisateur connecté :
-         * les histoires viennent de Firebase.
-         */
-        data = await getCloudStories();
+    if (auth.currentUser) {
+      /*
+       * Utilisateur connecté :
+       * on récupère Firebase ET la sauvegarde locale.
+       *
+       * Firebase reste la référence pour les données cloud
+       * (favoris, textes, etc.), mais les images locales
+       * sont conservées lorsqu'elles existent sur ce téléphone.
+       */
+      const [cloudStories, localStories] = await Promise.all([
+        getCloudStories(),
+        getStories(),
+      ]);
 
-        console.log(
-          "Histoires chargées depuis Firebase :",
-          data.length
+      data = cloudStories.map((cloudStory: any) => {
+        const localStory = localStories.find(
+          (story: any) =>
+            String(story.id) === String(cloudStory.id)
         );
-      } else {
+
         /*
-         * Visiteur :
-         * les histoires restent uniquement sur le téléphone.
+         * Si aucune copie locale n'existe,
+         * on conserve simplement la version Firebase.
          */
-        data = await getStories();
+        if (!localStory) {
+          return cloudStory;
+        }
 
-        console.log(
-          "Histoires chargées depuis le téléphone :",
-          data.length
-        );
-      }
+        const mergedScenes = Array.isArray(cloudStory.scenes)
+          ? cloudStory.scenes.map(
+              (cloudScene: any, index: number) => {
+                const localScene =
+                  localStory.scenes?.[index];
 
-      const sorted = [...data].sort((a: any, b: any) => {
+                return {
+                  ...cloudScene,
+
+                  /*
+                   * Priorité :
+                   * 1. image Firebase si elle existe
+                   * 2. sinon image locale du téléphone
+                   */
+                  imageUrl:
+                    cloudScene?.imageUrl ||
+                    localScene?.imageUrl ||
+                    null,
+                };
+              }
+            )
+          : localStory.scenes || [];
+
+        return {
+          ...cloudStory,
+          scenes: mergedScenes,
+        };
+      });
+
+      /*
+       * On ajoute également les éventuelles histoires locales
+       * qui n'existent pas encore dans Firebase.
+       */
+      const cloudIds = new Set(
+        cloudStories.map((story: any) =>
+          String(story.id)
+        )
+      );
+
+      const localOnlyStories = localStories.filter(
+        (story: any) =>
+          !cloudIds.has(String(story.id))
+      );
+
+      data = [...data, ...localOnlyStories];
+
+      console.log(
+        "Histoires Firebase + locales chargées :",
+        data.length
+      );
+    } else {
+      /*
+       * Visiteur :
+       * les histoires restent uniquement sur le téléphone.
+       */
+      data = await getStories();
+
+      console.log(
+        "Histoires chargées depuis le téléphone :",
+        data.length
+      );
+    }
+
+    const sorted = [...data].sort((a: any, b: any) => {
+      if (a.favorite && !b.favorite) return -1;
+      if (!a.favorite && b.favorite) return 1;
+
+      return Number(b.id) - Number(a.id);
+    });
+
+    setStories(sorted);
+  } catch (error) {
+    console.log(
+      "Erreur chargement histoires :",
+      error
+    );
+
+    /*
+     * En cas de problème Firebase,
+     * on affiche la sauvegarde locale.
+     */
+    const localStories = await getStories();
+
+    const sortedLocalStories = [...localStories].sort(
+      (a: any, b: any) => {
         if (a.favorite && !b.favorite) return -1;
         if (!a.favorite && b.favorite) return 1;
 
         return Number(b.id) - Number(a.id);
-      });
+      }
+    );
 
-      setStories(sorted);
-    } catch (error) {
-      console.log("Erreur chargement histoires :", error);
-
-      /*
-       * En cas de problème Firebase, on tente d’afficher
-       * la sauvegarde locale afin que l’utilisateur ne perde
-       * pas l’accès à ses histoires sur son téléphone.
-       */
-      const localStories = await getStories();
-
-      const sortedLocalStories = [...localStories].sort(
-        (a: any, b: any) => {
-          if (a.favorite && !b.favorite) return -1;
-          if (!a.favorite && b.favorite) return 1;
-
-          return Number(b.id) - Number(a.id);
-        }
-      );
-
-      setStories(sortedLocalStories);
-    } finally {
-      setLoading(false);
-    }
+    setStories(sortedLocalStories);
+  } finally {
+    setLoading(false);
   }
+}
 
   function openStory(story: any) {
     setCurrentStory(story);

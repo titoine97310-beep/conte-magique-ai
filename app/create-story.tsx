@@ -379,7 +379,7 @@ function openPhotoSelector() {
 
   Alert.alert(
     "📷 Ajouter une photo",
-    "Ajoute une photo de l'enfant, de son doudou ou des deux pour personnaliser les illustrations.",
+    "Ajoute une photo de référence pour personnaliser les illustrations : enfant, parent, famille, frères et sœurs, animal, doudou ou autre élément important.",
     [
       {
         text: "Prendre une photo",
@@ -496,18 +496,22 @@ function openPhotoSelector() {
         storyLength === "short" ? 4 : storyLength === "medium" ? 6 : 8;
 
       const storyPrompt = referencePhoto
-        ? `
-      ${prompt}
+  ? `
+${prompt}
 
-      IMPORTANT :
-      Une photo de référence a été ajoutée par le parent.
-      L'enfant et/ou son doudou présents sur cette photo doivent devenir les personnages principaux de l'histoire.
+IMPORTANT :
+Une photo de référence a été ajoutée.
 
-      L'histoire doit parler naturellement de l'enfant et de son doudou lorsqu'ils sont concernés.
-      Ne pas inventer de caractéristiques physiques précises qui ne sont pas données dans le texte.
-      Les illustrations utiliseront ensuite la photo pour reproduire leur apparence.
-      `
-        : prompt;
+- La photo peut contenir une ou plusieurs personnes, des enfants, des adultes, des animaux, des jouets ou éventuellement un doudou.
+- Ne pas supposer qu'un doudou est présent.
+- Ne pas inventer de personne, d'animal, de jouet ou de doudou qui ne soit pas demandé par le texte.
+- Les personnes ou éléments visibles sur la photo peuvent être intégrés naturellement à l'histoire lorsqu'ils sont pertinents pour l'idée donnée.
+- Si plusieurs personnes apparaissent sur la photo, ne pas réduire automatiquement l'histoire à un seul enfant.
+- Ne pas inventer de caractéristiques physiques détaillées dans le texte de l'histoire.
+- Les illustrations utiliseront la photo de référence pour conserver l'apparence des personnes et éléments concernés.
+- L'histoire doit avant tout respecter l'idée écrite par l'utilisateur.
+`
+  : prompt;
 
       const storyData = await generateStory(
         storyPrompt,
@@ -540,15 +544,21 @@ Personnages principaux de cette histoire :
 ${charactersDescription}
 
 ${referencePhoto ? `
-IMPORTANT — COHÉRENCE AVEC LA PHOTO DE RÉFÉRENCE :
-- utiliser exactement le même enfant et le même doudou que sur la photo de référence
-- conserver leurs caractéristiques principales d'une scène à l'autre
-- conserver la même couleur de cheveux, le même visage et les mêmes éléments distinctifs
-- conserver fidèlement la forme et les couleurs du doudou
-- ne pas remplacer le doudou par un autre jouet
-- ne pas modifier arbitrairement l'apparence de l'enfant
-- transformer l'ensemble dans le style illustré choisi, sans rendu photoréaliste
-- l'enfant et le doudou doivent rester immédiatement reconnaissables dans toutes les scènes
+IMPORTANT — PHOTO DE RÉFÉRENCE FOURNIE :
+- analyser attentivement la photo de référence avant de créer l'illustration
+- représenter uniquement les personnes, animaux, doudous ou objets importants réellement visibles sur la photo et utiles à la scène
+- ne jamais supposer qu'un doudou est présent s'il n'y en a pas sur la photo
+- ne jamais inventer une personne, un enfant, un animal ou un doudou à partir de la photo
+- si plusieurs personnes sont visibles, respecter le nombre de personnes et leurs principales caractéristiques visuelles
+- préserver l'identité visuelle de chaque personne d'une scène à l'autre : visage, cheveux, couleur de peau, âge apparent et éléments distinctifs
+- ne pas mélanger les caractéristiques physiques de plusieurs personnes
+- si un doudou, jouet ou animal est réellement visible, conserver fidèlement son apparence, sa forme et ses couleurs
+- conserver les mêmes personnages de référence dans toutes les scènes où ils apparaissent
+- adapter leurs vêtements, poses et expressions uniquement lorsque la scène le nécessite, tout en gardant leur identité visuelle reconnaissable
+- utiliser la photo uniquement comme référence d'apparence ; la composition, le décor, les poses et les actions doivent suivre la scène décrite
+- transformer les sujets dans le style illustré choisi
+- ne pas produire un rendu photoréaliste
+- créer une illustration chaleureuse, naturelle et adaptée à un livre pour enfants
 ` : ""}
 
 Scène à illustrer :
@@ -719,6 +729,12 @@ const imageUrl = await generateImage(
           onChangeText={setPrompt}
           multiline
         />
+
+        <Text style={styles.photoHelpText}>
+  📸 Photo de référence facultative{"\n"}
+  Utilise une photo nette où les personnes ou éléments importants sont bien visibles.
+</Text>
+
         <TouchableOpacity
   style={styles.photoButton}
   onPress={openPhotoSelector}
@@ -740,7 +756,7 @@ const imageUrl = await generateImage(
     />
 
     <Text style={styles.photoPreviewText}>
-      Photo de référence ajoutée
+      Photo de référence ajoutée ✓
     </Text>
   </View>
 )}
@@ -1220,5 +1236,12 @@ photoPreviewText: {
   color: "#E2E8F0",
   fontSize: 13,
   fontWeight: "800",
+},
+
+photoHelpText: {
+  color: "#CBD5E1",
+  fontSize: 13,
+  lineHeight: 19,
+  marginBottom: 10,
 },
 });
