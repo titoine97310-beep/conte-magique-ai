@@ -1130,12 +1130,24 @@ Utilise la photo fournie comme référence visuelle principale et obligatoire.
 OBJECTIF PRIORITAIRE :
 Conserver les mêmes personnes et les mêmes éléments visuels importants dans toutes les illustrations de cette histoire.
 
-Si plusieurs enfants, adultes, animaux ou objets importants sont visibles sur la photo :
-- conserve-les tous lorsqu'ils sont nécessaires dans la scène
+PERSONNES DE RÉFÉRENCE :
+Analyse attentivement la photo de référence avant de créer l'illustration.
+
+Les personnes visibles sur la photo constituent la distribution de référence de l'histoire.
+
+RÈGLES STRICTES :
+- n'invente aucun enfant, bébé, adulte ou personnage humain supplémentaire
+- n'ajoute jamais un frère, une sœur, un ami ou un autre enfant qui n'est pas demandé par la scène
+- ne duplique jamais une personne
 - ne fusionne jamais deux personnes
-- ne change pas leur identité visuelle
-- ne remplace pas une personne par une autre
-- ne modifie pas leur âge apparent
+- ne remplace jamais une personne par une autre
+- conserve l'âge apparent et les proportions relatives entre les personnes
+- lorsqu'une scène met en scène toutes les personnes de référence, représente exactement ces personnes et aucune personne supplémentaire
+- les personnages secondaires éventuellement nécessaires au décor doivent rester clairement en arrière-plan et ne jamais pouvoir être confondus avec les personnages principaux
+
+PRIORITÉ ABSOLUE :
+La fidélité et la continuité des personnages principaux sont plus importantes que l'ajout de détails décoratifs.
+En cas de doute, simplifie le décor plutôt que d'inventer une personne, un vêtement ou un accessoire.
 
 IDENTITÉ DES PERSONNAGES :
 Conserve au maximum :
@@ -1155,6 +1167,18 @@ Conserve :
 - les mêmes chaussures lorsqu'elles sont visibles
 - le même sac à dos
 - les mêmes accessoires importants
+- lorsqu'un sac à dos est porté ou visible dans la scène, conserve son apparence, sa couleur et ses caractéristiques principales
+- le sac à dos peut naturellement être posé ou hors champ lorsque le contexte le justifie, par exemple lorsque l'enfant est assis en classe
+
+RÈGLES STRICTES :
+- ne change jamais volontairement la couleur d'un vêtement
+- n'ajoute pas de chapeau, casquette, couronne, lunettes ou accessoire absent de la photo, sauf si la scène le demande explicitement
+- ne remplace pas un sac à dos par un autre
+- un accessoire peut ne pas être visible lorsque la situation le justifie naturellement, mais s'il réapparaît dans une autre scène, il doit conserver la même apparence
+- n'invente pas de nouveaux logos, lettres, animaux, symboles ou motifs sur les vêtements
+- si un motif précis est difficile à reproduire, simplifie-le mais garde le même motif simplifié dans toutes les scènes
+- ne transforme pas un vêtement en costume
+- privilégie la continuité visuelle plutôt que la créativité vestimentaire
 
 IMPORTANT :
 - ne change pas arbitrairement les couleurs des vêtements
