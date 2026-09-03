@@ -20,7 +20,8 @@ Les parents ou représentants légaux sont invités à accompagner l’enfant da
 Ils doivent notamment :
 
 • vérifier les informations saisies ;
-• éviter la transmission de données sensibles ;
+• éviter la transmission de données sensibles qui ne sont pas nécessaires au fonctionnement du service ;
+• vérifier qu’ils disposent des droits et autorisations nécessaires avant de transmettre une photo représentant un enfant ou une autre personne ;
 • superviser les achats ;
 • contrôler les contenus générés lorsqu’ils le jugent nécessaire ;
 • utiliser les dispositifs de contrôle parental disponibles sur l’appareil.
@@ -42,6 +43,12 @@ Les utilisateurs sont invités à ne pas renseigner inutilement :
 • localisation précise.
 
 Lorsque cela suffit à personnaliser une histoire, l’utilisation d’un prénom seul ou d’un pseudonyme est recommandée.
+
+Certaines fonctionnalités peuvent permettre à un parent ou représentant légal de fournir volontairement une photo représentant un enfant afin de personnaliser les illustrations d’une histoire.
+
+Cette fonctionnalité est facultative et l’utilisation de ConteMagiqueIA ne nécessite pas de fournir une photo d’enfant.
+
+Lorsqu’une telle photo est utilisée, elle doit être fournie sous la responsabilité d’un parent ou représentant légal disposant des droits et autorisations nécessaires.
 
 
 5. Minimisation des données
@@ -217,11 +224,25 @@ Lorsqu’une fonction de partage est proposée, le parent doit vérifier que l�
 • de contenu qu’il ne souhaite pas rendre public.
 
 
-25. Images et illustrations
+25. Photos de référence, images et illustrations
 
-Les illustrations générées par intelligence artificielle sont destinées à accompagner les histoires.
+ConteMagiqueIA peut permettre à l’utilisateur de choisir une photo présente sur son appareil ou de prendre une photo avec la caméra afin de personnaliser les illustrations d’une histoire.
 
-Elles peuvent présenter des variations ou anomalies inhérentes aux technologies utilisées.
+Cette photo peut notamment représenter un enfant, un membre de sa famille, un animal, un objet ou un autre élément que l’utilisateur souhaite intégrer à l’univers visuel de son histoire.
+
+Lorsqu’une photo représente un enfant ou une autre personne, l’utilisateur doit disposer des droits et autorisations nécessaires pour utiliser et transmettre cette image.
+
+La photo de référence est utilisée uniquement afin de fournir la fonctionnalité de personnalisation demandée.
+
+Elle peut être transmise de manière sécurisée aux systèmes techniques de ConteMagiqueIA ainsi qu’aux services d’intelligence artificielle nécessaires à la génération des illustrations.
+
+La photo originale utilisée comme référence n’est pas destinée à être conservée durablement dans l’espace de stockage Firebase de ConteMagiqueIA après le traitement nécessaire à la génération.
+
+Les illustrations générées à partir de cette photo peuvent en revanche être sauvegardées afin de permettre à l’utilisateur de conserver, retrouver et relire son histoire.
+
+La fonctionnalité photo est facultative. Une histoire peut être créée sans fournir de photo personnelle.
+
+Les illustrations générées par intelligence artificielle peuvent présenter des variations ou anomalies inhérentes aux technologies utilisées et ne constituent pas nécessairement une reproduction exacte de la personne ou de l’élément représenté sur la photo originale.
 
 
 26. Narration audio
@@ -287,6 +308,7 @@ Certaines fonctionnalités peuvent être fournies grâce à des prestataires ext
 • l’authentification ;
 • le stockage ;
 • l’hébergement ;
+• le traitement d’images nécessaire aux fonctionnalités de personnalisation ;
 • la narration audio ;
 • les paiements.
 

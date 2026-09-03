@@ -12,9 +12,11 @@ ConteMagiqueIA permet notamment de :
 
 • créer des histoires personnalisées ;
 • générer des illustrations ;
+• personnaliser certaines illustrations à partir d’une photo de référence fournie volontairement par l’utilisateur ;
 • écouter une narration audio ;
-• sauvegarder certaines histoires ;
-• utiliser différents carnets selon les droits disponibles ;
+• générer, lorsque cette fonctionnalité est disponible, des séquences vidéo ou petits dessins animés à partir d’une histoire et de ses illustrations ;
+• sauvegarder certaines histoires et contenus associés ;
+• utiliser différents carnets ou crédits selon les droits disponibles ;
 • accéder à des fonctionnalités complémentaires proposées dans l’application.
 
 Certaines fonctionnalités peuvent évoluer, être ajoutées, modifiées ou supprimées au fil des versions.
@@ -49,12 +51,28 @@ ConteMagiqueIA est principalement destinée à un usage familial.
 
 Lorsqu’un enfant utilise l’application, cette utilisation doit être réalisée sous la responsabilité d’un parent ou représentant légal lorsque cela est nécessaire.
 
-Les parents sont invités à accompagner les enfants dans l’utilisation de l’application et à éviter la saisie de données personnelles sensibles.
+Les parents sont invités à accompagner les enfants dans l’utilisation de l’application et à éviter la transmission de données personnelles sensibles qui ne sont pas nécessaires au fonctionnement du service.
 
+Lorsqu’une photo représentant un enfant est utilisée pour personnaliser une histoire ou ses illustrations, cette utilisation doit être effectuée sous la responsabilité d’un parent ou représentant légal disposant des droits et autorisations nécessaires.
 
-6. Carnets et droits d’utilisation
+La fonctionnalité de personnalisation par photo est facultative.
 
-ConteMagiqueIA peut proposer différents carnets donnant accès à un nombre déterminé d’histoires.
+6. Carnets, crédits et droits d’utilisation
+
+ConteMagiqueIA peut proposer différents carnets, crédits ou produits numériques donnant accès à un nombre déterminé de générations ou à certaines fonctionnalités Premium.
+
+À titre d’exemple :
+
+• Carnet Texte ;
+• Carnet Illustré ;
+• crédits ou droits permettant de générer une vidéo ;
+• autres produits numériques proposés dans l’application.
+
+Le nombre d’histoires, de générations ou de crédits disponibles dépend de l’offre souscrite et du solde restant sur le compte.
+
+Lorsque plusieurs carnets ou crédits sont disponibles, l’application peut permettre à l’utilisateur de choisir le produit correspondant à la fonctionnalité qu’il souhaite utiliser.
+
+Les conditions commerciales détaillées figurent dans les Conditions Premium.
 
 À titre d’exemple :
 
@@ -79,6 +97,36 @@ Le Carnet Illustré permet de générer des histoires accompagnées d’illustra
 
 Le nombre, le style et le rendu des illustrations peuvent varier en fonction de l’histoire, des paramètres choisis et des services techniques utilisés.
 
+8 bis. Personnalisation par photo
+
+ConteMagiqueIA peut permettre à l’utilisateur de choisir une photo présente sur son appareil ou de prendre une photo avec la caméra afin de personnaliser les illustrations d’une histoire.
+
+Cette fonctionnalité est facultative.
+
+L’utilisateur s’engage à ne transmettre que des photos qu’il est autorisé à utiliser.
+
+Lorsqu’une photo représente un enfant ou une autre personne, l’utilisateur doit disposer des droits et autorisations nécessaires pour utiliser cette image dans le cadre de la fonctionnalité proposée.
+
+La photo de référence peut être traitée par les systèmes techniques et services d’intelligence artificielle nécessaires à la génération des illustrations.
+
+Les modalités relatives au traitement et à la conservation des données sont précisées dans la Politique de confidentialité.
+
+8 ter. Génération vidéo
+
+ConteMagiqueIA peut proposer une fonctionnalité permettant de transformer tout ou partie d’une histoire et de ses illustrations en une séquence vidéo ou un petit dessin animé généré à l’aide de technologies automatisées et d’intelligence artificielle.
+
+Cette fonctionnalité peut être soumise à l’achat ou à l’utilisation d’un crédit spécifique.
+
+Les conditions applicables, notamment le prix ou le nombre de crédits nécessaires, sont affichées dans l’application avant l’achat ou le lancement de la génération lorsque cela est applicable.
+
+La génération vidéo peut nécessiter un délai de traitement et dépendre de services techniques ou de prestataires externes.
+
+Le résultat peut présenter des variations, mouvements, transitions, déformations, incohérences ou différences par rapport aux illustrations utilisées comme source.
+
+ConteMagiqueIA ne garantit pas un résultat visuel parfaitement identique aux illustrations originales ni un résultat créatif précis.
+
+Les conditions commerciales applicables sont précisées dans les Conditions Premium.
+
 
 9. Décompte des histoires
 
@@ -91,7 +139,7 @@ En cas d’échec technique empêchant la génération complète, ConteMagiqueIA
 
 ConteMagiqueIA utilise des technologies d’intelligence artificielle pour générer certains contenus.
 
-Les histoires, illustrations ou narrations peuvent donc comporter :
+Les histoires, illustrations, animations, vidéos ou narrations peuvent donc comporter :
 
 • des variations ;
 • des imprécisions ;
@@ -149,9 +197,9 @@ ConteMagiqueIA peut suspendre temporairement ou définitivement l’accès à un
 Lorsque cela est possible et approprié, l’utilisateur peut être informé du motif de la suspension.
 
 
-15. Sauvegarde des histoires
+15. Sauvegarde des histoires et contenus générés
 
-Certaines histoires peuvent être sauvegardées dans l’application ou dans des services cloud associés.
+Certaines histoires, illustrations, vidéos ou autres contenus générés peuvent être sauvegardés dans l’application ou dans des services cloud associés lorsque cette fonctionnalité est disponible.
 
 ConteMagiqueIA met en œuvre des moyens raisonnables pour assurer la disponibilité des contenus, mais ne garantit pas une conservation permanente en toutes circonstances.
 
@@ -191,6 +239,7 @@ Le fonctionnement de ConteMagiqueIA peut dépendre de prestataires externes, not
 • les services d’intelligence artificielle ;
 • le stockage ;
 • la narration audio ;
+• la génération ou le traitement de vidéos ;
 • Google Play ;
 • l’App Store ;
 • les paiements.
@@ -202,9 +251,9 @@ ConteMagiqueIA ne peut garantir la disponibilité permanente de services exploit
 
 Lorsque les paiements réels sont activés, les achats sont effectués via les plateformes ou prestataires autorisés, notamment Google Play ou Apple App Store.
 
-Les caractéristiques essentielles de l’offre, son prix et le nombre d’histoires incluses sont indiqués avant la validation de l’achat.
+Les caractéristiques essentielles de l’offre, son prix ainsi que le nombre d’histoires, de crédits, de générations ou les droits correspondants sont indiqués avant la validation de l’achat.
 
-Les conditions applicables aux carnets payants sont détaillées dans les Conditions Premium disponibles dans le Centre juridique.
+Les conditions applicables aux carnets, crédits vidéo et autres produits numériques payants sont détaillées dans les Conditions Premium disponibles dans le Centre juridique.
 
 Les achats numériques sont également soumis aux conditions de la plateforme de paiement utilisée.
 
@@ -257,16 +306,20 @@ Sauf lorsque la loi l’autorise expressément, il est interdit de :
 • exploiter les services afin de créer un service concurrent.
 
 
-25. Contenus créés par l’utilisateur
+25. Contenus fournis par l’utilisateur
 
-L’utilisateur reste responsable des informations, textes et instructions qu’il fournit à l’application.
+L’utilisateur reste responsable des informations, textes, instructions, images et photos qu’il fournit à l’application.
 
 Il s’engage à ne pas transmettre de contenu dont il ne possède pas les droits nécessaires lorsque cette transmission serait illicite.
+
+Lorsqu’une photo représente une autre personne, notamment un enfant, l’utilisateur doit disposer des droits et autorisations nécessaires à son utilisation.
+
+Il est interdit d’utiliser une photo ou tout autre contenu fourni afin d’usurper l’identité d’une personne, de tromper un tiers, de harceler, de diffamer ou de porter illicitement atteinte aux droits d’une personne.
 
 
 26. Contenus générés
 
-Les droits pouvant s’appliquer aux histoires, images ou autres contenus générés dépendent notamment :
+Les droits pouvant s’appliquer aux histoires, images, illustrations, animations, vidéos ou autres contenus générés dépendent notamment :
 
 • de la législation applicable ;
 • des technologies utilisées ;
@@ -289,6 +342,8 @@ Lorsque la fonctionnalité de partage est disponible, l’utilisateur peut parta
 
 Il lui appartient de vérifier qu’aucune donnée personnelle sensible ou information confidentielle n’est incluse dans le contenu partagé.
 
+Lorsqu’un contenu partagé comprend une illustration personnalisée à partir d’une photo représentant une personne réelle, l’utilisateur doit également tenir compte du droit à l’image, de la vie privée et des droits de la personne concernée.
+
 
 29. Protection des données personnelles
 
@@ -299,7 +354,7 @@ Les traitements de données personnelles réalisés dans le cadre de ConteMagiqu
 
 L’utilisateur peut demander la suppression de son compte depuis les fonctions prévues dans l’application.
 
-Cette suppression peut entraîner la perte définitive de certaines données et histoires associées au compte.
+Cette suppression peut entraîner la perte définitive de certaines données, histoires, illustrations, vidéos et autres contenus associés au compte.
 
 
 31. Sécurité
@@ -417,8 +472,8 @@ https://contemagiqueia.fr
 43. Version
 
 Version :
-1.0
+1.1
 
 Dernière mise à jour :
-12 août 2026
+3 septembre 2026
 `;

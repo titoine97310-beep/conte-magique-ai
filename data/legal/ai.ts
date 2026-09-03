@@ -9,6 +9,7 @@ La présente Politique relative à l’intelligence artificielle décrit les pri
 ConteMagiqueIA utilise l’intelligence artificielle afin notamment de :
 
 • générer des histoires personnalisées ;
+• générer des illustrations personnalisées à partir d’une photo de référence fournie volontairement par l’utilisateur ;
 • adapter le ton, le style ou le thème d’un récit ;
 • générer des illustrations ;
 • proposer certaines narrations audio ;
@@ -124,11 +125,23 @@ Le signalement peut préciser :
 
 12. Données envoyées aux services d’intelligence artificielle
 
-Certaines informations saisies par l’utilisateur peuvent être transmises à des prestataires d’intelligence artificielle lorsqu’elles sont nécessaires à la génération du contenu demandé.
+Certaines informations fournies par l’utilisateur peuvent être transmises à des prestataires d’intelligence artificielle lorsqu’elles sont nécessaires à la génération du contenu demandé.
 
-ConteMagiqueIA cherche à limiter ces transmissions au strict nécessaire.
+Ces informations peuvent notamment comprendre :
 
-Les utilisateurs ne doivent pas saisir inutilement de données sensibles ou confidentielles.
+• les instructions et textes nécessaires à la génération d’une histoire ;
+• les descriptions nécessaires à la génération des illustrations ;
+• lorsqu’elle est volontairement utilisée, une photo de référence choisie dans la galerie de l’appareil ou prise avec la caméra afin de générer des illustrations personnalisées.
+
+ConteMagiqueIA cherche à limiter ces transmissions au strict nécessaire pour fournir la fonctionnalité demandée.
+
+Lorsqu’une photo de référence est utilisée, elle peut être transmise au backend de ConteMagiqueIA ainsi qu’au service d’intelligence artificielle nécessaire à la génération de l’illustration.
+
+La photo originale utilisée comme référence n’est pas destinée à être conservée durablement dans l’espace de stockage Firebase de ConteMagiqueIA après le traitement nécessaire à la génération.
+
+Les illustrations générées peuvent en revanche être sauvegardées afin de permettre à l’utilisateur de conserver et retrouver son histoire.
+
+Les utilisateurs ne doivent pas transmettre inutilement de données sensibles ou confidentielles.
 
 
 13. Données relatives aux enfants
@@ -145,10 +158,18 @@ Il est recommandé de ne pas transmettre dans les demandes de génération :
 
 L’utilisation d’un prénom seul ou d’un pseudonyme est préférable lorsque cela suffit à personnaliser l’histoire.
 
+Certaines fonctionnalités peuvent permettre à un parent ou représentant légal de fournir volontairement une photo représentant un enfant afin de personnaliser les illustrations d’une histoire.
+
+Cette fonctionnalité est facultative.
+
+Lorsqu’une photo représente un enfant, elle doit être utilisée sous la responsabilité d’un parent ou représentant légal disposant des droits et autorisations nécessaires.
+
+La photo est utilisée comme référence pour la génération demandée et n’est pas destinée à être conservée durablement dans l’espace de stockage Firebase de ConteMagiqueIA après son traitement.
+
 
 14. Prestataires d’intelligence artificielle
 
-ConteMagiqueIA peut recourir à différents prestataires spécialisés pour la génération de texte, d’image ou d’audio.
+ConteMagiqueIA peut recourir à différents prestataires spécialisés pour la génération de texte, d’image ou d’audio ainsi que pour le traitement d’images de référence nécessaire à certaines fonctionnalités de personnalisation.
 
 Ces prestataires peuvent évoluer en fonction :
 
@@ -236,6 +257,10 @@ Les utilisateurs ne doivent pas utiliser ConteMagiqueIA afin de créer des conte
 • diffamer une personne ;
 • créer une représentation trompeuse portant atteinte à ses droits.
 
+L’utilisation d’une photo représentant une personne réelle dans une fonctionnalité de personnalisation doit être effectuée avec les droits et autorisations nécessaires.
+
+La fonctionnalité de personnalisation par photo est destinée à créer des illustrations associées aux histoires et ne doit pas être utilisée pour usurper l’identité d’une personne, tromper un tiers ou porter atteinte aux droits de la personne représentée.
+
 
 22. Utilisation abusive
 
@@ -304,6 +329,10 @@ Les illustrations générées automatiquement peuvent présenter :
 • des incohérences entre plusieurs scènes.
 
 ConteMagiqueIA peut utiliser des techniques destinées à améliorer la cohérence visuelle, sans garantir une identité parfaite entre toutes les images.
+
+Lorsqu’une photo de référence est utilisée, les illustrations générées constituent une interprétation produite par intelligence artificielle.
+
+ConteMagiqueIA ne garantit pas une reproduction exacte du visage, de l’apparence, des vêtements ou des autres caractéristiques visibles sur la photo de référence.
 
 
 28. Fiabilité de la narration audio
@@ -408,8 +437,8 @@ https://contemagiqueia.fr
 38. Version
 
 Version :
-1.0
+1.1
 
 Dernière mise à jour :
-12 août 2026
+3 septembre 2026
 `;

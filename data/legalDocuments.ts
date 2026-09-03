@@ -1,11 +1,11 @@
 import {
-    aiContent,
-    cguContent,
-    childrenContent,
-    eulaContent,
-    mentionsContent,
-    premiumContent,
-    privacyContent,
+  aiContent,
+  cguContent,
+  childrenContent,
+  eulaContent,
+  mentionsContent,
+  premiumContent,
+  privacyContent,
 } from "./legal";
 
 export type LegalDocumentId =
@@ -36,10 +36,11 @@ export const legalDocuments: LegalDocument[] = [
     shortTitle: "CGU",
     subtitle:
       "Règles applicables à l’utilisation de ConteMagiqueIA et de ses services.",
-    version: "1.0",
-    updatedAt: "10 août 2026",
+    version: "1.1",
+    updatedAt: "3 septembre 2026",
     content: cguContent,
   },
+
 
   {
     id: "privacy",
@@ -47,9 +48,9 @@ export const legalDocuments: LegalDocument[] = [
     title: "Politique de confidentialité",
     shortTitle: "Confidentialité",
     subtitle:
-      "Informations sur la collecte, l’utilisation et la protection de vos données personnelles.",
-    version: "1.0",
-    updatedAt: "10 août 2026",
+      "Informations sur la collecte, l’utilisation, le traitement et la protection de vos données personnelles.",
+    version: "1.1",
+    updatedAt: "3 septembre 2026",
     content: privacyContent,
   },
 
@@ -60,8 +61,8 @@ export const legalDocuments: LegalDocument[] = [
     shortTitle: "Licence utilisateur",
     subtitle:
       "Conditions de licence et règles d’utilisation de l’application.",
-    version: "1.0",
-    updatedAt: "10 août 2026",
+    version: "1.1",
+    updatedAt: "3 septembre 2026",
     content: eulaContent,
   },
 
@@ -72,8 +73,8 @@ export const legalDocuments: LegalDocument[] = [
     shortTitle: "Mentions légales",
     subtitle:
       "Informations relatives à l’éditeur, à l’hébergement et à la responsabilité.",
-    version: "1.0",
-    updatedAt: "10 août 2026",
+    version: "1.1",
+    updatedAt: "3 septembre 2026",
     content: mentionsContent,
   },
 
@@ -84,8 +85,8 @@ export const legalDocuments: LegalDocument[] = [
     shortTitle: "Politique IA",
     subtitle:
       "Principes encadrant l’utilisation de l’intelligence artificielle dans ConteMagiqueIA.",
-    version: "1.0",
-    updatedAt: "10 août 2026",
+    version: "1.1",
+    updatedAt: "3 septembre 2026",
     content: aiContent,
   },
 
@@ -95,9 +96,9 @@ export const legalDocuments: LegalDocument[] = [
     title: "Conditions des carnets Premium",
     shortTitle: "Conditions Premium",
     subtitle:
-      "Conditions applicables à l’achat et à l’utilisation des carnets payants.",
-    version: "1.0",
-    updatedAt: "10 août 2026",
+      "Conditions applicables aux achats de carnets, crédits vidéo et autres produits numériques.",
+    version: "1.1",
+    updatedAt: "3 septembre 2026",
     content: premiumContent,
   },
 
@@ -108,8 +109,8 @@ export const legalDocuments: LegalDocument[] = [
     shortTitle: "Protection des enfants",
     subtitle:
       "Engagements de ConteMagiqueIA pour protéger les enfants et accompagner les familles.",
-    version: "1.0",
-    updatedAt: "10 août 2026",
+    version: "1.1",
+    updatedAt: "3 septembre 2026",
     content: childrenContent,
   },
 ];

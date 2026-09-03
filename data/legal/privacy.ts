@@ -53,6 +53,8 @@ Selon les fonctionnalités utilisées, ConteMagiqueIA peut traiter notamment les
 • textes et instructions saisis afin de générer une histoire ;
 • préférences relatives au style des illustrations ;
 • préférences de narration ;
+• photos choisies dans la galerie de l’appareil ou prises avec la caméra lorsque l’utilisateur utilise volontairement la fonctionnalité de personnalisation par photo ;
+• illustrations générées à partir d’une photo de référence ;
 • informations techniques nécessaires au fonctionnement, à la sécurité et au diagnostic de l’application.
 
 ConteMagiqueIA cherche à limiter la collecte de données au strict nécessaire.
@@ -62,7 +64,11 @@ ConteMagiqueIA cherche à limiter la collecte de données au strict nécessaire.
 
 ConteMagiqueIA est destinée à une utilisation familiale.
 
-Les parents ou représentants légaux sont invités à ne pas saisir de données personnelles sensibles concernant un enfant lorsqu’elles ne sont pas nécessaires à la création de l’histoire.
+Certaines fonctionnalités permettent à l’utilisateur de fournir volontairement une photo pouvant notamment représenter un enfant afin de personnaliser les illustrations d’une histoire.
+
+Lorsqu’une photo représente un enfant, son utilisation doit être effectuée sous la responsabilité d’un parent ou représentant légal disposant des droits et autorisations nécessaires pour utiliser cette image.
+
+Les parents ou représentants légaux sont invités à ne pas saisir ou transmettre de données personnelles sensibles concernant un enfant lorsqu’elles ne sont pas nécessaires à la fonctionnalité utilisée.
 
 Il est notamment recommandé d’éviter de transmettre :
 
@@ -96,8 +102,10 @@ Les données peuvent être utilisées afin de :
 • authentifier l’utilisateur ;
 • générer des histoires personnalisées ;
 • générer des illustrations ;
+• personnaliser des illustrations à partir d’une photo fournie volontairement par l’utilisateur ;
 • proposer une narration audio ;
 • sauvegarder les histoires ;
+• sauvegarder les illustrations générées associées aux histoires ;
 • synchroniser certaines informations liées au compte ;
 • gérer les carnets et crédits d’histoires ;
 • gérer les achats et paiements effectués via les plateformes officielles ;
@@ -118,18 +126,39 @@ Selon les traitements concernés, ConteMagiqueIA peut s’appuyer notamment sur 
 • le respect d’une obligation légale.
 
 
-8. Utilisation de services d’intelligence artificielle
+8. Photos de référence et illustrations personnalisées
+
+ConteMagiqueIA peut permettre à l’utilisateur de choisir une photo présente sur son appareil ou de prendre une photo avec la caméra afin de personnaliser une histoire et ses illustrations.
+
+Cette photo peut notamment représenter un enfant, un membre de sa famille, un animal, un objet ou tout autre élément que l’utilisateur souhaite utiliser comme référence visuelle.
+
+La fonctionnalité photo est facultative. L’utilisateur peut créer et utiliser des histoires sans fournir de photo personnelle.
+
+La photo de référence est utilisée uniquement afin de fournir la fonctionnalité demandée par l’utilisateur et de permettre la génération des illustrations personnalisées correspondantes.
+
+Pour réaliser cette génération, la photo peut être transmise de manière sécurisée au backend de ConteMagiqueIA ainsi qu’aux prestataires techniques et services d’intelligence artificielle nécessaires au traitement.
+
+La photo originale utilisée comme référence n’est pas destinée à être conservée durablement dans l’espace de stockage Firebase de ConteMagiqueIA après le traitement nécessaire à la génération.
+
+En revanche, les illustrations générées à partir de cette photo peuvent être enregistrées dans les services de stockage utilisés par ConteMagiqueIA afin de permettre à l’utilisateur de sauvegarder, retrouver et relire son histoire.
+
+ConteMagiqueIA n’utilise pas volontairement la photo de référence pour établir un profil public de la personne représentée.
+
+L’utilisateur doit disposer des droits et autorisations nécessaires concernant toute photo qu’il choisit de transmettre à ConteMagiqueIA.
+
+
+9. Utilisation de services d’intelligence artificielle
 
 ConteMagiqueIA utilise des technologies d’intelligence artificielle afin de générer certaines histoires, illustrations ou fonctionnalités associées.
 
-Certaines informations saisies par l’utilisateur peuvent donc être transmises à des prestataires techniques d’intelligence artificielle lorsque cela est nécessaire à la fourniture du service.
+Certaines informations fournies par l’utilisateur, notamment les instructions de génération et, lorsque la fonctionnalité correspondante est utilisée, une photo de référence, peuvent être transmises à des prestataires techniques d’intelligence artificielle lorsque cela est nécessaire à la fourniture du service demandé.
 
 ConteMagiqueIA cherche à limiter les informations transmises à celles strictement nécessaires à la génération du contenu demandé.
 
-Les utilisateurs sont invités à ne pas inclure de données personnelles sensibles ou confidentielles dans leurs demandes de génération.
+Les utilisateurs sont invités à ne pas inclure de données personnelles sensibles ou confidentielles qui ne sont pas nécessaires dans leurs demandes de génération.
 
 
-9. Prestataires et sous-traitants
+10. Prestataires et sous-traitants
 
 Pour assurer son fonctionnement, ConteMagiqueIA peut utiliser différents prestataires techniques, notamment pour :
 
@@ -138,6 +167,7 @@ Pour assurer son fonctionnement, ConteMagiqueIA peut utiliser différents presta
 • le stockage ;
 • les bases de données ;
 • la génération de contenus par intelligence artificielle ;
+• le traitement d’images nécessaires aux fonctionnalités de personnalisation ;
 • la génération audio ;
 • la gestion des paiements ;
 • la distribution de l’application ;
@@ -148,7 +178,7 @@ Ces prestataires peuvent notamment inclure des services tels que Firebase / Goog
 La liste des prestataires peut évoluer en fonction des besoins techniques et de l’évolution de l’application.
 
 
-10. Paiements
+11. Paiements
 
 Lorsque les paiements réels sont activés, les transactions sont traitées par les plateformes de paiement autorisées, notamment Google Play ou l’App Store selon l’appareil utilisé.
 
@@ -157,7 +187,7 @@ ConteMagiqueIA n’a pas vocation à recevoir ni à conserver directement le num
 Les informations relatives aux achats nécessaires à l’activation des carnets peuvent être conservées afin de gérer les droits associés au compte et de prévenir la fraude.
 
 
-11. Conservation des données
+12. Conservation des données
 
 Les données personnelles ne sont pas conservées plus longtemps que nécessaire au regard des finalités pour lesquelles elles sont traitées.
 
@@ -165,6 +195,8 @@ Les données personnelles ne sont pas conservées plus longtemps que nécessaire
 
 • les données relatives au compte sont conservées pendant la durée d’existence du compte ;
 • les histoires et contenus sauvegardés sont conservés tant qu’ils restent associés au compte, sauf suppression par l’utilisateur ou nécessité technique ou légale ;
+• les illustrations générées et sauvegardées peuvent être conservées tant qu’elles restent associées à une histoire ou au compte de l’utilisateur ;
+• la photo originale utilisée comme référence pour générer une illustration n’est pas destinée à être conservée durablement dans Firebase Storage par ConteMagiqueIA après son traitement ;
 • les informations techniques et journaux de sécurité sont conservés pendant une durée proportionnée aux besoins de sécurité, de prévention des abus et de diagnostic ;
 • les informations relatives aux transactions peuvent être conservées pendant les durées nécessaires à la gestion des achats, à la prévention de la fraude et au respect des obligations légales, comptables ou fiscales.
 
@@ -173,16 +205,16 @@ Lorsqu’un compte est supprimé, les données qui ne doivent plus être conserv
 Lorsque la durée exacte ne peut être déterminée à l’avance, ConteMagiqueIA utilise des critères fondés sur la finalité du traitement, la durée de la relation avec l’utilisateur, les obligations légales et les nécessités de sécurité.
 
 
-12. Suppression du compte
+13. Suppression du compte
 
 L’utilisateur peut demander la suppression de son compte depuis les fonctionnalités prévues dans l’application.
 
-La suppression du compte peut entraîner la suppression définitive des données et contenus associés qui ne doivent pas être conservés pour des raisons légales.
+La suppression du compte peut entraîner la suppression définitive des données et contenus associés qui ne doivent pas être conservés pour des raisons légales, notamment les histoires et illustrations sauvegardées associées au compte.
 
 Il est recommandé à l’utilisateur de conserver une copie des contenus importants avant toute suppression définitive.
 
 
-13. Sécurité
+14. Sécurité
 
 ConteMagiqueIA met en œuvre des mesures techniques et organisationnelles raisonnables destinées à protéger les données contre :
 
@@ -195,7 +227,7 @@ ConteMagiqueIA met en œuvre des mesures techniques et organisationnelles raison
 Ces mesures peuvent notamment comprendre l’authentification, la limitation des accès, les communications sécurisées, les mises à jour techniques et les mécanismes de protection proposés par les prestataires utilisés.
 
 
-14. Droits des utilisateurs
+15. Droits des utilisateurs
 
 Conformément à la réglementation applicable, notamment au RGPD, les personnes concernées peuvent disposer de différents droits :
 
@@ -212,12 +244,12 @@ Pour exercer ces droits, l’utilisateur peut contacter :
 contact@contemagiqueia.fr
 
 
-15. Réclamation auprès de la CNIL
+16. Réclamation auprès de la CNIL
 
 Toute personne estimant que ses données personnelles ne sont pas traitées conformément à la réglementation peut introduire une réclamation auprès de la Commission nationale de l’informatique et des libertés (CNIL).
 
 
-16. Transferts internationaux
+17. Transferts internationaux
 
 Certains prestataires techniques peuvent traiter des données en dehors de l’Union européenne ou de l’Espace économique européen.
 
@@ -230,14 +262,14 @@ Lorsque de tels transferts ont lieu, ConteMagiqueIA veille à ce qu’ils repose
 Des garanties complémentaires peuvent être mises en œuvre lorsque cela est nécessaire.
 
 
-17. Absence de vente de données personnelles
+18. Absence de vente de données personnelles
 
 ConteMagiqueIA ne vend pas les données personnelles de ses utilisateurs.
 
 Les données ne sont transmises à des tiers que lorsque cela est nécessaire au fonctionnement du service, au respect d’une obligation légale, à la sécurité du service ou avec l’accord de la personne concernée lorsque celui-ci est requis.
 
 
-18. Évolution de la politique
+19. Évolution de la politique
 
 La présente Politique de confidentialité peut évoluer afin de tenir compte :
 
@@ -250,7 +282,7 @@ La présente Politique de confidentialité peut évoluer afin de tenir compte :
 La version et la date de dernière mise à jour sont indiquées dans l’application.
 
 
-19. Contact
+20. Contact
 
 Pour toute question relative à la protection des données personnelles :
 
@@ -268,11 +300,11 @@ Adresse postale :
 France
 
 
-20. Version
+21. Version
 
 Version :
-1.0
+1.1
 
 Dernière mise à jour :
-12 août 2026
+3 septembre 2026
 `;

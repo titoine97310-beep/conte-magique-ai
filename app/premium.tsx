@@ -883,7 +883,7 @@ async function buyMediumVideo() {
             >
               {getStorePrice(
                 ILLUSTRATED_PRODUCT_ID,
-                "9,99 €"
+                "5,99 €"
               )}
             </Text>
 

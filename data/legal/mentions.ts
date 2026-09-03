@@ -61,9 +61,11 @@ L’application permet notamment :
 • la création d’histoires personnalisées ;
 • la génération de textes à l’aide de technologies d’intelligence artificielle ;
 • la génération d’illustrations ;
+• la personnalisation de certaines illustrations à partir d’une photo de référence fournie volontairement par l’utilisateur ;
 • la narration audio ;
-• la sauvegarde d’histoires ;
-• l’utilisation de carnets Texte ou Illustrés ;
+• la génération, lorsque cette fonctionnalité est disponible, d’animations ou de vidéos à partir d’histoires et d’illustrations ;
+• la sauvegarde de certaines histoires et contenus associés ;
+• l’utilisation de carnets, crédits ou droits d’utilisation ;
 • l’accès à différentes fonctionnalités destinées principalement aux familles.
 
 5. Hébergement du site internet
@@ -85,6 +87,8 @@ Selon les services utilisés, ces prestataires peuvent notamment intervenir pour
 • l’authentification ;
 • le stockage de contenus ;
 • les services d’intelligence artificielle ;
+• la génération et le traitement d’images ;
+• la génération ou le traitement de vidéos ;
 • la génération audio ;
 • la sécurité ;
 • la distribution de l’application.
@@ -105,7 +109,9 @@ L’utilisation de ces services est soumise aux conditions applicables des prest
 
 8. OpenAI et services d’intelligence artificielle
 
-ConteMagiqueIA peut utiliser les services d’OpenAI ou d’autres prestataires spécialisés en intelligence artificielle afin de générer certaines histoires, illustrations, narrations ou fonctionnalités associées.
+ConteMagiqueIA peut utiliser les services d’OpenAI ou d’autres prestataires spécialisés en intelligence artificielle afin de générer certaines histoires, illustrations, narrations, animations, vidéos ou fonctionnalités associées.
+
+Ces services peuvent également intervenir dans le traitement d’une photo de référence fournie volontairement par l’utilisateur lorsqu’elle est nécessaire à une fonctionnalité de personnalisation.
 
 Ces prestataires restent responsables de leurs propres infrastructures et sont soumis à leurs propres conditions contractuelles.
 
@@ -117,6 +123,7 @@ Ces services peuvent intervenir notamment dans :
 
 • la génération audio ;
 • les échanges avec des API externes ;
+• le traitement de données ou de médias nécessaires à certaines fonctionnalités de personnalisation ;
 • certaines opérations serveur nécessaires au fonctionnement de l’application.
 
 10. Distribution de l’application
@@ -156,7 +163,7 @@ Ces éléments restent la propriété de leurs titulaires respectifs et peuvent 
 
 13. Contenus générés par intelligence artificielle
 
-Certaines histoires, images, narrations ou autres productions disponibles dans ConteMagiqueIA sont générées automatiquement.
+Certaines histoires, illustrations, animations, vidéos, narrations ou autres productions disponibles dans ConteMagiqueIA sont générées automatiquement ou à l’aide de technologies d’intelligence artificielle.
 
 La génération de ces contenus ne signifie pas nécessairement que ConteMagiqueIA dispose d’un droit exclusif sur chaque contenu produit.
 
@@ -181,7 +188,7 @@ Toutefois, l’éditeur ne peut garantir :
 
 15. Services automatisés
 
-Les histoires, illustrations et narrations peuvent être produites à l’aide de systèmes automatisés.
+Les histoires, illustrations, animations, vidéos et narrations peuvent être produites à l’aide de systèmes automatisés ou de technologies d’intelligence artificielle.
 
 Ces systèmes peuvent générer des résultats :
 
@@ -224,9 +231,9 @@ L’utilisation de ConteMagiqueIA est régie par les Conditions Générales d’
 
 L’utilisation du logiciel ConteMagiqueIA est également encadrée par le Contrat de licence utilisateur final (EULA).
 
-21. Conditions applicables aux carnets payants
+21. Conditions applicables aux produits numériques payants
 
-Les achats de carnets Texte, Illustrés ou d’autres produits numériques proposés par ConteMagiqueIA sont soumis aux Conditions Premium ainsi qu’aux règles de la plateforme de paiement utilisée.
+Les achats de carnets Texte, carnets Illustrés, crédits vidéo ou autres produits numériques proposés par ConteMagiqueIA sont soumis aux Conditions Premium ainsi qu’aux règles de la plateforme de paiement utilisée.
 
 22. Protection des enfants
 
@@ -282,8 +289,8 @@ Les présentes Mentions légales peuvent être modifiées notamment afin de teni
 • d’évolutions législatives ou réglementaires.
 
 Version :
-1.0
+1.1
 
 Dernière mise à jour :
-12 août 2026
+3 septembre 2026
 `;

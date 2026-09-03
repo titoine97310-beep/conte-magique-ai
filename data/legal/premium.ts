@@ -12,6 +12,7 @@ Ces produits peuvent notamment comprendre :
 
 • des Carnets Texte ;
 • des Carnets Illustrés ;
+• des crédits ou achats permettant de générer une vidéo à partir d’une histoire ;
 • des packs de crédits ;
 • des offres promotionnelles ;
 • des fonctionnalités Premium ;
@@ -30,6 +31,24 @@ Le nombre exact d’histoires incluses est indiqué dans l’application au mome
 Le Carnet Illustré permet de générer un nombre déterminé d’histoires accompagnées d’illustrations générées automatiquement.
 
 Le nombre exact d’histoires incluses est indiqué dans l’application au moment de l’achat.
+
+4 bis. Génération vidéo
+
+ConteMagiqueIA peut proposer une fonctionnalité Premium permettant de transformer tout ou partie d’une histoire et de ses illustrations en une séquence vidéo ou un petit dessin animé généré à l’aide de technologies automatisées et d’intelligence artificielle.
+
+Cette fonctionnalité peut nécessiter l’achat ou l’utilisation d’un crédit vidéo spécifique.
+
+Le prix, le nombre de crédits nécessaires et les caractéristiques principales de la génération sont affichés dans l’application avant la validation de l’achat ou de l’utilisation du crédit.
+
+Une génération vidéo peut notamment dépendre :
+
+• du nombre de scènes de l’histoire ;
+• de la durée proposée ;
+• du modèle ou du prestataire d’intelligence artificielle utilisé ;
+• des capacités techniques disponibles ;
+• de l’offre sélectionnée par l’utilisateur.
+
+Les caractéristiques effectivement proposées sont celles indiquées dans l’application au moment de l’achat ou du lancement de la génération.
 
 
 5. Nombre d’histoires incluses
@@ -74,9 +93,9 @@ ConteMagiqueIA n’a pas vocation à recevoir directement les coordonnées banca
 
 9. Validation de l’achat
 
-Un carnet est crédité après confirmation suffisante de l’achat.
+Un carnet, crédit vidéo ou autre produit numérique est crédité ou activé après confirmation suffisante de l’achat.
 
-ConteMagiqueIA peut utiliser des mécanismes techniques afin de vérifier la validité de la transaction avant d’ajouter les histoires au compte.
+ConteMagiqueIA peut utiliser des mécanismes techniques afin de vérifier la validité de la transaction avant d’ajouter les crédits ou droits correspondants au compte.
 
 
 10. Vérification serveur
@@ -92,9 +111,13 @@ Cette vérification peut notamment utiliser :
 • l’état de la transaction.
 
 
-11. Activation du carnet
+Après validation de l’achat, les crédits ou droits correspondants sont ajoutés au compte concerné.
 
-Après validation de l’achat, les histoires correspondantes sont ajoutées au carnet concerné.
+Par exemple :
+
+• achat d’un Carnet Texte → crédits ajoutés au Carnet Texte ;
+• achat d’un Carnet Illustré → crédits ajoutés au Carnet Illustré ;
+• achat d’un crédit vidéo → droit ou crédit permettant de lancer la génération vidéo correspondante.
 
 Par exemple :
 
@@ -129,12 +152,27 @@ En cas d’échec technique empêchant la création normale d’une histoire, Co
 
 Cependant, certaines situations exceptionnelles peuvent nécessiter une intervention du support.
 
+15 bis. Génération vidéo et consommation du crédit
+
+Lorsqu’un crédit vidéo est nécessaire, celui-ci est normalement consommé lorsqu’une génération vidéo a été réalisée avec succès selon les règles techniques de l’application.
+
+En cas d’échec technique empêchant la génération normale de la vidéo, ConteMagiqueIA peut mettre en œuvre des mécanismes permettant d’éviter ou de corriger un décompte injustifié.
+
+Certaines générations peuvent nécessiter un temps de traitement avant que la vidéo soit disponible.
+
+La fermeture de l’application ou une interruption temporaire de la connexion Internet ne signifie pas nécessairement que la génération a échoué si celle-ci continue à être traitée par les services techniques utilisés.
+
+En cas de problème persistant, l’utilisateur peut contacter le support.
+
 
 16. Réclamation concernant un crédit
 
 Si un utilisateur estime qu’une histoire a été décomptée à tort, il peut contacter :
 
 contact@contemagiqueia.fr
+
+• le type de produit ou de crédit concerné ;
+• lorsqu’il s’agit d’une vidéo, l’histoire ou la génération concernée ;
 
 Il est recommandé de préciser :
 
@@ -313,6 +351,7 @@ Certaines fonctionnalités peuvent dépendre :
 • de services d’intelligence artificielle ;
 • de fournisseurs tiers ;
 • d’une version compatible de l’application.
+• de services externes nécessaires à la génération vidéo ;
 
 Un achat ne garantit pas une disponibilité technique permanente et ininterrompue.
 
@@ -333,9 +372,13 @@ La cessation de commercialisation n’entraîne pas automatiquement la dispariti
 
 39. Contenus générés
 
-L’achat d’un carnet permet d’accéder à un nombre défini de générations.
+L’achat d’un carnet, d’un crédit vidéo ou d’un autre produit numérique permet d’accéder au nombre ou au type de générations indiqué dans l’application.
 
-Il ne garantit pas un résultat créatif précis.
+L’achat ne garantit pas un résultat créatif précis.
+
+Les histoires, illustrations, animations et vidéos générées à l’aide de technologies d’intelligence artificielle peuvent présenter des variations, imperfections, incohérences ou différences par rapport au contenu source.
+
+Lorsqu’une vidéo est générée à partir des illustrations d’une histoire ou d’une photo ayant servi à personnaliser ces illustrations, le résultat constitue une création automatisée et peut différer visuellement des images originales.
 
 Les règles relatives aux contenus générés figurent dans les CGU et la Politique relative à l’intelligence artificielle.
 
@@ -434,8 +477,8 @@ https://contemagiqueia.fr
 49. Version
 
 Version :
-1.0
+1.1
 
 Dernière mise à jour :
-12 août 2026
+3 septembre 2026
 `;

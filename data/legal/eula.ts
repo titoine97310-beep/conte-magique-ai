@@ -32,10 +32,12 @@ L’utilisateur s’engage à ne pas installer ou utiliser de version modifiée,
 La licence permet à l’utilisateur d’utiliser l’application conformément à sa destination, notamment pour :
 
 • créer des histoires ;
-• générer des illustrations lorsque le carnet utilisé le permet ;
+• générer des illustrations lorsque les droits disponibles le permettent ;
+• personnaliser certaines illustrations à partir d’une photo de référence lorsque cette fonctionnalité est disponible ;
 • utiliser les fonctionnalités de narration ;
-• sauvegarder certaines histoires ;
-• consulter ses carnets et ses droits disponibles ;
+• générer des animations ou vidéos lorsque cette fonctionnalité est disponible et que l’utilisateur dispose des droits ou crédits nécessaires ;
+• sauvegarder certains contenus ;
+• consulter ses carnets, crédits et droits disponibles ;
 • utiliser les fonctionnalités proposées dans les limites de son compte.
 
 
@@ -97,7 +99,10 @@ ConteMagiqueIA peut générer :
 • des histoires ;
 • des illustrations ;
 • des narrations ;
+• des animations ou vidéos ;
 • d’autres contenus créatifs.
+
+Certains contenus peuvent être personnalisés à partir d’informations, d’instructions, d’images ou de photos de référence fournies volontairement par l’utilisateur.
 
 Ces contenus sont produits à l’aide de technologies automatisées et peuvent varier d’une génération à l’autre.
 
@@ -109,11 +114,13 @@ Sauf indication contraire, l’utilisateur peut utiliser les histoires généré
 Toute exploitation commerciale importante ou à grande échelle peut nécessiter une vérification préalable des droits applicables.
 
 
-13. Utilisation des illustrations
+13. Utilisation des illustrations, animations et vidéos
 
-Les illustrations générées peuvent être utilisées dans les limites prévues par les CGU et par les conditions des fournisseurs technologiques concernés.
+Les illustrations, animations et vidéos générées peuvent être utilisées dans les limites prévues par les CGU et par les conditions des fournisseurs technologiques concernés.
 
-L’utilisateur reste responsable de l’usage qu’il fait des images générées.
+L’utilisateur reste responsable de l’usage qu’il fait des contenus générés.
+
+Lorsqu’un contenu est personnalisé à partir d’une photo représentant une personne réelle, l’utilisateur doit disposer des droits et autorisations nécessaires concernant cette photo et respecter les droits de la personne représentée.
 
 
 14. Narration audio
@@ -134,6 +141,7 @@ Le fonctionnement de l’application peut dépendre de services tiers, notamment
 • Google Play ;
 • Apple ;
 • services de synthèse vocale ;
+• services de génération ou de traitement d’images et de vidéos ;
 • services d’hébergement ou de stockage.
 
 Ces services demeurent soumis à leurs propres conditions.
@@ -247,6 +255,7 @@ ConteMagiqueIA ne garantit pas que :
 • chaque histoire correspondra exactement aux attentes de l’utilisateur ;
 • les contenus générés seront exempts d’erreurs ;
 • les illustrations seront parfaitement cohérentes ;
+• services de génération ou de traitement d’images et de vidéos ;
 • la narration sera exempte de défauts de prononciation.
 
 
@@ -271,9 +280,9 @@ Aucune clause du présent contrat ne doit être interprétée comme supprimant u
 Les traitements de données personnelles liés à l’utilisation de l’application sont décrits dans la Politique de confidentialité disponible dans le Centre juridique.
 
 
-31. Achats et carnets
+31. Achats, carnets et crédits
 
-Les achats de carnets et autres produits numériques sont soumis aux Conditions Premium ainsi qu’aux règles de la plateforme utilisée pour effectuer la transaction.
+Les achats de carnets, crédits vidéo et autres produits numériques sont soumis aux Conditions Premium ainsi qu’aux règles de la plateforme utilisée pour effectuer la transaction.
 
 
 32. Évolution du contrat
@@ -335,8 +344,8 @@ https://contemagiqueia.fr
 37. Version
 
 Version :
-1.0
+1.1
 
 Dernière mise à jour :
-12 août 2026
+3 septembre 2026
 `;
