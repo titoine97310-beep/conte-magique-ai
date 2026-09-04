@@ -290,6 +290,8 @@ export async function saveStory(story: any) {
       narrator:
         story.narrator || "narratrice",
 
+        finalVideoUrl: story.finalVideoUrl || null,
+
       scenes: savedScenes,
     };
 

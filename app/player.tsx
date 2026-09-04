@@ -62,10 +62,12 @@ export default function PlayerScreen() {
   const [bedtimeMode, setBedtimeMode] = useState(false);
   const [ambienceEnabled, setAmbienceEnabled] = useState(true);
   const [iaReading, setIaReading] = useState(false);
+  const [finalVideoUrl, setFinalVideoUrl] =
+  useState<string | null>(null);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [reportSending, setReportSending] = useState(false);
   const [videoModalVisible, setVideoModalVisible] = useState(false);
-const [videoGenerating, setVideoGenerating] = useState(false);
+  const [videoGenerating, setVideoGenerating] = useState(false);
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const ttsSoundRef = useRef<Audio.Sound | null>(null);
@@ -641,7 +643,11 @@ function closeVideoModal() {
         scene.imageUrl
     );
 
-    if (images.some((image: string | null | undefined) => !image)) {
+    if (
+      images.some(
+        (image: string | null | undefined) => !image
+      )
+    ) {
       throw new Error(
         "Une ou plusieurs illustrations sont manquantes."
       );
@@ -649,12 +655,26 @@ function closeVideoModal() {
 
     const response = await fetch(VIDEO_URL, {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
+
       body: JSON.stringify({
         images,
+
+        scenes: scenes.map((scene: any) => ({
+          text: scene?.text || "",
+          emotion: scene?.ambience || "warm",
+        })),
+
+        narrator:
+          story?.narrator || "narratrice",
+
+        mode:
+          bedtimeMode ? "bedtime" : "story",
+
         videoModel: "gen4_turbo",
       }),
     });
@@ -673,12 +693,47 @@ function closeVideoModal() {
       data
     );
 
+    if (data?.finalVideoUrl) {
+  setFinalVideoUrl(data.finalVideoUrl);
+}
+
+if (data?.finalVideoUrl) {
+  const updatedStory = {
+    ...story,
+    finalVideoUrl: data.finalVideoUrl,
+  };
+
+  setCurrentStory(updatedStory);
+}
+
     setVideoModalVisible(false);
 
     Alert.alert(
-      "Dessin animé créé 🎉",
-      `${data?.sceneCount || scenes.length} scènes ont été animées avec succès.`
-    );
+  "Dessin animé créé 🎉",
+  `${
+    data?.sceneCount || scenes.length
+  } scènes ont été animées avec succès.`,
+  [
+    {
+      text: "Plus tard",
+      style: "cancel",
+    },
+    {
+      text: "🎬 Regarder la vidéo",
+      onPress: () => {
+        if (data?.finalVideoUrl) {
+          router.push({
+            pathname: "/video-player",
+            params: {
+              url: data.finalVideoUrl,
+            },
+          });
+        }
+      },
+    },
+  ]
+);
+
   } catch (error) {
     console.error(
       "Erreur création dessin animé :",

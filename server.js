@@ -12,10 +12,14 @@ import fs from "fs";
 import { google } from "googleapis";
 import OpenAI, { toFile } from "openai";
 
+import { spawn } from "child_process";
+import ffmpegPath from "ffmpeg-static";
 import { cert, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import os from "os";
+import path from "path";
 
 dotenv.config();
 
@@ -29,6 +33,392 @@ app.use(express.json({ limit: "10mb" }));
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+async function downloadFile(url, outputPath) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      `Erreur téléchargement vidéo : ${response.status}`
+    );
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+
+  await fs.promises.writeFile(
+    outputPath,
+    Buffer.from(arrayBuffer)
+  );
+}
+
+async function mergeVideoClips(videoUrls, generationId) {
+  if (!ffmpegPath) {
+    throw new Error("FFmpeg introuvable.");
+  }
+
+  if (!Array.isArray(videoUrls) || videoUrls.length === 0) {
+    throw new Error("Aucune vidéo à assembler.");
+  }
+
+  const tempDir = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "contemagiqueia-video-")
+  );
+
+  try {
+    const localFiles = [];
+
+    for (let i = 0; i < videoUrls.length; i++) {
+      const localPath = path.join(
+        tempDir,
+        `scene-${i + 1}.mp4`
+      );
+
+      await downloadFile(
+        videoUrls[i],
+        localPath
+      );
+
+      localFiles.push(localPath);
+    }
+
+    const concatFilePath = path.join(
+      tempDir,
+      "concat.txt"
+    );
+
+    const concatContent = localFiles
+      .map(
+        (filePath) =>
+          `file '${filePath.replace(/'/g, "'\\''")}'`
+      )
+      .join("\n");
+
+    await fs.promises.writeFile(
+      concatFilePath,
+      concatContent,
+      "utf8"
+    );
+
+    const outputPath = path.join(
+      tempDir,
+      `${generationId}-final.mp4`
+    );
+
+    await new Promise((resolve, reject) => {
+      const ffmpeg = spawn(
+        ffmpegPath,
+        [
+          "-y",
+          "-f",
+          "concat",
+          "-safe",
+          "0",
+          "-i",
+          concatFilePath,
+          "-c",
+          "copy",
+          outputPath,
+        ],
+        {
+          windowsHide: true,
+        }
+      );
+
+      let stderr = "";
+
+      ffmpeg.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+
+      ffmpeg.on("close", (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `FFmpeg a échoué avec le code ${code}.\n${stderr}`
+            )
+          );
+        }
+      });
+
+      ffmpeg.on("error", reject);
+    });
+
+    function getNarratorProfile(narrator = "narratrice") {
+  const narratorProfiles = {
+    narratrice: {
+      voice: "nova",
+      instructions: `
+Lis comme une conteuse chaleureuse pour enfants.
+Voix naturelle, douce, expressive.
+Raconte comme une maman lisant une histoire.
+`,
+    },
+
+    narrateur: {
+      voice: "onyx",
+      instructions: `
+Lis comme un papa racontant une histoire.
+Voix grave, rassurante, naturelle, expressive.
+Prends ton temps et fais des pauses naturelles.
+`,
+    },
+
+    magicien: {
+      voice: "sage",
+      instructions: `
+Lis comme un vieux magicien bienveillant.
+Voix mystérieuse mais chaleureuse, expressive, naturelle.
+`,
+    },
+
+    fee: {
+      voice: "shimmer",
+      instructions: `
+Lis comme une fée joyeuse.
+Voix légère, lumineuse, pleine d'émerveillement, naturelle, expressive.
+`,
+    },
+
+    mamie: {
+      voice: "ballad",
+      instructions: `
+Lis comme une grand-mère racontant un conte à ses petits-enfants.
+Voix très douce, lente et affectueuse, expressive, naturelle.
+`,
+    },
+
+    garcon: {
+      voice: "echo",
+      instructions: `
+Lis comme un jeune garçon racontant une aventure.
+Voix vive, enthousiaste et naturelle, expressive.
+`,
+    },
+  };
+
+  return (
+    narratorProfiles[narrator] ||
+    narratorProfiles.narratrice
+  );
+}
+
+async function createNarrationMp3({
+  text,
+  mode = "story",
+  emotion = "warm",
+  narrator = "narratrice",
+}) {
+  if (!text?.trim()) {
+    throw new Error(
+      "Texte de narration manquant."
+    );
+  }
+
+  const profile =
+    getNarratorProfile(narrator);
+
+  let emotionInstructions = "";
+
+  if (emotion === "danger") {
+    emotionInstructions =
+      "Ajoute un suspense très léger, sans jamais devenir effrayant.";
+  } else if (emotion === "victory") {
+    emotionInstructions =
+      "Utilise un ton joyeux et chaleureux.";
+  } else if (emotion === "calm") {
+    emotionInstructions =
+      "Utilise un ton doux et paisible.";
+  } else if (emotion === "night") {
+    emotionInstructions =
+      "Utilise un ton calme et rassurant.";
+  }
+
+  const bedtimeInstructions =
+    mode === "bedtime"
+      ? `
+Cette lecture est destinée au coucher.
+Parle calmement et marque davantage les pauses.
+`
+      : "";
+
+  const instructions = `
+${profile.instructions}
+
+${emotionInstructions}
+
+${bedtimeInstructions}
+
+Respecte exactement la langue du texte fourni.
+Prononce les mots naturellement.
+`;
+
+  const response =
+    await openai.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice: profile.voice,
+      input: text,
+      instructions,
+      response_format: "mp3",
+    });
+
+  return Buffer.from(
+    await response.arrayBuffer()
+  );
+}
+
+async function createNarratedSceneVideo({
+  videoUrl,
+  sceneText,
+  emotion,
+  narrator,
+  mode,
+  sceneIndex,
+  tempDir,
+}) {
+  if (!ffmpegPath) {
+    throw new Error("FFmpeg introuvable.");
+  }
+
+  const sourceVideoPath =
+    path.join(
+      tempDir,
+      `source-${sceneIndex + 1}.mp4`
+    );
+
+  const narrationPath =
+    path.join(
+      tempDir,
+      `narration-${sceneIndex + 1}.mp3`
+    );
+
+  const outputPath =
+    path.join(
+      tempDir,
+      `narrated-${sceneIndex + 1}.mp4`
+    );
+
+  await downloadFile(
+    videoUrl,
+    sourceVideoPath
+  );
+
+  const narrationBuffer =
+    await createNarrationMp3({
+      text: sceneText,
+      mode,
+      emotion,
+      narrator,
+    });
+
+  await fs.promises.writeFile(
+    narrationPath,
+    narrationBuffer
+  );
+
+  await new Promise((resolve, reject) => {
+    const ffmpeg = spawn(
+      ffmpegPath,
+      [
+        "-y",
+
+        // La vidéo de 5 s boucle si la narration est plus longue.
+        "-stream_loop",
+        "-1",
+        "-i",
+        sourceVideoPath,
+
+        "-i",
+        narrationPath,
+
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "20",
+
+        "-c:a",
+        "aac",
+        "-b:a",
+        "160k",
+
+        "-pix_fmt",
+        "yuv420p",
+
+        // Coupe dès que la narration se termine.
+        "-shortest",
+
+        "-movflags",
+        "+faststart",
+
+        outputPath,
+      ],
+      {
+        windowsHide: true,
+      }
+    );
+
+    let stderr = "";
+
+    ffmpeg.stderr.on(
+      "data",
+      (data) => {
+        stderr += data.toString();
+      }
+    );
+
+    ffmpeg.on(
+      "close",
+      (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `FFmpeg narration scène ${
+                sceneIndex + 1
+              } échouée.\n${stderr}`
+            )
+          );
+        }
+      }
+    );
+
+    ffmpeg.on(
+      "error",
+      reject
+    );
+  });
+
+  return outputPath;
+}
+
+    const finalBuffer =
+      await fs.promises.readFile(outputPath);
+
+    return {
+      buffer: finalBuffer,
+      tempDir,
+    };
+  } catch (error) {
+    await fs.promises.rm(
+      tempDir,
+      {
+        recursive: true,
+        force: true,
+      }
+    );
+
+    throw error;
+  }
+}
 
 const runway = new RunwayML({
   apiKey: process.env.RUNWAY_API_KEY,
@@ -175,6 +565,80 @@ async function requireFirebaseUser(req, res) {
 
     return null;
   }
+}
+
+async function requireAdminUser(req, res) {
+  const decodedToken =
+    await requireFirebaseUser(req, res);
+
+  if (!decodedToken) {
+    return null;
+  }
+
+  const userSnapshot =
+    await adminDb
+      .collection("users")
+      .doc(decodedToken.uid)
+      .get();
+
+  if (!userSnapshot.exists) {
+    res.status(403).json({
+      error: "Profil administrateur introuvable.",
+    });
+
+    return null;
+  }
+
+  const userData =
+    userSnapshot.data() || {};
+
+  if (userData.role !== "admin") {
+    res.status(403).json({
+      error: "Accès administrateur requis.",
+    });
+
+    return null;
+  }
+
+  return decodedToken;
+}
+
+async function sendExpoPushNotification({
+  to,
+  title,
+  body,
+  data = {},
+}) {
+  const response = await fetch(
+    "https://exp.host/--/api/v2/push/send",
+    {
+      method: "POST",
+
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        to,
+        sound: "default",
+        title,
+        body,
+        data,
+      }),
+    }
+  );
+
+  const result =
+    await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      `Erreur Expo Push : ${JSON.stringify(result)}`
+    );
+  }
+
+  return result;
 }
 
 async function reserveVideoCredit(
@@ -2175,82 +2639,345 @@ Smooth, soft, child-friendly animation.`,
 
 runwaySucceeded = true;
 
-    await completeVideoGeneration(
-  uid,
-  generationRef,
-  videoUrls
-);
 
 console.log(
   `✅ Dessin animé complet généré : ${sceneCount} scènes`,
   generationRef.id
 );
 
-return res.json({
-  success: true,
-  videoUrls,
-  sceneCount,
-  generationId: generationRef.id,
-});
+const narrationScenes =
+  Array.isArray(req.body?.scenes)
+    ? req.body.scenes
+    : [];
 
-  } catch (error) {
+const narrator =
+  req.body?.narrator || "narratrice";
+
+const mode =
+  req.body?.mode || "story";
+
+if (narrationScenes.length !== videoUrls.length) {
+  throw new Error(
+    "Le nombre de textes ne correspond pas au nombre de scènes vidéo."
+  );
+}
+
+const narrationTempDir =
+  await fs.promises.mkdtemp(
+    path.join(
+      os.tmpdir(),
+      "contemagiqueia-narration-"
+    )
+  );
+
+let mergedVideo = null;
+
+try {
+  const narratedVideoPaths = [];
+
+  for (
+    let index = 0;
+    index < videoUrls.length;
+    index++
+  ) {
+    const sceneData =
+      narrationScenes[index] || {};
+
+    const narratedPath =
+      await createNarratedSceneVideo({
+        videoUrl: videoUrls[index],
+        sceneText: sceneData.text || "",
+        emotion:
+          sceneData.emotion || "warm",
+        narrator,
+        mode,
+        sceneIndex: index,
+        tempDir: narrationTempDir,
+      });
+
+    narratedVideoPaths.push(
+      narratedPath
+    );
+
+    console.log(
+      `🔊 Narration scène ${index + 1}/${videoUrls.length} créée.`
+    );
+  }
+
+  mergedVideo =
+    await mergeLocalVideoClips(
+      narratedVideoPaths,
+      generationRef.id
+    );
+
+  console.log(
+    "🎬 Vidéo finale avec narration assemblée."
+  );
+
+  const bucket =
+    getStorage().bucket();
+
+  const finalVideoStoragePath =
+    `videos/${uid}/${generationRef.id}/final.mp4`;
+
+  const finalVideoFile =
+    bucket.file(
+      finalVideoStoragePath
+    );
+
+  const downloadToken =
+    crypto.randomUUID();
+
+  await finalVideoFile.save(
+    mergedVideo.buffer,
+    {
+      resumable: false,
+
+      metadata: {
+        contentType: "video/mp4",
+        cacheControl:
+          "private,max-age=3600",
+
+        metadata: {
+          firebaseStorageDownloadTokens:
+            downloadToken,
+        },
+      },
+    }
+  );
+
+  const finalVideoUrl =
+    `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
+      finalVideoStoragePath
+    )}?alt=media&token=${downloadToken}`;
+
+  await generationRef.update({
+    finalVideoUrl,
+  });
+
+  await completeVideoGeneration(
+    uid,
+    generationRef,
+    videoUrls
+  );
+
+  return res.json({
+    success: true,
+    videoUrls,
+    finalVideoUrl,
+    sceneCount,
+    generationId:
+      generationRef.id,
+  });
+} finally {
+  await fs.promises.rm(
+    narrationTempDir,
+    {
+      recursive: true,
+      force: true,
+    }
+  );
+
+  if (mergedVideo?.tempDir) {
+    await fs.promises.rm(
+      mergedVideo.tempDir,
+      {
+        recursive: true,
+        force: true,
+      }
+    );
+  }
+}
+
+} catch (error) {
   console.error(
     "❌ Erreur génération vidéo Runway :",
     error
   );
 
-  if (uid && generationRef && !runwaySucceeded) {
-  try {
-    if (videoUrls.length > 0) {
-      await savePartialVideoGeneration(
-        uid,
-        generationRef,
-        videoUrls,
-        videoUrls.length
-      );
+  if (
+    uid &&
+    generationRef &&
+    !runwaySucceeded
+  ) {
+    try {
+      if (videoUrls.length > 0) {
+        await savePartialVideoGeneration(
+          uid,
+          generationRef,
+          videoUrls,
+          videoUrls.length
+        );
 
-      console.log(
-        `⚠️ Génération partielle sauvegardée : ${videoUrls.length} scène(s) terminée(s).`
-      );
-    } else {
-      await refundVideoCredit(
-        uid,
-        generationRef
-      );
+        console.log(
+          `⚠️ Génération partielle sauvegardée : ${videoUrls.length} scène(s) terminée(s).`
+        );
+      } else {
+        await refundVideoCredit(
+          uid,
+          generationRef
+        );
 
-      console.log(
-        "💰 Crédit vidéo remboursé :",
-        generationRef.id
-      );
-    }
-  } catch (creditError) {
-    console.error(
-      "❌ Erreur gestion crédit vidéo après échec :",
-      creditError
-    );
-  }
-}
-
-  if (error?.code === "NO_VIDEO_CREDIT") {
-  return res.status(402).json({
-    error: "Aucun crédit vidéo disponible.",
-    code: "NO_VIDEO_CREDIT",
-  });
-}
-
-    if (error instanceof TaskFailedError) {
+        console.log(
+          "💰 Crédit vidéo remboursé :",
+          generationRef.id
+        );
+      }
+    } catch (creditError) {
       console.error(
-        "Détails Runway :",
-        error.taskDetails
+        "❌ Erreur gestion crédit vidéo après échec :",
+        creditError
       );
     }
+  }
 
-    return res.status(500).json({
-      error: "Erreur génération vidéo",
-      details: error?.message,
+  if (
+    error?.code ===
+    "NO_VIDEO_CREDIT"
+  ) {
+    return res.status(402).json({
+      error:
+        "Aucun crédit vidéo disponible.",
+      code:
+        "NO_VIDEO_CREDIT",
     });
   }
+
+  if (
+    error instanceof TaskFailedError
+  ) {
+    console.error(
+      "Détails Runway :",
+      error.taskDetails
+    );
+  }
+
+  return res.status(500).json({
+    error:
+      "Erreur génération vidéo",
+    details:
+      error?.message,
+  });
+}
 });
+
+async function mergeLocalVideoClips(
+  localFiles,
+  generationId
+) {
+  if (!ffmpegPath) {
+    throw new Error("FFmpeg introuvable.");
+  }
+
+  if (
+    !Array.isArray(localFiles) ||
+    localFiles.length === 0
+  ) {
+    throw new Error(
+      "Aucune scène locale à assembler."
+    );
+  }
+
+  const tempDir =
+    await fs.promises.mkdtemp(
+      path.join(
+        os.tmpdir(),
+        "contemagiqueia-final-"
+      )
+    );
+
+  const concatFilePath =
+    path.join(
+      tempDir,
+      "concat.txt"
+    );
+
+  const concatContent =
+    localFiles
+      .map(
+        (filePath) =>
+          `file '${filePath.replace(
+            /'/g,
+            "'\\''"
+          )}'`
+      )
+      .join("\n");
+
+  await fs.promises.writeFile(
+    concatFilePath,
+    concatContent,
+    "utf8"
+  );
+
+  const outputPath =
+    path.join(
+      tempDir,
+      `${generationId}-final.mp4`
+    );
+
+  await new Promise(
+    (resolve, reject) => {
+      const ffmpeg = spawn(
+        ffmpegPath,
+        [
+          "-y",
+          "-f",
+          "concat",
+          "-safe",
+          "0",
+          "-i",
+          concatFilePath,
+          "-c",
+          "copy",
+          outputPath,
+        ],
+        {
+          windowsHide: true,
+        }
+      );
+
+      let stderr = "";
+
+      ffmpeg.stderr.on(
+        "data",
+        (data) => {
+          stderr +=
+            data.toString();
+        }
+      );
+
+      ffmpeg.on(
+        "close",
+        (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                `FFmpeg fusion finale échouée avec le code ${code}.\n${stderr}`
+              )
+            );
+          }
+        }
+      );
+
+      ffmpeg.on(
+        "error",
+        reject
+      );
+    }
+  );
+
+  const finalBuffer =
+    await fs.promises.readFile(
+      outputPath
+    );
+
+  return {
+    buffer: finalBuffer,
+    tempDir,
+  };
+}
 
 const PORT = process.env.PORT || 3000;
 

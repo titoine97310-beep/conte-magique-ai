@@ -128,6 +128,15 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => router.push("/saved-videos" as any)}
+          >
+            <Text style={styles.secondaryText}>
+              🎬 Mes vidéos
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[
               styles.accountButton,
               checkingAuth && styles.buttonDisabled,
