@@ -145,8 +145,21 @@ async function mergeVideoClips(videoUrls, generationId) {
       ffmpeg.on("error", reject);
     });
 
+    return outputPath;
+  } catch (error) {
+    await fs.promises.rm(
+      tempDir,
+      {
+        recursive: true,
+        force: true,
+      }
+    );
 
-    function getNarratorProfile(narrator = "narratrice") {
+    throw error;
+  }
+}
+
+function getNarratorProfile(narrator = "narratrice") {
   const narratorProfiles = {
     narratrice: {
       voice: "nova",
@@ -203,26 +216,6 @@ Voix vive, enthousiaste et naturelle, expressive.
     narratorProfiles[narrator] ||
     narratorProfiles.narratrice
   );
-}
-
-    const finalBuffer =
-      await fs.promises.readFile(outputPath);
-
-    return {
-      buffer: finalBuffer,
-      tempDir,
-    };
-  } catch (error) {
-    await fs.promises.rm(
-      tempDir,
-      {
-        recursive: true,
-        force: true,
-      }
-    );
-
-    throw error;
-  }
 }
 
 async function createNarrationMp3({
