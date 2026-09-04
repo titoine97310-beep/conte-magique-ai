@@ -2597,47 +2597,35 @@ for (
     `🎬 Génération scène ${index + 1}/${sceneCount}...`
   );
 
+  const rawPromptText =
+  prompt ||
+  `Gentle children's story animation.
+Preserve the original characters, faces, clothing, colors, proportions and visual style.
+Keep important accessories unchanged.
+A backpack must remain the same backpack.
+Do not add, remove, duplicate, merge or replace characters.
+Animate only subtle and natural movements.
+Locked camera and static framing.
+No zoom, no pan, no dolly and no camera movement.
+Keep all main characters fully visible.
+Do not crop heads, bodies, backpacks or important objects.
+Maintain the original composition as closely as possible.
+Smooth, soft, child-friendly animation.`;
+
+const safePromptText =
+  rawPromptText.length > 1000
+    ? rawPromptText.slice(0, 1000)
+    : rawPromptText;
+
+console.log(
+  `📝 Longueur prompt Runway : ${safePromptText.length}/1000`
+);
+
   const task = await runway.imageToVideo
     .create({
       model: videoModel,
       promptImage: imageUrl,
-      promptText:
-        prompt ||
-`Gentle children's story animation.
-
-STRICT VISUAL PRESERVATION:
-Preserve the exact original characters, faces, skin tones, hairstyles, clothing, colors, proportions and visual style from the source image.
-Preserve all visible objects and accessories exactly as they appear in the source image.
-
-IMPORTANT OBJECT CONSISTENCY:
-Backpacks, bags, toys, comfort objects, hats, glasses, shoes and other visible accessories must remain the same throughout the entire video.
-Keep their original shape, size, colors, patterns and position relative to the character.
-Never replace one accessory with another.
-Never invent a new accessory.
-Never remove an important visible accessory.
-A backpack must remain the same backpack and must not transform, change color, disappear or become another object.
-
-CHARACTER CONSISTENCY:
-Do not add, remove, duplicate, merge or replace characters.
-Do not alter faces, hairstyles, clothing or body proportions.
-Characters must remain recognizable as exactly the same characters from the source image.
-
-MOTION:
-Animate only subtle and natural movements.
-Use gentle facial expressions, blinking, breathing, small body movements, subtle hair and clothing movement, and subtle environmental animation.
-Avoid large movements that could distort characters, clothing or accessories.
-
-CAMERA:
-Locked camera and static framing.
-No zoom, no pan, no dolly and no camera movement.
-Keep all main characters fully visible throughout the entire video.
-Do not crop heads, bodies, backpacks or important objects.
-
-COMPOSITION:
-Maintain the original composition, character positions and important objects as closely as possible.
-Prioritize visual consistency over creative changes.
-
-Smooth, soft, child-friendly animation.`,
+      promptText: safePromptText,
 ratio: "720:1280",
 duration: 5,
     })
