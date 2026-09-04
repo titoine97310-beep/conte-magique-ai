@@ -145,6 +145,7 @@ async function mergeVideoClips(videoUrls, generationId) {
       ffmpeg.on("error", reject);
     });
 
+
     function getNarratorProfile(narrator = "narratrice") {
   const narratorProfiles = {
     narratrice: {
@@ -266,6 +267,26 @@ Prononce les mots naturellement.
   return Buffer.from(
     await response.arrayBuffer()
   );
+}
+
+    const finalBuffer =
+      await fs.promises.readFile(outputPath);
+
+    return {
+      buffer: finalBuffer,
+      tempDir,
+    };
+  } catch (error) {
+    await fs.promises.rm(
+      tempDir,
+      {
+        recursive: true,
+        force: true,
+      }
+    );
+
+    throw error;
+  }
 }
 
 async function createNarratedSceneVideo({
@@ -398,26 +419,6 @@ async function createNarratedSceneVideo({
   });
 
   return outputPath;
-}
-
-    const finalBuffer =
-      await fs.promises.readFile(outputPath);
-
-    return {
-      buffer: finalBuffer,
-      tempDir,
-    };
-  } catch (error) {
-    await fs.promises.rm(
-      tempDir,
-      {
-        recursive: true,
-        force: true,
-      }
-    );
-
-    throw error;
-  }
 }
 
 const runway = new RunwayML({
