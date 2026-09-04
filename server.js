@@ -2565,11 +2565,6 @@ else {
 }
 
     console.log(
-    "💳 Crédit vidéo réservé :",
-    generationRef.id
-    );
-
-    console.log(
   `🎬 Génération de ${sceneCount} scènes vidéo Runway...`
 );
 
