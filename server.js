@@ -1667,6 +1667,7 @@ Transforme les personnes photographiées en personnages illustrés.
 Ne produis pas une photographie réaliste.
 Garde une illustration douce, familiale, premium et adaptée aux enfants.
 
+
 ${finalPrompt}
 `,
         size: "1024x1024",
@@ -2602,17 +2603,43 @@ for (
       promptImage: imageUrl,
       promptText:
         prompt ||
-        `Gentle children's story animation.
-Preserve the original characters, faces, clothing, colors, proportions and visual style.
-Locked camera, static framing.
-No zoom, no pan, no dolly, no camera movement.
-Keep all main characters fully visible in the frame throughout the entire video.
-Do not crop heads, bodies or important objects.
-Animate only subtle natural character movements, facial expressions, hair, clothing and environmental details.
-Maintain the exact original composition as much as possible.
+`Gentle children's story animation.
+
+STRICT VISUAL PRESERVATION:
+Preserve the exact original characters, faces, skin tones, hairstyles, clothing, colors, proportions and visual style from the source image.
+Preserve all visible objects and accessories exactly as they appear in the source image.
+
+IMPORTANT OBJECT CONSISTENCY:
+Backpacks, bags, toys, comfort objects, hats, glasses, shoes and other visible accessories must remain the same throughout the entire video.
+Keep their original shape, size, colors, patterns and position relative to the character.
+Never replace one accessory with another.
+Never invent a new accessory.
+Never remove an important visible accessory.
+A backpack must remain the same backpack and must not transform, change color, disappear or become another object.
+
+CHARACTER CONSISTENCY:
+Do not add, remove, duplicate, merge or replace characters.
+Do not alter faces, hairstyles, clothing or body proportions.
+Characters must remain recognizable as exactly the same characters from the source image.
+
+MOTION:
+Animate only subtle and natural movements.
+Use gentle facial expressions, blinking, breathing, small body movements, subtle hair and clothing movement, and subtle environmental animation.
+Avoid large movements that could distort characters, clothing or accessories.
+
+CAMERA:
+Locked camera and static framing.
+No zoom, no pan, no dolly and no camera movement.
+Keep all main characters fully visible throughout the entire video.
+Do not crop heads, bodies, backpacks or important objects.
+
+COMPOSITION:
+Maintain the original composition, character positions and important objects as closely as possible.
+Prioritize visual consistency over creative changes.
+
 Smooth, soft, child-friendly animation.`,
-      ratio: "720:1280",
-      duration: 5,
+ratio: "720:1280",
+duration: 5,
     })
     .waitForTaskOutput();
 
@@ -2978,6 +3005,139 @@ async function mergeLocalVideoClips(
     tempDir,
   };
 }
+
+app.post(
+  "/admin/send-notification",
+  async (req, res) => {
+    try {
+      const adminUser =
+        await requireAdminUser(req, res);
+
+      if (!adminUser) {
+        return;
+      }
+
+      const {
+        title,
+        body,
+        data = {},
+      } = req.body || {};
+
+      if (
+        !title?.trim() ||
+        !body?.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            "Le titre et le message sont obligatoires.",
+        });
+      }
+
+      const usersSnapshot =
+        await adminDb
+          .collection("users")
+          .where(
+            "pushNotificationsEnabled",
+            "==",
+            true
+          )
+          .get();
+
+      const tokens = [];
+
+      usersSnapshot.forEach(
+        (docSnapshot) => {
+          const userData =
+            docSnapshot.data() || {};
+
+          const token =
+            userData.expoPushToken;
+
+          if (
+            typeof token === "string" &&
+            token.startsWith(
+              "ExponentPushToken["
+            )
+          ) {
+            tokens.push(token);
+          }
+        }
+      );
+
+      if (tokens.length === 0) {
+        return res.json({
+          success: true,
+          sent: 0,
+          message:
+            "Aucun appareil inscrit aux notifications.",
+        });
+      }
+
+      const results = [];
+
+      for (const token of tokens) {
+        try {
+          const result =
+            await sendExpoPushNotification({
+              to: token,
+              title,
+              body,
+              data,
+            });
+
+          results.push({
+            token,
+            success: true,
+            result,
+          });
+        } catch (error) {
+          console.error(
+            "Erreur envoi notification :",
+            error
+          );
+
+          results.push({
+            token,
+            success: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          });
+        }
+      }
+
+      const sent =
+        results.filter(
+          (item) => item.success
+        ).length;
+
+      const failed =
+        results.length - sent;
+
+      return res.json({
+        success: true,
+        total: results.length,
+        sent,
+        failed,
+      });
+    } catch (error) {
+      console.error(
+        "Erreur route admin notification :",
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          "Erreur pendant l'envoi des notifications.",
+        details:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      });
+    }
+  }
+);
 
 const PORT = process.env.PORT || 3000;
 
