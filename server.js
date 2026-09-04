@@ -2750,10 +2750,18 @@ try {
     }
   );
 
-  const finalVideoUrl =
-    `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
-      finalVideoStoragePath
-    )}?alt=media&token=${downloadToken}`;
+  const encodedStoragePath =
+  encodeURIComponent(
+    finalVideoStoragePath
+  );
+
+const finalVideoUrl =
+  `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedStoragePath}?alt=media&token=${downloadToken}`;
+
+console.log(
+  "🎬 URL finale Firebase :",
+  finalVideoUrl
+);
 
   await generationRef.update({
     finalVideoUrl,
