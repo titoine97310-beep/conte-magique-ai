@@ -205,6 +205,26 @@ Voix vive, enthousiaste et naturelle, expressive.
   );
 }
 
+    const finalBuffer =
+      await fs.promises.readFile(outputPath);
+
+    return {
+      buffer: finalBuffer,
+      tempDir,
+    };
+  } catch (error) {
+    await fs.promises.rm(
+      tempDir,
+      {
+        recursive: true,
+        force: true,
+      }
+    );
+
+    throw error;
+  }
+}
+
 async function createNarrationMp3({
   text,
   mode = "story",
@@ -267,26 +287,6 @@ Prononce les mots naturellement.
   return Buffer.from(
     await response.arrayBuffer()
   );
-}
-
-    const finalBuffer =
-      await fs.promises.readFile(outputPath);
-
-    return {
-      buffer: finalBuffer,
-      tempDir,
-    };
-  } catch (error) {
-    await fs.promises.rm(
-      tempDir,
-      {
-        recursive: true,
-        force: true,
-      }
-    );
-
-    throw error;
-  }
 }
 
 async function createNarratedSceneVideo({
