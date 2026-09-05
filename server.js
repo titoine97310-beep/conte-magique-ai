@@ -333,51 +333,59 @@ async function createNarratedSceneVideo({
 
   await new Promise((resolve, reject) => {
     const ffmpeg = spawn(
-      ffmpegPath,
-      [
-        "-y",
+  ffmpegPath,
+  [
+    "-y",
 
-        // La vidéo de 5 s boucle si la narration est plus longue.
-        "-stream_loop",
-        "-1",
-        "-i",
-        sourceVideoPath,
+    // Vidéo Runway : jouée une seule fois.
+    "-i",
+    sourceVideoPath,
 
-        "-i",
-        narrationPath,
+    // Narration de la scène.
+    "-i",
+    narrationPath,
 
-        "-map",
-        "0:v:0",
-        "-map",
-        "1:a:0",
+    // Une fois la vidéo terminée,
+    // conserve sa dernière image.
+    "-filter_complex",
+    "[0:v]tpad=stop_mode=clone:stop_duration=600[v]",
 
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "20",
+    "-map",
+    "[v]",
 
-        "-c:a",
-        "aac",
-        "-b:a",
-        "160k",
+    "-map",
+    "1:a:0",
 
-        "-pix_fmt",
-        "yuv420p",
+    "-c:v",
+    "libx264",
 
-        // Coupe dès que la narration se termine.
-        "-shortest",
+    "-preset",
+    "veryfast",
 
-        "-movflags",
-        "+faststart",
+    "-crf",
+    "20",
 
-        outputPath,
-      ],
-      {
-        windowsHide: true,
-      }
-    );
+    "-c:a",
+    "aac",
+
+    "-b:a",
+    "160k",
+
+    "-pix_fmt",
+    "yuv420p",
+
+    // La scène s'arrête à la fin de la narration.
+    "-shortest",
+
+    "-movflags",
+    "+faststart",
+
+    outputPath,
+  ],
+  {
+    windowsHide: true,
+  }
+);
 
     let stderr = "";
 
