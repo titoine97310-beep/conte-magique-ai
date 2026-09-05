@@ -115,8 +115,27 @@ async function mergeVideoClips(videoUrls, generationId) {
           "0",
           "-i",
           concatFilePath,
-          "-c",
-          "copy",
+          "-c:v",
+          "libx264",
+
+          "-preset",
+          "veryfast",
+
+          "-crf",
+          "20",
+
+          "-c:a",
+          "aac",
+
+          "-b:a",
+          "160k",
+
+          "-pix_fmt",
+          "yuv420p",
+
+          "-movflags",
+          "+faststart",
+
           outputPath,
         ],
         {
@@ -1615,14 +1634,38 @@ PRIORITÉ ABSOLUE :
 La fidélité et la continuité des personnages principaux sont plus importantes que l'ajout de détails décoratifs.
 En cas de doute, simplifie le décor plutôt que d'inventer une personne, un vêtement ou un accessoire.
 
-IDENTITÉ DES PERSONNAGES :
-Conserve au maximum :
+IDENTITÉ DES PERSONNES :
+
+L'identité visuelle de chaque personnage principal doit rester stable d'une scène à l'autre.
+
+Considère chaque personne de référence comme un personnage fixe de la série.
+
+Conserve strictement :
+
 - la forme générale du visage
+- la structure du visage
+- la forme des yeux
+- l'écartement des yeux
+- la forme du nez
+- la forme de la bouche
+- la ligne de la mâchoire
 - la couleur de peau
 - la coiffure
-- la couleur et la longueur des cheveux
+- la couleur, la texture et la longueur des cheveux
+- l'âge apparent
 - les proportions générales
 - les traits distinctifs visibles
+
+RÈGLES STRICTES SUR LES VISAGES :
+
+- ne redessine pas un visage différemment d'une scène à l'autre
+- ne change pas arbitrairement la forme des yeux, du nez, de la bouche ou de la mâchoire
+- ne rajeunis pas et ne vieillis pas un personnage
+- ne modifie pas la couleur de peau
+- ne change pas de coiffure sauf si la scène le demande explicitement
+- ne transforme pas progressivement un personnage en une autre personne
+- lorsque le même personnage réapparaît, il doit être immédiatement reconnaissable comme exactement la même personne
+- la pose, l'expression et l'angle de vue peuvent changer, mais l'identité faciale doit rester stable
 
 VÊTEMENTS ET ACCESSOIRES :
 Les vêtements doivent rester cohérents avec la photo de référence et entre toutes les scènes.
@@ -1658,6 +1701,14 @@ Si un doudou ou un objet important est visible :
 - conserve ses couleurs
 - conserve ses proportions
 - ne le remplace pas par un autre objet
+
+RÉFÉRENCE PRIORITAIRE :
+
+En cas de conflit entre la créativité de la scène et la fidélité au personnage, privilégie toujours la fidélité au personnage.
+
+Ne crée pas une nouvelle interprétation du visage à chaque illustration.
+
+Traite la photo de référence comme la fiche d'identité visuelle permanente des personnages principaux pour toute l'histoire.
 
 COHÉRENCE ENTRE LES SCÈNES :
 Cette illustration appartient à une série.
