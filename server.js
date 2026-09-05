@@ -2635,6 +2635,21 @@ for (
 ) {
   const imageUrl = images[index];
 
+  console.log(
+  `🖼️ Image reçue scène ${index + 1} :`,
+  {
+    type: typeof imageUrl,
+    length:
+      typeof imageUrl === "string"
+        ? imageUrl.length
+        : null,
+    start:
+      typeof imageUrl === "string"
+        ? imageUrl.slice(0, 100)
+        : imageUrl,
+  }
+);
+
   if (typeof imageUrl !== "string" || !imageUrl.trim()) {
     throw new Error(
       `Image invalide pour la scène ${index + 1}.`
