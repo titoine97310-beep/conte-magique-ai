@@ -2582,29 +2582,58 @@ for (
     );
   }
 
-  console.log(
-    `🎬 Génération scène ${index + 1}/${sceneCount}...`
-  );
+  const sceneActionPrompt =
+  typeof prompt === "string"
+    ? prompt.trim()
+    : "";
 
-  const rawPromptText =
-  prompt ||
-  `Gentle children's story animation.
-Preserve the original characters, faces, clothing, colors, proportions and visual style.
-Keep important accessories unchanged.
-A backpack must remain the same backpack.
-Do not add, remove, duplicate, merge or replace characters.
-Animate only subtle and natural movements.
-Locked camera and static framing.
-No zoom, no pan, no dolly and no camera movement.
+const consistencyPrompt = `
+Animate the exact source image.
+
+Preserve character identity exactly:
+same faces, skin tones, hairstyles, ages, body proportions, clothing, shoes, colors and accessories.
+
+Do not add, remove, duplicate, merge, replace or transform characters.
+Do not redesign characters or change their appearance.
+Keep important objects unchanged.
+
+Use only subtle natural movements:
+blinking, breathing, small head movements, gentle hand movements and slight environmental motion.
+
+Keep the original framing and composition.
+Locked camera.
+No zoom, pan, dolly or camera rotation.
 Keep all main characters fully visible.
-Do not crop heads, bodies, backpacks or important objects.
-Maintain the original composition as closely as possible.
-Smooth, soft, child-friendly animation.`;
+Do not crop heads, bodies or important objects.
+
+Preserve the original illustration style, lighting, colors and atmosphere.
+Smooth, stable, child-friendly animation.
+`;
+
+const rawPromptText =
+  sceneActionPrompt
+    ? `${sceneActionPrompt}\n\n${consistencyPrompt}`
+    : consistencyPrompt;
 
 const safePromptText =
   rawPromptText.length > 1000
     ? rawPromptText.slice(0, 1000)
     : rawPromptText;
+
+console.log(
+  "🧩 Prompt brut Runway :",
+  rawPromptText.length
+);
+
+console.log(
+  "✂️ Prompt envoyé Runway :",
+  safePromptText.length
+);
+
+console.log(
+  "📝 Contenu prompt Runway :",
+  safePromptText
+);
 
 console.log(
   `📝 Longueur prompt Runway : ${safePromptText.length}/1000`
