@@ -2698,10 +2698,65 @@ console.log(
   `📝 Longueur prompt Runway : ${safePromptText.length}/1000`
 );
 
+let runwayPromptImage = imageUrl;
+
+if (
+  typeof imageUrl === "string" &&
+  imageUrl.startsWith("data:image/")
+) {
+  const match = imageUrl.match(
+    /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/
+  );
+
+  if (!match) {
+    throw new Error(
+      `Image base64 invalide pour la scène ${index + 1}.`
+    );
+  }
+
+  const mimeType = match[1];
+  const base64Data = match[2];
+
+  const extension =
+    mimeType === "image/png"
+      ? "png"
+      : mimeType === "image/webp"
+      ? "webp"
+      : "jpg";
+
+  const imageBuffer = Buffer.from(
+    base64Data,
+    "base64"
+  );
+
+  const runwayFile = await toFile(
+    imageBuffer,
+    `scene-${index + 1}.${extension}`,
+    {
+      type:
+        mimeType === "image/jpg"
+          ? "image/jpeg"
+          : mimeType,
+    }
+  );
+
+  const upload =
+    await runway.uploads.createEphemeral(
+      runwayFile
+    );
+
+  runwayPromptImage = upload.uri;
+
+  console.log(
+    `📤 Image scène ${index + 1} envoyée à Runway :`,
+    runwayPromptImage
+  );
+}
+
   const task = await runway.imageToVideo
     .create({
       model: videoModel,
-      promptImage: imageUrl,
+      promptImage: runwayPromptImage,
       promptText: safePromptText,
 ratio: "720:1280",
 duration: 5,
