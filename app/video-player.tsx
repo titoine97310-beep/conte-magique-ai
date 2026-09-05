@@ -1,10 +1,26 @@
-import { ResizeMode, Video } from "expo-av";
-import { router, useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
+import {
+    AVPlaybackStatus,
+    ResizeMode,
+    Video,
+} from "expo-av";
+
+import {
+    router,
+    useLocalSearchParams,
+} from "expo-router";
+
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+
 import {
     ActivityIndicator,
     Alert,
     SafeAreaView,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -16,25 +32,123 @@ export default function VideoPlayerScreen() {
     url?: string | string[];
   }>();
 
-  const videoRef = useRef<Video | null>(null);
+  const videoRef =
+    useRef<Video | null>(null);
 
   const [loading, setLoading] =
     useState(true);
 
   const [playing, setPlaying] =
-    useState(true);
+    useState(false);
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
 
   const rawUrl = params.url;
 
-  const videoUrl =
+const videoUrl = useMemo(() => {
+  const value =
     Array.isArray(rawUrl)
       ? rawUrl[0]
       : rawUrl;
 
+  if (!value) {
+    return "";
+  }
+
+  const url = String(value).trim();
+
+  try {
+    const marker = "/o/";
+    const markerIndex =
+      url.indexOf(marker);
+
+    if (markerIndex === -1) {
+      return url;
+    }
+
+    const queryIndex =
+      url.indexOf(
+        "?",
+        markerIndex
+      );
+
+    const prefix =
+      url.slice(
+        0,
+        markerIndex +
+          marker.length
+      );
+
+    const objectPath =
+      queryIndex >= 0
+        ? url.slice(
+            markerIndex +
+              marker.length,
+            queryIndex
+          )
+        : url.slice(
+            markerIndex +
+              marker.length
+          );
+
+    const suffix =
+      queryIndex >= 0
+        ? url.slice(queryIndex)
+        : "";
+
+    const decodedPath =
+      decodeURIComponent(
+        objectPath
+      );
+
+    const encodedPath =
+      encodeURIComponent(
+        decodedPath
+      );
+
+    return (
+      prefix +
+      encodedPath +
+      suffix
+    );
+  } catch (error) {
+    console.error(
+      "Erreur normalisation URL vidéo :",
+      error
+    );
+
+    return url;
+  }
+}, [rawUrl]);
+
+  useEffect(() => {
+    console.log(
+      "🎬 URL vidéo reçue :",
+      videoUrl
+    );
+
+    console.log(
+      "🎬 Longueur URL :",
+      videoUrl.length
+    );
+
+    console.log(
+      "🎬 Firebase URL :",
+      videoUrl.includes(
+        "firebasestorage.googleapis.com"
+      )
+    );
+  }, [videoUrl]);
+
   if (!videoUrl) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.emptyContainer}>
+      <SafeAreaView
+        style={styles.container}
+      >
+        <View
+          style={styles.emptyContainer}
+        >
           <Text style={styles.emptyIcon}>
             🎬
           </Text>
@@ -44,15 +158,21 @@ export default function VideoPlayerScreen() {
           </Text>
 
           <Text style={styles.emptyText}>
-            Le dessin animé n'est pas
-            disponible.
+            Aucune adresse vidéo n'a été
+            transmise à cette page.
           </Text>
 
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() =>
+              router.back()
+            }
           >
-            <Text style={styles.backButtonText}>
+            <Text
+              style={
+                styles.backButtonText
+              }
+            >
               ← Retour
             </Text>
           </TouchableOpacity>
@@ -67,17 +187,33 @@ export default function VideoPlayerScreen() {
         return;
       }
 
-      if (playing) {
+      const status =
+        await videoRef.current.getStatusAsync();
+
+      if (!status.isLoaded) {
+        return;
+      }
+
+      if (status.isPlaying) {
         await videoRef.current.pauseAsync();
+
         setPlaying(false);
       } else {
         await videoRef.current.playAsync();
+
         setPlaying(true);
       }
     } catch (error) {
       console.error(
-        "Erreur lecture vidéo :",
+        "❌ Erreur pause/lecture :",
         error
+      );
+
+      Alert.alert(
+        "Erreur",
+        error instanceof Error
+          ? error.message
+          : String(error)
       );
     }
   }
@@ -97,20 +233,64 @@ export default function VideoPlayerScreen() {
       setPlaying(true);
     } catch (error) {
       console.error(
-        "Erreur replay vidéo :",
+        "❌ Erreur replay vidéo :",
         error
+      );
+
+      Alert.alert(
+        "Erreur",
+        error instanceof Error
+          ? error.message
+          : String(error)
       );
     }
   }
 
+  function handlePlaybackStatus(
+    status: AVPlaybackStatus
+  ) {
+    if (!status.isLoaded) {
+      if (status.error) {
+        console.error(
+          "❌ AVPlaybackStatus :",
+          status.error
+        );
+
+        setLoading(false);
+
+        setErrorMessage(
+          status.error
+        );
+      }
+
+      return;
+    }
+
+    setPlaying(
+      Boolean(status.isPlaying)
+    );
+
+    if (status.didJustFinish) {
+      setPlaying(false);
+    }
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+    >
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.headerButton}
-          onPress={() => router.back()}
+          onPress={() =>
+            router.back()
+          }
         >
-          <Text style={styles.headerButtonText}>
+          <Text
+            style={
+              styles.headerButtonText
+            }
+          >
             ←
           </Text>
         </TouchableOpacity>
@@ -119,18 +299,27 @@ export default function VideoPlayerScreen() {
           🎬 Mon dessin animé
         </Text>
 
-        <View style={styles.headerSpacer} />
+        <View
+          style={styles.headerSpacer}
+        />
       </View>
 
-      <View style={styles.videoContainer}>
+      <View
+        style={styles.videoContainer}
+      >
         {loading && (
           <View style={styles.loader}>
             <ActivityIndicator
               size="large"
             />
 
-            <Text style={styles.loaderText}>
-              Chargement du dessin animé...
+            <Text
+              style={
+                styles.loaderText
+              }
+            >
+              Chargement du dessin
+              animé...
             </Text>
           </View>
         )}
@@ -141,43 +330,107 @@ export default function VideoPlayerScreen() {
             uri: videoUrl,
           }}
           style={styles.video}
-          resizeMode={ResizeMode.CONTAIN}
+          resizeMode={
+            ResizeMode.CONTAIN
+          }
           shouldPlay
           useNativeControls
-          onLoad={() => {
+          progressUpdateIntervalMillis={
+            500
+          }
+          onLoadStart={() => {
+            console.log(
+              "⏳ Début chargement vidéo..."
+            );
+
+            setLoading(true);
+            setErrorMessage("");
+          }}
+          onLoad={(status) => {
+            console.log(
+              "✅ Vidéo chargée :",
+              status
+            );
+
             setLoading(false);
             setPlaying(true);
+            setErrorMessage("");
           }}
+          onReadyForDisplay={(
+            event
+          ) => {
+            console.log(
+              "✅ Vidéo prête à afficher :",
+              event
+            );
+          }}
+          onPlaybackStatusUpdate={
+            handlePlaybackStatus
+          }
           onError={(error) => {
-            setLoading(false);
+            const message =
+              typeof error === "string"
+                ? error
+                : JSON.stringify(
+                    error
+                  );
 
             console.error(
-              "Erreur vidéo :",
-              error
+              "❌ ERREUR VIDÉO EXPO-AV :",
+              message
+            );
+
+            console.error(
+              "❌ URL utilisée :",
+              videoUrl
+            );
+
+            setLoading(false);
+
+            setErrorMessage(
+              message
             );
 
             Alert.alert(
               "Lecture impossible",
-              "Le dessin animé ne peut pas être lu pour le moment."
+              `Erreur vidéo :\n\n${message}`
             );
-          }}
-          onPlaybackStatusUpdate={(
-            status
-          ) => {
-            if (
-              status.isLoaded &&
-              status.didJustFinish
-            ) {
-              setPlaying(false);
-            }
           }}
         />
       </View>
 
+      {errorMessage ? (
+        <ScrollView
+          style={styles.errorBox}
+          contentContainerStyle={
+            styles.errorContent
+          }
+        >
+          <Text
+            style={
+              styles.errorTitle
+            }
+          >
+            ⚠️ Détail technique
+          </Text>
+
+          <Text
+            selectable
+            style={
+              styles.errorText
+            }
+          >
+            {errorMessage}
+          </Text>
+        </ScrollView>
+      ) : null}
+
       <View style={styles.controls}>
         <TouchableOpacity
           style={styles.controlButton}
-          onPress={togglePlayback}
+          onPress={
+            togglePlayback
+          }
         >
           <Text
             style={
@@ -310,6 +563,31 @@ const styles =
       color:
         "rgba(255,255,255,0.55)",
       paddingBottom: 12,
+    },
+
+    errorBox: {
+      maxHeight: 150,
+      marginHorizontal: 16,
+      marginBottom: 14,
+      backgroundColor:
+        "rgba(127,29,29,0.45)",
+      borderRadius: 14,
+    },
+
+    errorContent: {
+      padding: 12,
+    },
+
+    errorTitle: {
+      color: "#fecaca",
+      fontSize: 15,
+      fontWeight: "800",
+      marginBottom: 8,
+    },
+
+    errorText: {
+      color: "#ffffff",
+      fontSize: 12,
     },
 
     emptyContainer: {
