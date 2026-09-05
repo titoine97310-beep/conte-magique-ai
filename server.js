@@ -3097,8 +3097,27 @@ async function mergeLocalVideoClips(
           "0",
           "-i",
           concatFilePath,
-          "-c",
-          "copy",
+          "-c:v",
+          "libx264",
+
+          "-preset",
+          "veryfast",
+
+          "-crf",
+          "20",
+
+          "-c:a",
+          "aac",
+
+          "-b:a",
+          "160k",
+
+          "-pix_fmt",
+          "yuv420p",
+
+          "-movflags",
+          "+faststart",
+
           outputPath,
         ],
         {

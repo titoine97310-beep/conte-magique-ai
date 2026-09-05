@@ -1,4 +1,5 @@
 import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system/legacy";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -638,10 +639,70 @@ function closeVideoModal() {
 
     const token = await user.getIdToken();
 
-    const images = scenes.map(
-      (scene: { imageUrl?: string | null }) =>
-        scene.imageUrl
-    );
+    const images = await Promise.all(
+  scenes.map(
+    async (
+      scene: {
+        imageUrl?: string | null;
+      },
+      index: number
+    ) => {
+      const imageUrl =
+        scene.imageUrl?.trim();
+
+      if (!imageUrl) {
+        return null;
+      }
+
+      // URL distante ou image déjà en base64 :
+      // on la garde telle quelle.
+      if (
+        imageUrl.startsWith("https://") ||
+        imageUrl.startsWith("data:image/")
+      ) {
+        return imageUrl;
+      }
+
+      // Image sauvegardée localement sur Android/iOS :
+      // on l'envoie au backend sous forme de Data URI.
+      if (imageUrl.startsWith("file://")) {
+        const base64 =
+          await FileSystem.readAsStringAsync(
+            imageUrl,
+            {
+              encoding:
+                FileSystem.EncodingType.Base64,
+            }
+          );
+
+        const extension =
+          imageUrl
+            .split("?")[0]
+            .split(".")
+            .pop()
+            ?.toLowerCase();
+
+        const mimeType =
+          extension === "jpg" ||
+          extension === "jpeg"
+            ? "image/jpeg"
+            : extension === "webp"
+            ? "image/webp"
+            : "image/png";
+
+        console.log(
+          `🖼️ Scène ${index + 1} convertie en base64`
+        );
+
+        return `data:${mimeType};base64,${base64}`;
+      }
+
+      throw new Error(
+        `Format d'image non pris en charge pour la scène ${index + 1}.`
+      );
+    }
+  )
+);
 
     if (
       images.some(
