@@ -2671,7 +2671,7 @@ Smooth, stable, child-friendly animation.
 
 const rawPromptText =
   sceneActionPrompt
-    ? `${sceneActionPrompt}\n\n${consistencyPrompt}`
+    ? `${consistencyPrompt}\n\nScene action:\n${sceneActionPrompt}`
     : consistencyPrompt;
 
 const safePromptText =
