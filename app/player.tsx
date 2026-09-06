@@ -594,7 +594,13 @@ sound.setOnPlaybackStatusUpdate((status) => {
         },
         {
           text: "Obtenir un crédit",
-          onPress: () => router.push("/premium"),
+          onPress: () =>
+  router.push({
+    pathname: "/premium",
+    params: {
+      returnTo: "video",
+    },
+  }),
         },
       ]
     );

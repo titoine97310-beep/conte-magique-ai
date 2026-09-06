@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams, } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,6 +21,10 @@ import {
 
 import { auth } from "../services/firebase";
 import { setUserMode } from "../services/usageService";
+
+const params = useLocalSearchParams<{
+  returnTo?: string;
+}>();
 
 const BACKEND_URL =
   "https://conte-magique-ai.onrender.com";
@@ -199,6 +203,11 @@ export default function PremiumScreen() {
           throw new Error(
             "Le serveur n'a pas confirmé l'achat."
           );
+        }
+
+        if (params.returnTo === "video") {
+          router.back();
+          return;
         }
 
         /*
