@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  DeviceEventEmitter,
   Modal,
   ScrollView,
   StyleSheet,
@@ -36,6 +37,9 @@ const REPORT_REASONS = [
 export default function PlayerScreen() {
   useKeepAwake();
 
+  const story = getCurrentStory();
+  const scenes = story?.scenes || [];
+
   useEffect(() => {
     async function configureAudio() {
       try {
@@ -45,17 +49,64 @@ export default function PlayerScreen() {
           shouldDuckAndroid: true,
         });
       } catch (error) {
-        console.log("Erreur configuration audio :", error);
+        console.log(
+          "Erreur configuration audio :",
+          error
+        );
       }
     }
 
     configureAudio();
   }, []);
 
-  const story = getCurrentStory();
-  const scenes = story?.scenes || [];
+  useEffect(() => {
+    const subscription =
+      DeviceEventEmitter.addListener(
+        "videoPurchaseCompleted",
+        async () => {
+          try {
+            console.log(
+              "🎟️ Achat vidéo terminé, reprise de la création."
+            );
+
+            await new Promise((resolve) =>
+              setTimeout(resolve, 600)
+            );
+
+            const remaining =
+              await getVideoCreditsRemaining(
+                scenes.length
+              );
+
+            console.log(
+              "🎟️ Crédit vidéo disponible :",
+              remaining
+            );
+
+            if (remaining > 0) {
+              await openVideoModal();
+            } else {
+              Alert.alert(
+                "Crédit en cours d'activation",
+                "Ton achat a été validé. Réessaie dans quelques secondes."
+              );
+            }
+          } catch (error) {
+            console.error(
+              "Erreur reprise après achat vidéo :",
+              error
+            );
+          }
+        }
+      );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [scenes.length]);
 
   const [index, setIndex] = useState(0);
+
   const [fullscreen, setFullscreen] = useState(false);
   const [favorite, setFavorite] = useState(!!story?.favorite);
   const [nightMode, setNightMode] = useState(false);

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Platform,
   ScrollView,
   StyleSheet,
@@ -19,13 +20,8 @@ import {
   type ProductAndroid,
 } from "expo-iap";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "../services/firebase";
 import { setUserMode } from "../services/usageService";
-
-const params = useLocalSearchParams<{
-  returnTo?: string;
-}>();
 
 const BACKEND_URL =
   "https://conte-magique-ai.onrender.com";
@@ -57,6 +53,10 @@ const STORE_NAME =
 export default function PremiumScreen() {
   const [processing, setProcessing] =
     useState(false);
+
+    const params = useLocalSearchParams<{
+  returnTo?: string;
+}>();
 
   const {
     connected,
@@ -206,16 +206,6 @@ export default function PremiumScreen() {
           );
         }
 
-        if (params.returnTo === "video") {
-  await AsyncStorage.setItem(
-    "resumeVideoCreation",
-    "true"
-  );
-
-  router.back();
-  return;
-}
-
         /*
          * À ce stade :
          *
@@ -240,6 +230,22 @@ export default function PremiumScreen() {
         });
 
         await setUserMode();
+
+        const isVideoPurchase =
+  productId === VIDEO_SHORT_PRODUCT_ID ||
+  productId === VIDEO_MEDIUM_PRODUCT_ID;
+
+if (
+  params.returnTo === "video" &&
+  isVideoPurchase
+) {
+  DeviceEventEmitter.emit(
+    "videoPurchaseCompleted"
+  );
+
+  router.back();
+  return;
+}
 
         if (
           productId ===
