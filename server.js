@@ -3,7 +3,10 @@ import {
   Environment,
   SignedDataVerifier,
 } from "@apple/app-store-server-library";
-import RunwayML, { TaskFailedError } from "@runwayml/sdk";
+import RunwayML, {
+  TaskFailedError,
+  toFile as runwayToFile,
+} from "@runwayml/sdk";
 import cors from "cors";
 import crypto from "crypto";
 import dotenv from "dotenv";
@@ -2744,16 +2747,10 @@ if (
     "base64"
   );
 
-  const runwayFile = await toFile(
-    imageBuffer,
-    `scene-${index + 1}.${extension}`,
-    {
-      type:
-        mimeType === "image/jpg"
-          ? "image/jpeg"
-          : mimeType,
-    }
-  );
+  const runwayFile = await runwayToFile(
+  imageBuffer,
+  `scene-${index + 1}.${extension}`
+);
 
   const upload =
     await runway.uploads.createEphemeral(
