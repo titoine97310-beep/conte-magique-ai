@@ -2,10 +2,10 @@ import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as Speech from "expo-speech";
 import { addDoc, collection, doc, getDocFromServer, serverTimestamp } from "firebase/firestore";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -18,10 +18,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getCurrentStory, setCurrentStory } from "../services/currentStory";
 import { auth, db } from "../services/firebase";
 import { toggleFavoriteStory } from "../services/storageService";
-
 
 const TTS_URL = "https://conte-magique-ai.onrender.com/tts";
 const VIDEO_URL =
@@ -49,6 +49,70 @@ export default function PlayerScreen() {
         console.log("Erreur configuration audio :", error);
       }
     }
+
+    useFocusEffect(
+  useCallback(() => {
+    let cancelled = false;
+
+    async function resumeVideoAfterPurchase() {
+      try {
+        const shouldResume =
+          await AsyncStorage.getItem(
+            "resumeVideoCreation"
+          );
+
+        if (
+          shouldResume !== "true" ||
+          cancelled
+        ) {
+          return;
+        }
+
+        await AsyncStorage.removeItem(
+          "resumeVideoCreation"
+        );
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500)
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        const remaining =
+          await getVideoCreditsRemaining(
+            scenes.length
+          );
+
+        console.log(
+          "🎟️ Crédit vidéo après achat :",
+          remaining
+        );
+
+        if (remaining > 0) {
+          await openVideoModal();
+        } else {
+          Alert.alert(
+            "Crédit en cours d'activation",
+            "Ton achat a bien été validé. Réessaie dans quelques secondes."
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Erreur reprise vidéo après achat :",
+          error
+        );
+      }
+    }
+
+    resumeVideoAfterPurchase();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scenes.length])
+);
 
     configureAudio();
   }, []);

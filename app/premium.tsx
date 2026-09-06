@@ -19,6 +19,7 @@ import {
   type ProductAndroid,
 } from "expo-iap";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "../services/firebase";
 import { setUserMode } from "../services/usageService";
 
@@ -206,9 +207,14 @@ export default function PremiumScreen() {
         }
 
         if (params.returnTo === "video") {
-          router.back();
-          return;
-        }
+  await AsyncStorage.setItem(
+    "resumeVideoCreation",
+    "true"
+  );
+
+  router.back();
+  return;
+}
 
         /*
          * À ce stade :
