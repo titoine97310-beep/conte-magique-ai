@@ -4,7 +4,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
-import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDocFromServer, serverTimestamp } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -540,7 +540,7 @@ sound.setOnPlaybackStatusUpdate((status) => {
     doc(db, "users", user.uid);
 
   const userSnap =
-    await getDoc(userRef);
+  await getDocFromServer(userRef);
 
   if (!userSnap.exists()) {
     return 0;
