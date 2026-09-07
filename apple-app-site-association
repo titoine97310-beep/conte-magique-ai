@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "5D9U352XT3.com.contemagiqueia.app"
+        ],
+        "components": [
+          {
+            "/": "/histoire/*"
+          },
+          {
+            "/": "/video/*"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -4,13 +4,12 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  DeviceEventEmitter,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -239,13 +238,12 @@ if (
   params.returnTo === "video" &&
   isVideoPurchase
 ) {
-  router.back();
-
-setTimeout(() => {
-  DeviceEventEmitter.emit(
-    "videoPurchaseCompleted"
-  );
-}, 700);
+  router.replace({
+  pathname: "/player",
+  params: {
+    resumeVideo: "1",
+  },
+});
 
 return;
 }

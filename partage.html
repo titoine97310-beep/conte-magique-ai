@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>ConteMagiqueIA - Contenu partagé</title>
+
+  <meta
+    name="description"
+    content="Découvre une histoire ou une vidéo créée avec ConteMagiqueIA."
+  />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(
+          circle at top,
+          #312e81 0%,
+          #111827 48%,
+          #020617 100%
+        );
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(620px, 100%);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 28px;
+      padding: 42px 28px;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+    }
+
+    .logo {
+      font-size: 30px;
+      font-weight: 900;
+      color: #ffb703;
+      margin-bottom: 24px;
+    }
+
+    .icon {
+      font-size: 68px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 7vw, 42px);
+      line-height: 1.15;
+      margin-bottom: 18px;
+    }
+
+    .highlight {
+      color: #ffb703;
+    }
+
+    .description {
+      font-size: 18px;
+      line-height: 1.6;
+      color: #cbd5e1;
+      max-width: 500px;
+      margin: 0 auto 30px;
+    }
+
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-width: 380px;
+      margin: auto;
+    }
+
+    .button {
+      display: block;
+      padding: 16px 22px;
+      border-radius: 16px;
+      text-decoration: none;
+      font-weight: 900;
+      font-size: 16px;
+      transition: transform 0.15s ease;
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+    }
+
+    .apple {
+      background: white;
+      color: #111827;
+    }
+
+    .google {
+      background: #ffb703;
+      color: #111827;
+    }
+
+    .note {
+      margin-top: 28px;
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    .home {
+      display: inline-block;
+      margin-top: 22px;
+      color: #ffcf4a;
+      text-decoration: none;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="card">
+
+    <div class="logo">
+      ✨ ConteMagiqueIA
+    </div>
+
+    <div class="icon" id="contentIcon">
+      📖
+    </div>
+
+    <h1 id="title">
+      Une histoire
+      <span class="highlight">magique</span>
+      t’attend
+    </h1>
+
+    <p class="description" id="description">
+      Ce contenu a été partagé avec toi depuis ConteMagiqueIA.
+      Ouvre-le dans l’application pour le découvrir.
+    </p>
+
+    <div class="buttons">
+
+      <a
+        class="button apple"
+        href="https://apps.apple.com/app/id6805620727"
+      >
+         Télécharger sur l’App Store
+      </a>
+
+      <a
+        class="button google"
+        href="https://play.google.com/store/apps/details?id=com.contemagiqueia.app"
+      >
+        ▶ Télécharger sur Google Play
+      </a>
+
+    </div>
+
+    <p class="note">
+      Si ConteMagiqueIA est déjà installée,
+      retourne au lien reçu et touche-le de nouveau
+      pour ouvrir directement le contenu dans l’application.
+    </p>
+
+    <a
+      href="/"
+      class="home"
+    >
+      Découvrir ConteMagiqueIA
+    </a>
+
+  </main>
+
+  <script>
+    const path =
+      window.location.pathname;
+
+    const title =
+      document.getElementById("title");
+
+    const icon =
+      document.getElementById("contentIcon");
+
+    const description =
+      document.getElementById("description");
+
+    if (
+      path.startsWith("/video/")
+    ) {
+      icon.textContent = "🎬";
+
+      title.innerHTML =
+        'Un dessin animé <span class="highlight">magique</span> t’attend';
+
+      description.textContent =
+        "Un dessin animé créé avec ConteMagiqueIA a été partagé avec toi. Ouvre-le dans l’application pour le regarder.";
+    } else {
+      icon.textContent = "📖";
+
+      title.innerHTML =
+        'Une histoire <span class="highlight">magique</span> t’attend';
+
+      description.textContent =
+        "Une histoire créée avec ConteMagiqueIA a été partagée avec toi. Ouvre-la dans l’application pour la découvrir.";
+    }
+  </script>
+</body>
+</html>

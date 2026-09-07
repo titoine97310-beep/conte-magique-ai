@@ -1146,6 +1146,398 @@ app.get("/", (req, res) => {
   res.send("Backend ConteMagiqueIA OK");
 });
 // =========================
+// 🔗 PARTAGE SÉCURISÉ
+// =========================
+
+function createShareToken() {
+  return crypto
+    .randomBytes(32)
+    .toString("base64url");
+}
+
+function hashShareToken(token) {
+  return crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+}
+
+// =========================
+// 🔗 CRÉER UN LIEN DE PARTAGE
+// =========================
+
+app.post(
+  "/share/create",
+  async (req, res) => {
+    try {
+      const decodedToken =
+        await requireFirebaseUser(
+          req,
+          res
+        );
+
+      if (!decodedToken) {
+        return;
+      }
+
+      const uid =
+        decodedToken.uid;
+
+      const {
+        type,
+        contentId,
+        story,
+      } = req.body;
+
+      if (
+        type !== "story" &&
+        type !== "video"
+      ) {
+        return res.status(400).json({
+          error:
+            "Type de partage invalide.",
+        });
+      }
+
+      if (!contentId) {
+        return res.status(400).json({
+          error:
+            "Identifiant du contenu manquant.",
+        });
+      }
+
+      let sharedContent = null;
+
+      // =========================
+      // 🎬 PARTAGE VIDÉO
+      // =========================
+
+      if (type === "video") {
+        const videoRef =
+          adminDb
+            .collection(
+              "videoGenerations"
+            )
+            .doc(
+              String(contentId)
+            );
+
+        const videoSnapshot =
+          await videoRef.get();
+
+        if (
+          !videoSnapshot.exists
+        ) {
+          return res
+            .status(404)
+            .json({
+              error:
+                "Vidéo introuvable.",
+            });
+        }
+
+        const video =
+          videoSnapshot.data();
+
+        if (
+          video.uid !== uid
+        ) {
+          return res
+            .status(403)
+            .json({
+              error:
+                "Cette vidéo ne vous appartient pas.",
+            });
+        }
+
+        if (
+          video.status !==
+            "completed" ||
+          !video.finalVideoUrl
+        ) {
+          return res
+            .status(400)
+            .json({
+              error:
+                "Cette vidéo n'est pas disponible pour le partage.",
+            });
+        }
+
+        sharedContent = {
+          generationId:
+            videoSnapshot.id,
+
+          finalVideoUrl:
+            video.finalVideoUrl,
+
+          sceneCount:
+            video.sceneCount || 0,
+
+          videoType:
+            video.videoType ||
+            null,
+        };
+      }
+
+      // =========================
+      // 📖 PARTAGE HISTOIRE
+      // =========================
+
+      if (type === "story") {
+        if (
+          !story ||
+          typeof story !==
+            "object"
+        ) {
+          return res
+            .status(400)
+            .json({
+              error:
+                "Données de l'histoire manquantes.",
+            });
+        }
+
+        if (
+          String(story.id) !==
+          String(contentId)
+        ) {
+          return res
+            .status(400)
+            .json({
+              error:
+                "Identifiant de l'histoire incorrect.",
+            });
+        }
+
+        if (
+          !Array.isArray(
+            story.scenes
+          ) ||
+          story.scenes.length === 0
+        ) {
+          return res
+            .status(400)
+            .json({
+              error:
+                "L'histoire ne contient aucune scène.",
+            });
+        }
+
+        if (
+          story.scenes.length > 20
+        ) {
+          return res
+            .status(400)
+            .json({
+              error:
+                "Cette histoire contient trop de scènes.",
+            });
+        }
+
+        sharedContent = {
+          id:
+            String(story.id),
+
+          prompt:
+            story.prompt || "",
+
+          title:
+            story.title ||
+            story.prompt ||
+            "Histoire ConteMagiqueIA",
+
+          imageStyle:
+            story.imageStyle ||
+            "cartoon",
+
+          narrator:
+            story.narrator ||
+            "narratrice",
+
+          scenes:
+            story.scenes.map(
+              (scene) => ({
+                text:
+                  scene?.text ||
+                  "",
+
+                imagePrompt:
+                  scene?.imagePrompt ||
+                  "",
+
+                imageUrl:
+                  scene?.imageUrl ||
+                  null,
+
+                ambience:
+                  scene?.ambience ||
+                  "magic",
+              })
+            ),
+        };
+      }
+
+      // =========================
+      // 🔐 CRÉATION DU JETON
+      // =========================
+
+      const shareToken =
+        createShareToken();
+
+      const tokenHash =
+        hashShareToken(
+          shareToken
+        );
+
+      const shareRef =
+        adminDb
+          .collection(
+            "shareLinks"
+          )
+          .doc(tokenHash);
+
+      await shareRef.set({
+        ownerUid: uid,
+
+        type,
+
+        contentId:
+          String(contentId),
+
+        content:
+          sharedContent,
+
+        active: true,
+
+        createdAt:
+          FieldValue.serverTimestamp(),
+
+        lastAccessedAt: null,
+      });
+
+      const shareUrl =
+        type === "video"
+          ? `https://contemagiqueia.fr/video/${shareToken}`
+          : `https://contemagiqueia.fr/histoire/${shareToken}`;
+
+      return res.json({
+        success: true,
+        token: shareToken,
+        shareUrl,
+      });
+    } catch (error) {
+      console.error(
+        "❌ Erreur création partage :",
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Impossible de créer le lien de partage.",
+          message:
+            error?.message,
+        });
+    }
+  }
+);
+
+// =========================
+// 🔗 LIRE UN CONTENU PARTAGÉ
+// =========================
+
+app.get(
+  "/share/:token",
+  async (req, res) => {
+    try {
+      const token =
+        String(
+          req.params.token || ""
+        ).trim();
+
+      if (!token) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Jeton de partage manquant.",
+          });
+      }
+
+      const tokenHash =
+        hashShareToken(token);
+
+      const shareRef =
+        adminDb
+          .collection(
+            "shareLinks"
+          )
+          .doc(tokenHash);
+
+      const shareSnapshot =
+        await shareRef.get();
+
+      if (
+        !shareSnapshot.exists
+      ) {
+        return res
+          .status(404)
+          .json({
+            error:
+              "Lien de partage introuvable.",
+          });
+      }
+
+      const share =
+        shareSnapshot.data();
+
+      if (
+        share.active !== true
+      ) {
+        return res
+          .status(410)
+          .json({
+            error:
+              "Ce lien de partage n'est plus disponible.",
+          });
+      }
+
+      await shareRef.update({
+        lastAccessedAt:
+          FieldValue.serverTimestamp(),
+      });
+
+      return res.json({
+        success: true,
+
+        type:
+          share.type,
+
+        contentId:
+          share.contentId,
+
+        content:
+          share.content,
+      });
+    } catch (error) {
+      console.error(
+        "❌ Erreur lecture partage :",
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Impossible d'ouvrir ce contenu partagé.",
+          message:
+            error?.message,
+        });
+    }
+  }
+);
+// =========================
 // ☁️ FIREBASE STORAGE - IMAGES HISTOIRES
 // =========================
 app.post("/story-image/upload", async (req, res) => {

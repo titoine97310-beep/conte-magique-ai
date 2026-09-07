@@ -2,20 +2,22 @@ import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import {
+  router,
+  useLocalSearchParams,
+} from "expo-router";
 import * as Speech from "expo-speech";
 import { addDoc, collection, doc, getDocFromServer, serverTimestamp } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
-  DeviceEventEmitter,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -36,6 +38,14 @@ const REPORT_REASONS = [
 
 export default function PlayerScreen() {
   useKeepAwake();
+
+  const params =
+  useLocalSearchParams<{
+    resumeVideo?: string;
+  }>();
+
+const resumeVideoHandledRef =
+  useRef(false);
 
   const story = getCurrentStory();
   const scenes = story?.scenes || [];
@@ -58,52 +68,6 @@ export default function PlayerScreen() {
 
     configureAudio();
   }, []);
-
-  useEffect(() => {
-    const subscription =
-      DeviceEventEmitter.addListener(
-        "videoPurchaseCompleted",
-        async () => {
-          try {
-            console.log(
-              "🎟️ Achat vidéo terminé, reprise de la création."
-            );
-
-            await new Promise((resolve) =>
-              setTimeout(resolve, 600)
-            );
-
-            const remaining =
-              await getVideoCreditsRemaining(
-                scenes.length
-              );
-
-            console.log(
-              "🎟️ Crédit vidéo disponible :",
-              remaining
-            );
-
-            if (remaining > 0) {
-              await openVideoModal();
-            } else {
-              Alert.alert(
-                "Crédit en cours d'activation",
-                "Ton achat a été validé. Réessaie dans quelques secondes."
-              );
-            }
-          } catch (error) {
-            console.error(
-              "Erreur reprise après achat vidéo :",
-              error
-            );
-          }
-        }
-      );
-
-    return () => {
-      subscription.remove();
-    };
-  }, [scenes.length]);
 
   const [index, setIndex] = useState(0);
 
@@ -670,6 +634,68 @@ sound.setOnPlaybackStatusUpdate((status) => {
 
   setVideoModalVisible(true);
 }
+
+useEffect(() => {
+  if (
+    params.resumeVideo !== "1" ||
+    resumeVideoHandledRef.current
+  ) {
+    return;
+  }
+
+  if (
+    scenes.length !== 4 &&
+    scenes.length !== 6
+  ) {
+    return;
+  }
+
+  resumeVideoHandledRef.current = true;
+
+  const resumeAfterPurchase = async () => {
+    try {
+      console.log(
+        "🎟️ Retour après achat vidéo"
+      );
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const remaining =
+          await getVideoCreditsRemaining(
+            scenes.length
+          );
+
+        console.log(
+          "🎟️ Crédit après achat :",
+          remaining
+        );
+
+        if (remaining > 0) {
+          setVideoModalVisible(true);
+          return;
+        }
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, 800)
+        );
+      }
+
+      Alert.alert(
+        "Crédit en cours d’activation",
+        "Ton achat a bien été validé. Réessaie dans quelques secondes."
+      );
+    } catch (error) {
+      console.error(
+        "Erreur reprise vidéo après achat :",
+        error
+      );
+    }
+  };
+
+  void resumeAfterPurchase();
+}, [
+  params.resumeVideo,
+  scenes.length,
+]);
 
 function closeVideoModal() {
   if (!videoGenerating) {

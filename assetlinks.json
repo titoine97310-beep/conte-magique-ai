@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.contemagiqueia.app",
+      "sha256_cert_fingerprints": [
+        "E7:9A:FD:FF:53:24:7A:B8:6E:A7:8F:44:90:79:A8:FC:B3:8A:27:BE:EE:90:D4:92:5A:75:CB:03:D8:8F:A9:0E"
+      ]
+    }
+  }
+]

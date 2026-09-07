@@ -1,0 +1,4 @@
+RewriteEngine On
+
+RewriteRule ^histoire/.*$ /partage.html [L]
+RewriteRule ^video/.*$ /partage.html [L]
