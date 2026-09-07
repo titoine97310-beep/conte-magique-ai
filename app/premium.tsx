@@ -239,12 +239,15 @@ if (
   params.returnTo === "video" &&
   isVideoPurchase
 ) {
+  router.back();
+
+setTimeout(() => {
   DeviceEventEmitter.emit(
     "videoPurchaseCompleted"
   );
+}, 700);
 
-  router.back();
-  return;
+return;
 }
 
         if (

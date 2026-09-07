@@ -868,7 +868,7 @@ if (data?.finalVideoUrl) {
   }
 }
 
-  async function stopVoice() {
+async function stopVoice() {
     iaRunRef.current += 1;
 
     setIaReading(false);
