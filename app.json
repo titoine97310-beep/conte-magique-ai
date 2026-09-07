@@ -10,13 +10,15 @@
     "newArchEnabled": true,
 
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.contemagiqueia.app",
-      "buildNumber": "5",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
-    },
+  "supportsTablet": true,
+  "bundleIdentifier": "com.contemagiqueia.app",
+  "buildNumber": "5",
+  "infoPlist": {
+    "ITSAppUsesNonExemptEncryption": false,
+    "NSCameraUsageDescription": "ConteMagiqueIA utilise l’appareil photo uniquement lorsque vous choisissez de prendre une photo de référence pour personnaliser une histoire.",
+    "NSPhotoLibraryUsageDescription": "ConteMagiqueIA accède aux photos que vous choisissez afin de les utiliser comme référence pour personnaliser les illustrations de votre histoire."
+  }
+},
 
     "android": {
       "versionCode": 7,
@@ -35,23 +37,31 @@
     },
 
     "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#111827",
-          "dark": {
-            "backgroundColor": "#111827"
-          }
-        }
-      ],
-      "expo-font",
-      "expo-iap",
-      "./plugins/withOptionalCamera.cjs"
-    ],
+  "expo-router",
+  [
+    "expo-splash-screen",
+    {
+      "image": "./assets/images/splash.png",
+      "imageWidth": 200,
+      "resizeMode": "contain",
+      "backgroundColor": "#111827",
+      "dark": {
+        "backgroundColor": "#111827"
+      }
+    }
+  ],
+  "expo-font",
+  "expo-iap",
+  [
+    "expo-image-picker",
+    {
+      "photosPermission": "ConteMagiqueIA accède aux photos que vous choisissez afin de les utiliser comme référence pour personnaliser les illustrations de votre histoire.",
+      "cameraPermission": "ConteMagiqueIA utilise l’appareil photo uniquement lorsque vous choisissez de prendre une photo de référence pour personnaliser une histoire.",
+      "microphonePermission": false
+    }
+  ],
+  "./plugins/withOptionalCamera.cjs"
+],
 
     "experiments": {
       "typedRoutes": true,

@@ -1021,9 +1021,11 @@ async function buyMediumVideo() {
 
   <Text style={styles.cardPrice}>
     {getStorePrice(
-      VIDEO_MEDIUM_PRODUCT_ID,
-      "9,99 €"
-    )}
+  VIDEO_MEDIUM_PRODUCT_ID,
+  Platform.OS === "ios"
+    ? "12,99 €"
+    : "11,99 €"
+)}
   </Text>
 
   <Text style={styles.cardDescription}>

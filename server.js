@@ -518,6 +518,7 @@ const androidPublisher = google.androidpublisher({
 
 const APPLE_ISSUER_ID = process.env.APPLE_ISSUER_ID;
 const APPLE_KEY_ID = process.env.APPLE_KEY_ID;
+const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID;
 
 const APPLE_KEY_PATH = APPLE_KEY_ID
   ? `/etc/secrets/SubscriptionKey_${APPLE_KEY_ID}.p8`
