@@ -45,7 +45,7 @@ export default function PlayerScreen() {
   }>();
 
 const resumeVideoHandledRef =
-  useRef(false);
+  useRef<string | null>(null);
 
   const story = getCurrentStory();
   const scenes = story?.scenes || [];
@@ -636,9 +636,18 @@ sound.setOnPlaybackStatusUpdate((status) => {
 }
 
 useEffect(() => {
+  const resumeToken =
+    typeof params.resumeVideo === "string"
+      ? params.resumeVideo
+      : null;
+
+  if (!resumeToken) {
+    return;
+  }
+
   if (
-    params.resumeVideo !== "1" ||
-    resumeVideoHandledRef.current
+    resumeVideoHandledRef.current ===
+    resumeToken
   ) {
     return;
   }
@@ -650,46 +659,96 @@ useEffect(() => {
     return;
   }
 
-  resumeVideoHandledRef.current = true;
+  resumeVideoHandledRef.current =
+    resumeToken;
 
-  const resumeAfterPurchase = async () => {
-    try {
-      console.log(
-        "🎟️ Retour après achat vidéo"
-      );
+  const resumeAfterPurchase =
+    async () => {
+      try {
+        console.log(
+          "🎟️ Retour après achat vidéo :",
+          resumeToken
+        );
 
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const remaining =
-          await getVideoCreditsRemaining(
-            scenes.length
+        /*
+         * Le serveur vient normalement
+         * d'ajouter le crédit.
+         *
+         * On vérifie plusieurs fois car
+         * Firestore peut avoir un léger
+         * délai de synchronisation.
+         */
+        for (
+          let attempt = 0;
+          attempt < 8;
+          attempt++
+        ) {
+          const remaining =
+            await getVideoCreditsRemaining(
+              scenes.length
+            );
+
+          console.log(
+            `🎟️ Vérification crédit ${
+              attempt + 1
+            }/8 :`,
+            remaining
           );
 
-        console.log(
-          "🎟️ Crédit après achat :",
-          remaining
-        );
+          if (remaining > 0) {
+            /*
+             * On place directement
+             * l'utilisateur à la dernière scène
+             * pour rester cohérent avec
+             * l'emplacement normal du bouton.
+             */
+            setIndex(
+              Math.max(
+                scenes.length - 1,
+                0
+              )
+            );
 
-        if (remaining > 0) {
-          setVideoModalVisible(true);
-          return;
+            setVideoModalVisible(true);
+
+            console.log(
+              "✅ Crédit vidéo disponible, fenêtre de création ouverte."
+            );
+
+            return;
+          }
+
+          await new Promise(
+            (resolve) =>
+              setTimeout(
+                resolve,
+                1000
+              )
+          );
         }
 
-        await new Promise((resolve) =>
-          setTimeout(resolve, 800)
+        /*
+         * Aucun crédit visible après
+         * plusieurs vérifications.
+         *
+         * On ne lance surtout PAS Runway.
+         */
+        Alert.alert(
+          "Crédit en cours d’activation",
+          "Ton achat a bien été validé, mais ton crédit n'est pas encore visible. Retourne dans ton histoire dans quelques secondes puis appuie sur « Créer mon dessin animé »."
+        );
+      } catch (error) {
+        console.error(
+          "Erreur reprise vidéo après achat :",
+          error
+        );
+
+        Alert.alert(
+          "Erreur",
+          "Ton achat est conservé, mais le crédit vidéo n'a pas pu être vérifié. Réessaie depuis ton histoire."
         );
       }
-
-      Alert.alert(
-        "Crédit en cours d’activation",
-        "Ton achat a bien été validé. Réessaie dans quelques secondes."
-      );
-    } catch (error) {
-      console.error(
-        "Erreur reprise vidéo après achat :",
-        error
-      );
-    }
-  };
+    };
 
   void resumeAfterPurchase();
 }, [

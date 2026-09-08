@@ -224,29 +224,51 @@ export default function PremiumScreen() {
          * la transaction côté store.
          */
         await finishTransaction({
-          purchase,
-          isConsumable: true,
-        });
+  purchase,
+  isConsumable: true,
+});
 
-        await setUserMode();
-
-        const isVideoPurchase =
+const isVideoPurchase =
   productId === VIDEO_SHORT_PRODUCT_ID ||
   productId === VIDEO_MEDIUM_PRODUCT_ID;
 
+/*
+ * 🎬 ACHAT VIDÉO
+ *
+ * Le serveur a déjà validé l'achat
+ * et ajouté le crédit dans Firestore.
+ *
+ * On retourne immédiatement au Player.
+ * On ne laisse pas setUserMode()
+ * bloquer le retour vidéo.
+ */
 if (
   params.returnTo === "video" &&
   isVideoPurchase
 ) {
-  router.replace({
-  pathname: "/player",
-  params: {
-    resumeVideo: "1",
-  },
-});
+  const resumeToken = String(Date.now());
 
-return;
+  console.log(
+    "🎟️ Achat vidéo validé, retour vers le Player :",
+    resumeToken
+  );
+
+  router.replace({
+    pathname: "/player",
+    params: {
+      resumeVideo: resumeToken,
+    },
+  });
+
+  return;
 }
+
+/*
+ * Pour les carnets d'histoires,
+ * on peut ensuite mettre à jour
+ * le mode utilisateur.
+ */
+await setUserMode();
 
         if (
           productId ===

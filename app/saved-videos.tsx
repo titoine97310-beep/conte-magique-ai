@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import * as VideoThumbnails from "expo-video-thumbnails";
+
 import {
   collection,
   deleteDoc,
@@ -9,12 +10,18 @@ import {
   query,
   where,
 } from "firebase/firestore";
+
 import {
   deleteObject,
   getStorage,
   ref,
 } from "firebase/storage";
-import { useEffect, useState } from "react";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -28,7 +35,15 @@ import {
   View,
 } from "react-native";
 
-import { auth, db } from "../services/firebase";
+import {
+  auth,
+  db,
+} from "../services/firebase";
+
+import {
+  deleteSharedVideo,
+  getSharedVideos,
+} from "../services/sharedVideoService";
 
 type SavedVideo = {
   id: string;
@@ -36,6 +51,19 @@ type SavedVideo = {
   sceneCount?: number;
   createdAt?: any;
   status?: string;
+
+  /**
+   * true = vidéo reçue par partage
+   * false/undefined = vidéo créée par l'utilisateur
+   */
+  shared?: boolean;
+
+  /**
+   * Présent uniquement pour une vidéo reçue.
+   */
+  shareToken?: string;
+
+  videoType?: string | null;
 };
 
 export default function SavedVideosScreen() {
@@ -46,52 +74,102 @@ export default function SavedVideosScreen() {
     useState(true);
 
   const [thumbnails, setThumbnails] =
-    useState<Record<string, string>>({});
+    useState<Record<string, string>>(
+      {}
+    );
 
   const [deletingId, setDeletingId] =
-    useState<string | null>(null);
+    useState<string | null>(
+      null
+    );
 
   useEffect(() => {
     void loadVideos();
   }, []);
 
+  /**
+   * Permet d'avoir une clé unique,
+   * même si une vidéo créée et une
+   * vidéo reçue avaient par hasard
+   * le même ID.
+   */
+  function getVideoKey(
+    video: SavedVideo
+  ) {
+    return video.shared
+      ? `shared-${video.id}`
+      : `owned-${video.id}`;
+  }
+
+  /**
+   * Charge :
+   *
+   * 1. les vidéos créées par l'utilisateur ;
+   * 2. les vidéos reçues et enregistrées.
+   *
+   * Puis fusionne les deux listes.
+   */
   async function loadVideos() {
     try {
       setLoading(true);
 
-      const user = auth.currentUser;
+      const user =
+        auth.currentUser;
 
       if (!user) {
         setVideos([]);
         return;
       }
 
-      const videosQuery = query(
-        collection(
-          db,
-          "videoGenerations"
-        ),
-        where(
-          "uid",
-          "==",
-          user.uid
-        ),
-        orderBy(
-          "createdAt",
-          "desc"
-        )
-      );
+      /*
+       * ==========================
+       * VIDÉOS CRÉÉES
+       * ==========================
+       */
 
-      const snapshot =
-        await getDocs(
-          videosQuery
+      const videosQuery =
+        query(
+          collection(
+            db,
+            "videoGenerations"
+          ),
+
+          where(
+            "uid",
+            "==",
+            user.uid
+          ),
+
+          orderBy(
+            "createdAt",
+            "desc"
+          )
         );
 
-      const loadedVideos:
+      /*
+       * On charge en parallèle :
+       *
+       * - les vidéos créées ;
+       * - les vidéos partagées enregistrées.
+       */
+      const [
+        snapshot,
+        receivedVideos,
+      ] = await Promise.all([
+        getDocs(
+          videosQuery
+        ),
+
+        getSharedVideos(),
+      ]);
+
+      const ownedVideos:
         SavedVideo[] =
         snapshot.docs
           .map(
-            (docSnapshot) => {
+            (
+              docSnapshot
+            ) => {
               const data =
                 docSnapshot.data();
 
@@ -111,6 +189,9 @@ export default function SavedVideosScreen() {
 
                 status:
                   data.status,
+
+                shared:
+                  false,
               };
             }
           )
@@ -121,29 +202,159 @@ export default function SavedVideosScreen() {
                 "completed"
           );
 
-      setVideos(
-        loadedVideos
+      /*
+       * ==========================
+       * VIDÉOS REÇUES
+       * ==========================
+       */
+
+      const sharedVideos:
+        SavedVideo[] =
+        receivedVideos
+          .map(
+            (video) => ({
+              id:
+                video.id,
+
+              shareToken:
+                video.shareToken,
+
+              finalVideoUrl:
+                video.finalVideoUrl,
+
+              sceneCount:
+                video.sceneCount,
+
+              createdAt:
+                video.createdAt,
+
+              videoType:
+                video.videoType,
+
+              shared:
+                true,
+
+              status:
+                "completed",
+            })
+          )
+          .filter(
+            (video) =>
+              Boolean(
+                video.finalVideoUrl
+              )
+          );
+
+      /*
+       * Fusion des deux types
+       * de vidéos.
+       */
+      const mergedVideos = [
+        ...ownedVideos,
+        ...sharedVideos,
+      ];
+
+      /*
+       * Tri du plus récent
+       * au plus ancien.
+       */
+      mergedVideos.sort(
+        (a, b) =>
+          getDateValue(
+            b.createdAt
+          ) -
+          getDateValue(
+            a.createdAt
+          )
       );
 
+      setVideos(
+        mergedVideos
+      );
+
+      /*
+       * Génération des miniatures.
+       */
       void generateThumbnails(
-        loadedVideos
+        mergedVideos
       );
     } catch (error) {
       console.error(
         "Erreur chargement vidéos :",
         error
       );
+
+      Alert.alert(
+        "Chargement impossible",
+        "Tes vidéos n'ont pas pu être chargées."
+      );
     } finally {
       setLoading(false);
     }
   }
 
+  /**
+   * Convertit les différentes formes
+   * possibles de createdAt en timestamp.
+   */
+  function getDateValue(
+    value: any
+  ): number {
+    try {
+      if (!value) {
+        return 0;
+      }
+
+      if (
+        typeof value?.toDate ===
+        "function"
+      ) {
+        return value
+          .toDate()
+          .getTime();
+      }
+
+      if (
+        typeof value?.seconds ===
+        "number"
+      ) {
+        return (
+          value.seconds *
+          1000
+        );
+      }
+
+      const date =
+        new Date(value);
+
+      const time =
+        date.getTime();
+
+      return Number.isNaN(
+        time
+      )
+        ? 0
+        : time;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Génère une miniature locale
+   * pour chaque vidéo.
+   */
   async function generateThumbnails(
     videoList: SavedVideo[]
   ) {
     await Promise.all(
       videoList.map(
         async (video) => {
+          const key =
+            getVideoKey(
+              video
+            );
+
           try {
             const result =
               await VideoThumbnails.getThumbnailAsync(
@@ -155,9 +366,12 @@ export default function SavedVideosScreen() {
               );
 
             setThumbnails(
-              (previous) => ({
+              (
+                previous
+              ) => ({
                 ...previous,
-                [video.id]:
+
+                [key]:
                   result.uri,
               })
             );
@@ -181,12 +395,27 @@ export default function SavedVideosScreen() {
         return "Date inconnue";
       }
 
-      if (value?.toDate) {
+      if (
+        typeof value?.toDate ===
+        "function"
+      ) {
         return value
           .toDate()
           .toLocaleDateString(
             "fr-FR"
           );
+      }
+
+      if (
+        typeof value?.seconds ===
+        "number"
+      ) {
+        return new Date(
+          value.seconds *
+            1000
+        ).toLocaleDateString(
+          "fr-FR"
+        );
       }
 
       return new Date(
@@ -199,105 +428,181 @@ export default function SavedVideosScreen() {
     }
   }
 
+  /**
+   * Partage d'une vidéo.
+   *
+   * - vidéo créée :
+   *   création d'un nouveau lien sécurisé
+   *   via le backend.
+   *
+   * - vidéo reçue :
+   *   on réutilise simplement son lien
+   *   de partage existant.
+   */
   async function shareVideo(
-  video: SavedVideo
-) {
-  try {
-    const user =
-      auth.currentUser;
-
-    if (!user) {
-      Alert.alert(
-        "Connexion requise",
-        "Connecte-toi pour partager cette vidéo."
-      );
-
-      return;
-    }
-
-    const token =
-      await user.getIdToken(
-        true
-      );
-
-    const response =
-      await fetch(
-        "https://conte-magique-ai.onrender.com/share/create",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            Authorization:
-              `Bearer ${token}`,
-          },
-
-          body:
-            JSON.stringify({
-              type: "video",
-              contentId:
-                video.id,
-            }),
+    video: SavedVideo
+  ) {
+    try {
+      /*
+       * ==========================
+       * VIDÉO REÇUE
+       * ==========================
+       */
+      if (video.shared) {
+        if (
+          !video.shareToken
+        ) {
+          throw new Error(
+            "Le lien de partage de cette vidéo est introuvable."
+          );
         }
+
+        const shareUrl =
+          `https://contemagiqueia.fr/video/${encodeURIComponent(
+            video.shareToken
+          )}`;
+
+        await Share.share({
+          title:
+            "Dessin animé ConteMagiqueIA",
+
+          message:
+            "🎬 Découvre ce dessin animé créé avec ConteMagiqueIA ! ✨\n\n" +
+            shareUrl,
+
+          url:
+            shareUrl,
+        });
+
+        return;
+      }
+
+      /*
+       * ==========================
+       * VIDÉO CRÉÉE PAR LE COMPTE
+       * ==========================
+       */
+
+      const user =
+        auth.currentUser;
+
+      if (!user) {
+        Alert.alert(
+          "Connexion requise",
+          "Connecte-toi pour partager cette vidéo."
+        );
+
+        return;
+      }
+
+      const token =
+        await user.getIdToken(
+          true
+        );
+
+      const response =
+        await fetch(
+          "https://conte-magique-ai.onrender.com/share/create",
+          {
+            method:
+              "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${token}`,
+            },
+
+            body:
+              JSON.stringify({
+                type:
+                  "video",
+
+                contentId:
+                  video.id,
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Impossible de créer le lien de partage."
+        );
+      }
+
+      if (
+        !data?.shareUrl
+      ) {
+        throw new Error(
+          "Lien de partage manquant."
+        );
+      }
+
+      await Share.share({
+        title:
+          "Dessin animé ConteMagiqueIA",
+
+        message:
+          "🎬 Découvre ce dessin animé créé avec ConteMagiqueIA ! ✨\n\n" +
+          data.shareUrl,
+
+        url:
+          data.shareUrl,
+      });
+    } catch (error) {
+      console.error(
+        "Erreur partage vidéo :",
+        error
       );
 
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data?.error ||
-          "Impossible de créer le lien de partage."
+      Alert.alert(
+        "Partage impossible",
+        error instanceof Error
+          ? error.message
+          : "La vidéo n'a pas pu être partagée."
       );
     }
-
-    if (!data?.shareUrl) {
-      throw new Error(
-        "Lien de partage manquant."
-      );
-    }
-
-    await Share.share({
-      title:
-        "Dessin animé ConteMagiqueIA",
-
-      message:
-        "🎬 Découvre ce dessin animé créé avec ConteMagiqueIA ! ✨\n\n" +
-        data.shareUrl,
-
-      url:
-        data.shareUrl,
-    });
-  } catch (error) {
-    console.error(
-      "Erreur partage vidéo :",
-      error
-    );
-
-    Alert.alert(
-      "Partage impossible",
-      error instanceof Error
-        ? error.message
-        : "La vidéo n'a pas pu être partagée."
-    );
   }
-}
 
+  /**
+   * Demande confirmation avant
+   * la suppression.
+   */
   function askDeleteVideo(
     video: SavedVideo
   ) {
+    const message =
+      video.shared
+        ? "Cette vidéo sera retirée de Mes vidéos. La vidéo originale de son créateur ne sera pas supprimée."
+        : "Cette vidéo sera supprimée définitivement de tes vidéos enregistrées.";
+
     Alert.alert(
-      "Supprimer cette vidéo ?",
-      "Cette vidéo sera supprimée définitivement de tes vidéos enregistrées.",
+      video.shared
+        ? "Retirer cette vidéo ?"
+        : "Supprimer cette vidéo ?",
+
+      message,
+
       [
         {
-          text: "Annuler",
-          style: "cancel",
+          text:
+            "Annuler",
+          style:
+            "cancel",
         },
+
         {
-          text: "Supprimer",
+          text:
+            video.shared
+              ? "Retirer"
+              : "Supprimer",
+
           style:
             "destructive",
 
@@ -311,6 +616,17 @@ export default function SavedVideosScreen() {
     );
   }
 
+  /**
+   * Suppression sécurisée.
+   *
+   * Vidéo reçue :
+   * on supprime UNIQUEMENT la référence
+   * personnelle dans users/{uid}/sharedVideos.
+   *
+   * Vidéo créée :
+   * comportement historique :
+   * suppression Storage + videoGenerations.
+   */
   async function deleteVideo(
     video: SavedVideo
   ) {
@@ -318,10 +634,70 @@ export default function SavedVideosScreen() {
       return;
     }
 
+    const key =
+      getVideoKey(
+        video
+      );
+
     try {
       setDeletingId(
-        video.id
+        key
       );
+
+      /*
+       * ==========================
+       * VIDÉO REÇUE
+       * ==========================
+       */
+      if (video.shared) {
+        const deleted =
+          await deleteSharedVideo(
+            video.id
+          );
+
+        if (!deleted) {
+          throw new Error(
+            "Impossible de retirer cette vidéo."
+          );
+        }
+
+        setVideos(
+          (previous) =>
+            previous.filter(
+              (item) =>
+                getVideoKey(
+                  item
+                ) !== key
+            )
+        );
+
+        setThumbnails(
+          (previous) => {
+            const next = {
+              ...previous,
+            };
+
+            delete next[
+              key
+            ];
+
+            return next;
+          }
+        );
+
+        Alert.alert(
+          "Vidéo retirée",
+          "La vidéo a été retirée de Mes vidéos. L'originale n'a pas été supprimée."
+        );
+
+        return;
+      }
+
+      /*
+       * ==========================
+       * VIDÉO CRÉÉE
+       * ==========================
+       */
 
       const storage =
         getStorage();
@@ -336,7 +712,9 @@ export default function SavedVideosScreen() {
         await deleteObject(
           videoRef
         );
-      } catch (error: any) {
+      } catch (
+        error: any
+      ) {
         if (
           error?.code !==
           "storage/object-not-found"
@@ -357,8 +735,9 @@ export default function SavedVideosScreen() {
         (previous) =>
           previous.filter(
             (item) =>
-              item.id !==
-              video.id
+              getVideoKey(
+                item
+              ) !== key
           )
       );
 
@@ -369,7 +748,7 @@ export default function SavedVideosScreen() {
           };
 
           delete next[
-            video.id
+            key
           ];
 
           return next;
@@ -388,7 +767,9 @@ export default function SavedVideosScreen() {
 
       Alert.alert(
         "Suppression impossible",
-        "La vidéo n'a pas pu être supprimée. Réessaie dans quelques instants."
+        video.shared
+          ? "La vidéo n'a pas pu être retirée. Réessaie dans quelques instants."
+          : "La vidéo n'a pas pu être supprimée. Réessaie dans quelques instants."
       );
     } finally {
       setDeletingId(
@@ -418,8 +799,7 @@ export default function SavedVideosScreen() {
               styles.loadingText
             }
           >
-            Chargement de tes
-            vidéos...
+            Chargement de tes vidéos...
           </Text>
         </View>
       </SafeAreaView>
@@ -469,7 +849,8 @@ export default function SavedVideosScreen() {
         />
       </View>
 
-      {videos.length === 0 ? (
+      {videos.length ===
+      0 ? (
         <View
           style={
             styles.center
@@ -496,31 +877,41 @@ export default function SavedVideosScreen() {
               styles.emptyText
             }
           >
-            Tes dessins animés
-            apparaîtront ici après
-            leur création.
+            Tes dessins animés créés ou reçus apparaîtront ici.
           </Text>
         </View>
       ) : (
         <FlatList
           data={videos}
+
           keyExtractor={(
             item
-          ) => item.id}
+          ) =>
+            getVideoKey(
+              item
+            )
+          }
+
           contentContainerStyle={
             styles.listContent
           }
+
           renderItem={({
             item,
           }) => {
+            const key =
+              getVideoKey(
+                item
+              );
+
             const thumbnail =
               thumbnails[
-                item.id
+                key
               ];
 
             const isDeleting =
               deletingId ===
-              item.id;
+              key;
 
             return (
               <View
@@ -539,6 +930,7 @@ export default function SavedVideosScreen() {
                         uri:
                           thumbnail,
                       }}
+
                       style={
                         styles.thumbnail
                       }
@@ -576,6 +968,22 @@ export default function SavedVideosScreen() {
                       scènes
                     </Text>
                   </View>
+
+                  {item.shared ? (
+                    <View
+                      style={
+                        styles.sharedBadge
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.sharedBadgeText
+                        }
+                      >
+                        🎁 Reçue
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 <View>
@@ -584,7 +992,9 @@ export default function SavedVideosScreen() {
                       styles.cardTitle
                     }
                   >
-                    🎬 Dessin animé
+                    {item.shared
+                      ? "🎁 Dessin animé reçu"
+                      : "🎬 Dessin animé"}
                   </Text>
 
                   <Text
@@ -611,6 +1021,7 @@ export default function SavedVideosScreen() {
                     style={
                       styles.watchButton
                     }
+
                     onPress={() =>
                       router.push({
                         pathname:
@@ -622,6 +1033,7 @@ export default function SavedVideosScreen() {
                         },
                       })
                     }
+
                     disabled={
                       isDeleting
                     }
@@ -639,11 +1051,13 @@ export default function SavedVideosScreen() {
                     style={
                       styles.shareButton
                     }
+
                     onPress={() =>
                       shareVideo(
                         item
                       )
                     }
+
                     disabled={
                       isDeleting
                     }
@@ -661,11 +1075,13 @@ export default function SavedVideosScreen() {
                     style={
                       styles.deleteButton
                     }
+
                     onPress={() =>
                       askDeleteVideo(
                         item
                       )
                     }
+
                     disabled={
                       isDeleting
                     }
@@ -678,7 +1094,9 @@ export default function SavedVideosScreen() {
                           styles.deleteButtonText
                         }
                       >
-                        🗑️ Supprimer
+                        {item.shared
+                          ? "🗑️ Retirer"
+                          : "🗑️ Supprimer"}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -842,6 +1260,28 @@ const styles =
     },
 
     sceneBadgeText: {
+      color:
+        "#ffffff",
+      fontSize: 12,
+      fontWeight:
+        "800",
+    },
+
+    sharedBadge: {
+      position:
+        "absolute",
+      left: 12,
+      bottom: 12,
+      backgroundColor:
+        "rgba(49,46,129,0.90)",
+      paddingHorizontal:
+        10,
+      paddingVertical:
+        6,
+      borderRadius: 12,
+    },
+
+    sharedBadgeText: {
       color:
         "#ffffff",
       fontSize: 12,

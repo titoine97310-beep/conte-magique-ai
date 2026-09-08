@@ -2,18 +2,28 @@ import {
     router,
     useLocalSearchParams,
 } from "expo-router";
+
 import {
     useEffect,
     useState,
 } from "react";
+
 import {
     ActivityIndicator,
+    Alert,
     SafeAreaView,
     StyleSheet,
     Text,
+    TouchableOpacity,
 } from "react-native";
 
-import { setCurrentStory } from "../../services/currentStory";
+import {
+    setCurrentStory,
+} from "../../services/currentStory";
+
+import {
+    saveStory,
+} from "../../services/storageService";
 
 const BACKEND_URL =
   "https://conte-magique-ai.onrender.com";
@@ -28,6 +38,12 @@ export default function SharedStoryScreen() {
     useState(
       "Ouverture de l’histoire..."
     );
+
+  const [sharedStory, setSharedStory] =
+    useState<any | null>(null);
+
+  const [saving, setSaving] =
+    useState(false);
 
   useEffect(() => {
     void openSharedStory();
@@ -74,29 +90,38 @@ export default function SharedStoryScreen() {
         );
       }
 
-      const sharedStory =
+      const receivedStory =
         data.content;
 
       if (
         !Array.isArray(
-          sharedStory.scenes
+          receivedStory.scenes
         ) ||
-        sharedStory.scenes.length === 0
+        receivedStory.scenes.length === 0
       ) {
         throw new Error(
           "Cette histoire ne contient aucune scène."
         );
       }
 
-      setCurrentStory({
-        ...sharedStory,
-        id:
-          sharedStory.id ||
-          data.contentId,
-      });
+      const storyToOpen = {
+        ...receivedStory,
 
-      router.replace(
-        "/player"
+        id:
+          receivedStory.id ||
+          data.contentId,
+      };
+
+      setSharedStory(
+        storyToOpen
+      );
+
+      setCurrentStory(
+        storyToOpen
+      );
+
+      setMessage(
+        "Cette histoire est prête à être lue."
       );
     } catch (error) {
       console.error(
@@ -112,15 +137,92 @@ export default function SharedStoryScreen() {
     }
   }
 
+  async function saveReceivedStory() {
+    if (
+      !sharedStory ||
+      saving
+    ) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const saved =
+        await saveStory(
+          sharedStory
+        );
+
+      if (!saved) {
+        throw new Error(
+          "Impossible d'enregistrer cette histoire."
+        );
+      }
+
+      Alert.alert(
+        "Histoire ajoutée ✨",
+        "Cette histoire a été ajoutée à Mes histoires.",
+        [
+          {
+            text: "Continuer",
+            style: "cancel",
+          },
+          {
+            text: "Lire",
+            onPress: () => {
+              setCurrentStory(
+                saved
+              );
+
+              router.replace(
+                "/player"
+              );
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error(
+        "Erreur sauvegarde histoire reçue :",
+        error
+      );
+
+      Alert.alert(
+        "Enregistrement impossible",
+        error instanceof Error
+          ? error.message
+          : "Impossible d'enregistrer cette histoire."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openStory() {
+    if (!sharedStory) {
+      return;
+    }
+
+    setCurrentStory(
+      sharedStory
+    );
+
+    router.replace(
+      "/player"
+    );
+  }
+
   return (
     <SafeAreaView
       style={
         styles.container
       }
     >
-      <ActivityIndicator
-        size="large"
-      />
+      {!sharedStory ? (
+        <ActivityIndicator
+          size="large"
+        />
+      ) : null}
 
       <Text
         style={
@@ -129,6 +231,68 @@ export default function SharedStoryScreen() {
       >
         {message}
       </Text>
+
+      {sharedStory ? (
+        <>
+          <TouchableOpacity
+            style={
+              styles.openButton
+            }
+            onPress={
+              openStory
+            }
+          >
+            <Text
+              style={
+                styles.openButtonText
+              }
+            >
+              📖 Lire l’histoire
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={
+              styles.saveButton
+            }
+            onPress={
+              saveReceivedStory
+            }
+            disabled={
+              saving
+            }
+          >
+            {saving ? (
+              <ActivityIndicator />
+            ) : (
+              <Text
+                style={
+                  styles.saveButtonText
+                }
+              >
+                ➕ Ajouter à Mes histoires
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={
+              styles.homeButton
+            }
+            onPress={() =>
+              router.replace("/")
+            }
+          >
+            <Text
+              style={
+                styles.homeButtonText
+              }
+            >
+              Retour accueil
+            </Text>
+          </TouchableOpacity>
+        </>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -151,7 +315,75 @@ const styles =
       color:
         "#ffffff",
       fontSize: 16,
+      lineHeight: 23,
       textAlign:
         "center",
+      marginBottom: 10,
+    },
+
+    openButton: {
+      marginTop: 20,
+      width: "100%",
+      maxWidth: 380,
+      backgroundColor:
+        "#FFB703",
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 16,
+      alignItems:
+        "center",
+    },
+
+    openButtonText: {
+      color:
+        "#111827",
+      fontWeight:
+        "900",
+      fontSize: 16,
+      textAlign:
+        "center",
+    },
+
+    saveButton: {
+      marginTop: 12,
+      width: "100%",
+      maxWidth: 380,
+      minHeight: 54,
+      backgroundColor:
+        "rgba(255,255,255,0.12)",
+      borderWidth: 1,
+      borderColor:
+        "rgba(255,255,255,0.25)",
+      paddingVertical: 15,
+      paddingHorizontal: 24,
+      borderRadius: 16,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    saveButtonText: {
+      color:
+        "#ffffff",
+      fontWeight:
+        "900",
+      fontSize: 15,
+      textAlign:
+        "center",
+    },
+
+    homeButton: {
+      marginTop: 20,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+    },
+
+    homeButtonText: {
+      color:
+        "#CBD5E1",
+      fontSize: 14,
+      fontWeight:
+        "800",
     },
   });
