@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams, } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -9,8 +10,9 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -52,10 +54,6 @@ const STORE_NAME =
 export default function PremiumScreen() {
   const [processing, setProcessing] =
     useState(false);
-
-    const params = useLocalSearchParams<{
-  returnTo?: string;
-}>();
 
   const {
     connected,
@@ -117,32 +115,16 @@ export default function PremiumScreen() {
           );
         }
 
-        /*
-         * Firebase permet au serveur
-         * d'identifier réellement
-         * l'utilisateur connecté.
-         */
         const firebaseIdToken =
           await currentUser.getIdToken(
             true
           );
 
-        /*
-         * Android :
-         * Google Play
-         *
-         * iPhone / iPad :
-         * Apple App Store
-         */
         const verifyUrl =
           Platform.OS === "ios"
             ? `${BACKEND_URL}/apple/verify-purchase`
             : `${BACKEND_URL}/google-play/verify-purchase`;
 
-        /*
-         * Apple et Google n'utilisent pas
-         * la même preuve d'achat.
-         */
         const body =
           Platform.OS === "ios"
             ? {
@@ -175,7 +157,8 @@ export default function PremiumScreen() {
             }
           );
 
-        let result: any = null;
+        let result: any =
+          null;
 
         try {
           result =
@@ -205,70 +188,75 @@ export default function PremiumScreen() {
           );
         }
 
-        /*
-         * À ce stade :
-         *
-         * - Apple ou Google a confirmé
-         *   l'achat ;
-         *
-         * - Firebase a identifié
-         *   l'utilisateur ;
-         *
-         * - Firestore a ajouté les
-         *   15 histoires ;
-         *
-         * - le serveur protège contre
-         *   le double crédit.
-         *
-         * On termine seulement maintenant
-         * la transaction côté store.
-         */
         await finishTransaction({
-  purchase,
-  isConsumable: true,
-});
+          purchase,
+          isConsumable: true,
+        });
 
-const isVideoPurchase =
-  productId === VIDEO_SHORT_PRODUCT_ID ||
-  productId === VIDEO_MEDIUM_PRODUCT_ID;
+        const isVideoPurchase =
+          productId ===
+            VIDEO_SHORT_PRODUCT_ID ||
+          productId ===
+            VIDEO_MEDIUM_PRODUCT_ID;
 
-/*
- * 🎬 ACHAT VIDÉO
- *
- * Le serveur a déjà validé l'achat
- * et ajouté le crédit dans Firestore.
- *
- * On retourne immédiatement au Player.
- * On ne laisse pas setUserMode()
- * bloquer le retour vidéo.
- */
-if (
-  params.returnTo === "video" &&
-  isVideoPurchase
-) {
-  const resumeToken = String(Date.now());
+        /*
+         * ============================
+         * 🎬 ACHAT VIDÉO
+         * ============================
+         *
+         * Nouveau fonctionnement simple :
+         *
+         * achat validé
+         *      ↓
+         * Mes histoires
+         *      ↓
+         * choix de l'histoire
+         *      ↓
+         * Créer le dessin animé
+         */
+        if (isVideoPurchase) {
+          void setUserMode().catch(
+            (error) => {
+              console.log(
+                "Mise à jour mode utilisateur ignorée :",
+                error
+              );
+            }
+          );
 
-  console.log(
-    "🎟️ Achat vidéo validé, retour vers le Player :",
-    resumeToken
-  );
+          const isShort =
+            productId ===
+            VIDEO_SHORT_PRODUCT_ID;
 
-  router.replace({
-    pathname: "/player",
-    params: {
-      resumeVideo: resumeToken,
-    },
-  });
+          Alert.alert(
+            isShort
+              ? "Dessin animé Court activé 🎬"
+              : "Dessin animé Moyen activé 🎬",
 
-  return;
-}
+            isShort
+              ? "Ton crédit vidéo de 4 scènes a bien été ajouté. Choisis maintenant l'histoire que tu veux transformer en dessin animé."
+              : "Ton crédit vidéo de 6 scènes a bien été ajouté. Choisis maintenant l'histoire que tu veux transformer en dessin animé.",
 
-/*
- * Pour les carnets d'histoires,
- * on peut ensuite mettre à jour
- * le mode utilisateur.
- */
-await setUserMode();
+            [
+              {
+                text:
+                  "Choisir mon histoire",
+
+                onPress: () =>
+                  router.replace(
+                    "/saved-stories"
+                  ),
+              },
+            ]
+          );
+
+          return;
+        }
+
+        /*
+         * Carnets classiques.
+         */
+        await setUserMode();
 
         if (
           productId ===
@@ -316,47 +304,9 @@ await setUserMode();
           return;
         }
 
-        if (
-  productId ===
-  VIDEO_SHORT_PRODUCT_ID
-) {
-  Alert.alert(
-    "Dessin animé Court activé 🎬",
-    "1 crédit pour un dessin animé de 4 scènes a été ajouté à ton compte.",
-    [
-      {
-        text: "Continuer",
-        onPress: () =>
-          router.back(),
-      },
-    ]
-  );
-
-  return;
-}
-
-if (
-  productId ===
-  VIDEO_MEDIUM_PRODUCT_ID
-) {
-  Alert.alert(
-    "Dessin animé Moyen activé 🎬",
-    "1 crédit pour un dessin animé de 6 scènes a été ajouté à ton compte.",
-    [
-      {
-        text: "Continuer",
-        onPress: () =>
-          router.back(),
-      },
-    ]
-  );
-
-  return;
-}
-
         Alert.alert(
           "Achat validé 🎉",
-          "Ton carnet a été ajouté à ton compte."
+          "Ton achat a été ajouté à ton compte."
         );
       } catch (error: any) {
         console.error(
@@ -375,12 +325,13 @@ if (
       }
     },
 
-    onPurchaseError: (error) => {
+    onPurchaseError: (
+      error
+    ) => {
       console.log(
         Platform.OS === "ios"
           ? "Erreur App Store :"
           : "Erreur Google Play :",
-
         error
       );
 
@@ -402,11 +353,6 @@ if (
     },
   });
 
-  /*
-   * Récupère les deux produits depuis
-   * Google Play sur Android
-   * ou l'App Store sur iOS.
-   */
   useEffect(() => {
     if (!connected) {
       return;
@@ -477,136 +423,126 @@ if (
   }
 
   async function buyProduct(
-  productId: string
-) {
-  const currentUser =
-    auth.currentUser;
+    productId: string
+  ) {
+    const currentUser =
+      auth.currentUser;
 
-  if (!currentUser) {
-    redirectToRegister();
-    return;
-  }
+    if (!currentUser) {
+      redirectToRegister();
+      return;
+    }
 
-  if (!connected) {
-    Alert.alert(
-      `${STORE_NAME} indisponible`,
-      `La connexion à ${STORE_NAME} n'est pas encore prête. Réessaie dans quelques secondes.`
-    );
+    if (!connected) {
+      Alert.alert(
+        `${STORE_NAME} indisponible`,
+        `La connexion à ${STORE_NAME} n'est pas encore prête. Réessaie dans quelques secondes.`
+      );
 
-    return;
-  }
+      return;
+    }
 
-  if (processing) {
-    return;
-  }
+    if (processing) {
+      return;
+    }
 
-  const storeProduct =
-    products.find(
-      (product) =>
-        product.id === productId
-    );
+    const storeProduct =
+      products.find(
+        (product) =>
+          product.id ===
+          productId
+      );
 
-  if (!storeProduct) {
-    Alert.alert(
-      "Produit indisponible",
-      `Ce carnet n'est pas disponible sur ${STORE_NAME} pour le moment.`
-    );
+    if (!storeProduct) {
+      Alert.alert(
+        "Produit indisponible",
+        `Ce carnet n'est pas disponible sur ${STORE_NAME} pour le moment.`
+      );
 
-    return;
-  }
+      return;
+    }
 
-  try {
-    setProcessing(true);
+    try {
+      setProcessing(true);
 
-    /*
-     * GOOGLE PLAY
-     *
-     * Pour les produits ponctuels,
-     * Google peut retourner plusieurs
-     * offres :
-     *
-     * - l'achat normal
-     * - une remise temporaire
-     *
-     * Pendant la promotion rentrée,
-     * on sélectionne automatiquement
-     * l'offre avec remise disponible.
-     */
-    let googleOfferToken:
-  | string
-  | undefined;
+      let googleOfferToken:
+        | string
+        | undefined;
 
-if (Platform.OS === "android") {
-  const androidProduct =
-    storeProduct as ProductAndroid;
+      if (
+        Platform.OS ===
+        "android"
+      ) {
+        const androidProduct =
+          storeProduct as ProductAndroid;
 
-  const offers =
-    androidProduct.discountOffers ?? [];
+        const offers =
+          androidProduct.discountOffers ??
+          [];
 
-  const discountOffer =
-    offers.find(
-      (offer) =>
-        (offer.percentageDiscountAndroid ??
-          0) > 0
-    );
+        const discountOffer =
+          offers.find(
+            (offer) =>
+              (offer.percentageDiscountAndroid ??
+                0) > 0
+          );
 
-  if (discountOffer) {
-    googleOfferToken =
-  discountOffer.offerTokenAndroid ?? undefined;
+        if (discountOffer) {
+          googleOfferToken =
+            discountOffer.offerTokenAndroid ??
+            undefined;
 
-    console.log(
-      "🛒 Offre Google sélectionnée :",
-      {
-        productId,
-        price:
-          discountOffer.displayPrice,
-        discount:
-          discountOffer
-            .percentageDiscountAndroid,
+          console.log(
+            "🛒 Offre Google sélectionnée :",
+            {
+              productId,
+              price:
+                discountOffer.displayPrice,
+              discount:
+                discountOffer.percentageDiscountAndroid,
+            }
+          );
+        }
       }
-    );
-  }
-}
 
-    await requestPurchase({
-      request: {
-        google: {
-          skus: [productId],
+      await requestPurchase({
+        request: {
+          google: {
+            skus: [
+              productId,
+            ],
 
-          /*
-           * Le token est envoyé seulement
-           * lorsqu'il existe.
-           */
-          ...(googleOfferToken
-            ? {
-                offerToken:
-                  googleOfferToken,
-              }
-            : {}),
+            ...(googleOfferToken
+              ? {
+                  offerToken:
+                    googleOfferToken,
+                }
+              : {}),
+          },
+
+          apple: {
+            sku: productId,
+          },
         },
 
-        apple: {
-          sku: productId,
-        },
-      },
+        type:
+          "in-app",
+      });
+    } catch (error: any) {
+      setProcessing(false);
 
-      type: "in-app",
-    });
-  } catch (error: any) {
-    setProcessing(false);
+      console.error(
+        "Erreur lancement paiement :",
+        error
+      );
 
-    console.error(
-      "Erreur lancement paiement :",
-      error
-    );
-
-    Alert.alert(
-      "Paiement impossible",
-      error?.message ||
-        `Impossible d'ouvrir ${STORE_NAME}.`
-    );
+      Alert.alert(
+        "Paiement impossible",
+        error?.message ||
+          `Impossible d'ouvrir ${STORE_NAME}.`
+      );
+    }
   }
-}
 
   async function buyTextPack() {
     await buyProduct(
@@ -621,72 +557,68 @@ if (Platform.OS === "android") {
   }
 
   async function buyShortVideo() {
-  await buyProduct(
-    VIDEO_SHORT_PRODUCT_ID
-  );
-}
+    await buyProduct(
+      VIDEO_SHORT_PRODUCT_ID
+    );
+  }
 
-async function buyMediumVideo() {
-  await buyProduct(
-    VIDEO_MEDIUM_PRODUCT_ID
-  );
-}
+  async function buyMediumVideo() {
+    await buyProduct(
+      VIDEO_MEDIUM_PRODUCT_ID
+    );
+  }
 
-  /*
-   * Prix renvoyé directement par
-   * Google Play ou Apple.
-   *
-   * Les prix de secours ne sont utilisés
-   * que si le store n'a pas encore
-   * retourné les produits.
-   */
   function getStorePrice(
-  productId: string,
-  fallback: string
-) {
-  const product =
-    products.find(
-      (item) =>
-        item.id === productId
-    );
+    productId: string,
+    fallback: string
+  ) {
+    const product =
+      products.find(
+        (item) =>
+          item.id ===
+          productId
+      );
 
-  if (!product) {
-    return fallback;
-  }
+    if (!product) {
+      return fallback;
+    }
 
-  if (Platform.OS === "ios") {
+    if (
+      Platform.OS === "ios"
+    ) {
+      return (
+        product.displayPrice ||
+        fallback
+      );
+    }
+
+    const androidProduct =
+      product as ProductAndroid;
+
+    const offers =
+      androidProduct.discountOffers ??
+      [];
+
+    const discountOffer =
+      offers.find(
+        (offer) =>
+          (offer.percentageDiscountAndroid ??
+            0) > 0
+      );
+
+    if (discountOffer) {
+      return (
+        discountOffer.displayPrice ||
+        product.displayPrice ||
+        fallback
+      );
+    }
+
     return (
       product.displayPrice ||
       fallback
     );
   }
-
-  const androidProduct =
-    product as ProductAndroid;
-
-  const offers =
-    androidProduct.discountOffers ?? [];
-
-  const discountOffer =
-    offers.find(
-      (offer) =>
-        (offer.percentageDiscountAndroid ??
-          0) > 0
-    );
-
-  if (discountOffer) {
-    return (
-      discountOffer.displayPrice ||
-      product.displayPrice ||
-      fallback
-    );
-  }
-
-  return (
-    product.displayPrice ||
-    fallback
-  );
-}
 
   return (
     <LinearGradient
@@ -854,10 +786,8 @@ async function buyMediumVideo() {
               style={[
                 styles.button,
 
-                (
-                  !connected ||
-                  processing
-                ) &&
+                (!connected ||
+                  processing) &&
                   styles.disabledButton,
               ]}
               onPress={
@@ -948,10 +878,8 @@ async function buyMediumVideo() {
               style={[
                 styles.premiumButton,
 
-                (
-                  !connected ||
-                  processing
-                ) &&
+                (!connected ||
+                  processing) &&
                   styles.disabledButton,
               ]}
               onPress={
@@ -980,101 +908,187 @@ async function buyMediumVideo() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.videoCard}>
-  <View style={styles.videoBadge}>
-    <Text style={styles.videoBadgeText}>
-      🎬 4 scènes
-    </Text>
-  </View>
+          <View
+            style={
+              styles.videoCard
+            }
+          >
+            <View
+              style={
+                styles.videoBadge
+              }
+            >
+              <Text
+                style={
+                  styles.videoBadgeText
+                }
+              >
+                🎬 4 scènes
+              </Text>
+            </View>
 
-  <Text style={styles.cardIcon}>
-    🎬
-  </Text>
+            <Text
+              style={
+                styles.cardIcon
+              }
+            >
+              🎬
+            </Text>
 
-  <Text style={styles.cardTitle}>
-    Dessin animé Court
-  </Text>
+            <Text
+              style={
+                styles.cardTitle
+              }
+            >
+              Dessin animé Court
+            </Text>
 
-  <Text style={styles.cardPrice}>
-    {getStorePrice(
-      VIDEO_SHORT_PRODUCT_ID,
-      "6,99 €"
-    )}
-  </Text>
+            <Text
+              style={
+                styles.cardPrice
+              }
+            >
+              {getStorePrice(
+                VIDEO_SHORT_PRODUCT_ID,
+                "6,99 €"
+              )}
+            </Text>
 
-  <Text style={styles.cardDescription}>
-    Transforme une histoire illustrée de 4 scènes
-    en dessin animé d’environ 20 secondes.
-  </Text>
+            <Text
+              style={
+                styles.cardDescription
+              }
+            >
+              Transforme une histoire
+              illustrée de 4 scènes en
+              dessin animé d’environ 20
+              secondes.
+            </Text>
 
-  <TouchableOpacity
-    style={[
-      styles.videoPurchaseButton,
-      (!connected || processing) &&
-        styles.disabledButton,
-    ]}
-    onPress={buyShortVideo}
-    activeOpacity={0.85}
-    disabled={!connected || processing}
-  >
-    {processing ? (
-      <ActivityIndicator />
-    ) : (
-      <Text style={styles.videoPurchaseButtonText}>
-        🎬 Acheter le dessin animé Court
-      </Text>
-    )}
-  </TouchableOpacity>
-</View>
+            <TouchableOpacity
+              style={[
+                styles.videoPurchaseButton,
 
-<View style={styles.videoCard}>
-  <View style={styles.videoBadge}>
-    <Text style={styles.videoBadgeText}>
-      🎬 6 scènes
-    </Text>
-  </View>
+                (!connected ||
+                  processing) &&
+                  styles.disabledButton,
+              ]}
+              onPress={
+                buyShortVideo
+              }
+              activeOpacity={
+                0.85
+              }
+              disabled={
+                !connected ||
+                processing
+              }
+            >
+              {processing ? (
+                <ActivityIndicator />
+              ) : (
+                <Text
+                  style={
+                    styles.videoPurchaseButtonText
+                  }
+                >
+                  🎬 Acheter le dessin animé Court
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
-  <Text style={styles.cardIcon}>
-    🎬
-  </Text>
+          <View
+            style={
+              styles.videoCard
+            }
+          >
+            <View
+              style={
+                styles.videoBadge
+              }
+            >
+              <Text
+                style={
+                  styles.videoBadgeText
+                }
+              >
+                🎬 6 scènes
+              </Text>
+            </View>
 
-  <Text style={styles.cardTitle}>
-    Dessin animé Moyen
-  </Text>
+            <Text
+              style={
+                styles.cardIcon
+              }
+            >
+              🎬
+            </Text>
 
-  <Text style={styles.cardPrice}>
-    {getStorePrice(
-  VIDEO_MEDIUM_PRODUCT_ID,
-  Platform.OS === "ios"
-    ? "12,99 €"
-    : "11,99 €"
-)}
-  </Text>
+            <Text
+              style={
+                styles.cardTitle
+              }
+            >
+              Dessin animé Moyen
+            </Text>
 
-  <Text style={styles.cardDescription}>
-    Transforme une histoire illustrée de 6 scènes
-    en dessin animé d’environ 30 secondes.
-  </Text>
+            <Text
+              style={
+                styles.cardPrice
+              }
+            >
+              {getStorePrice(
+                VIDEO_MEDIUM_PRODUCT_ID,
+                Platform.OS === "ios"
+                  ? "12,99 €"
+                  : "11,99 €"
+              )}
+            </Text>
 
-  <TouchableOpacity
-    style={[
-      styles.videoPurchaseButton,
-      (!connected || processing) &&
-        styles.disabledButton,
-    ]}
-    onPress={buyMediumVideo}
-    activeOpacity={0.85}
-    disabled={!connected || processing}
-  >
-    {processing ? (
-      <ActivityIndicator />
-    ) : (
-      <Text style={styles.videoPurchaseButtonText}>
-        🎬 Acheter le dessin animé Moyen
-      </Text>
-    )}
-  </TouchableOpacity>
-</View>
+            <Text
+              style={
+                styles.cardDescription
+              }
+            >
+              Transforme une histoire
+              illustrée de 6 scènes en
+              dessin animé d’environ 30
+              secondes.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.videoPurchaseButton,
+
+                (!connected ||
+                  processing) &&
+                  styles.disabledButton,
+              ]}
+              onPress={
+                buyMediumVideo
+              }
+              activeOpacity={
+                0.85
+              }
+              disabled={
+                !connected ||
+                processing
+              }
+            >
+              {processing ? (
+                <ActivityIndicator />
+              ) : (
+                <Text
+                  style={
+                    styles.videoPurchaseButtonText
+                  }
+                >
+                  🎬 Acheter le dessin animé Moyen
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
           <Text
             style={
@@ -1140,12 +1154,9 @@ const styles =
     benefitsBox: {
       backgroundColor:
         "rgba(255,255,255,0.1)",
-
       borderWidth: 1,
-
       borderColor:
         "rgba(255,255,255,0.18)",
-
       borderRadius: 20,
       padding: 18,
       marginBottom: 22,
@@ -1161,7 +1172,6 @@ const styles =
     storeStatus: {
       backgroundColor:
         "rgba(255,255,255,0.10)",
-
       borderRadius: 16,
       padding: 14,
       marginBottom: 20,
@@ -1176,9 +1186,7 @@ const styles =
     },
 
     card: {
-      backgroundColor:
-        "white",
-
+      backgroundColor: "white",
       borderRadius: 26,
       padding: 24,
       marginBottom: 22,
@@ -1186,23 +1194,17 @@ const styles =
     },
 
     premiumCard: {
-      backgroundColor:
-        "#FFB703",
-
+      backgroundColor: "#FFB703",
       borderRadius: 28,
       padding: 24,
       marginBottom: 22,
       alignItems: "center",
-
       borderWidth: 2,
-      borderColor:
-        "#FFE8A3",
+      borderColor: "#FFE8A3",
     },
 
     badge: {
-      backgroundColor:
-        "#111827",
-
+      backgroundColor: "#111827",
       paddingHorizontal: 14,
       paddingVertical: 7,
       borderRadius: 999,
@@ -1210,12 +1212,8 @@ const styles =
     },
 
     badgeText: {
-      color:
-        "#FFB703",
-
-      fontWeight:
-        "900",
-
+      color: "#FFB703",
+      fontWeight: "900",
       fontSize: 13,
     },
 
@@ -1229,6 +1227,7 @@ const styles =
       fontWeight: "900",
       color: "#111",
       marginBottom: 6,
+      textAlign: "center",
     },
 
     cardPrice: {
@@ -1247,9 +1246,7 @@ const styles =
     },
 
     button: {
-      backgroundColor:
-        "#111827",
-
+      backgroundColor: "#111827",
       paddingVertical: 16,
       paddingHorizontal: 28,
       borderRadius: 18,
@@ -1265,9 +1262,7 @@ const styles =
     },
 
     premiumButton: {
-      backgroundColor:
-        "#111827",
-
+      backgroundColor: "#111827",
       paddingVertical: 16,
       paddingHorizontal: 28,
       borderRadius: 18,
@@ -1283,44 +1278,44 @@ const styles =
     },
 
     videoCard: {
-  backgroundColor: "#EDE9FE",
-  borderRadius: 28,
-  padding: 24,
-  marginBottom: 22,
-  alignItems: "center",
-  borderWidth: 2,
-  borderColor: "#C4B5FD",
-},
+      backgroundColor: "#EDE9FE",
+      borderRadius: 28,
+      padding: 24,
+      marginBottom: 22,
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: "#C4B5FD",
+    },
 
-videoBadge: {
-  backgroundColor: "#7C3AED",
-  paddingHorizontal: 14,
-  paddingVertical: 7,
-  borderRadius: 999,
-  marginBottom: 14,
-},
+    videoBadge: {
+      backgroundColor: "#7C3AED",
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 999,
+      marginBottom: 14,
+    },
 
-videoBadgeText: {
-  color: "white",
-  fontWeight: "900",
-  fontSize: 13,
-},
+    videoBadgeText: {
+      color: "white",
+      fontWeight: "900",
+      fontSize: 13,
+    },
 
-videoPurchaseButton: {
-  backgroundColor: "#7C3AED",
-  paddingVertical: 16,
-  paddingHorizontal: 28,
-  borderRadius: 18,
-  width: "100%",
-  alignItems: "center",
-},
+    videoPurchaseButton: {
+      backgroundColor: "#7C3AED",
+      paddingVertical: 16,
+      paddingHorizontal: 28,
+      borderRadius: 18,
+      width: "100%",
+      alignItems: "center",
+    },
 
-videoPurchaseButtonText: {
-  color: "white",
-  fontWeight: "900",
-  fontSize: 16,
-  textAlign: "center",
-},
+    videoPurchaseButtonText: {
+      color: "white",
+      fontWeight: "900",
+      fontSize: 16,
+      textAlign: "center",
+    },
 
     disabledButton: {
       opacity: 0.55,

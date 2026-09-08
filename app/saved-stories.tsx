@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -12,42 +13,57 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setCurrentStory } from "../services/currentStory";
 import { auth } from "../services/firebase";
+
 import {
   deleteStory,
   getStories,
   toggleFavoriteStory,
 } from "../services/storageService";
+
 import {
   deleteCloudStory,
   getCloudStories,
   toggleCloudFavorite,
 } from "../services/storyCloudService";
 
+const BACKEND_URL =
+  "https://conte-magique-ai.onrender.com";
+
 export default function SavedStoriesScreen() {
-  const [stories, setStories] = useState<any[]>([]);
-  const [showFavoritesOnly, setShowFavoritesOnly] =
+  const [stories, setStories] =
+    useState<any[]>([]);
+
+  const [
+    showFavoritesOnly,
+    setShowFavoritesOnly,
+  ] = useState(false);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [authReady, setAuthReady] =
     useState(false);
-  const [loading, setLoading] = useState(true);
-  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      () => {
-        setAuthReady(true);
-      }
-    );
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        () => {
+          setAuthReady(true);
+        }
+      );
 
     return unsubscribe;
   }, []);
 
   useEffect(() => {
     if (authReady) {
-      load();
+      void load();
     }
   }, [authReady]);
 
@@ -58,14 +74,6 @@ export default function SavedStoriesScreen() {
       let data: any[] = [];
 
       if (auth.currentUser) {
-        /*
-         * Utilisateur connecté :
-         * on récupère Firebase ET la sauvegarde locale.
-         *
-         * Firebase reste la référence pour les données cloud
-         * (favoris, textes, etc.), mais les images locales
-         * sont conservées lorsqu'elles existent sur ce téléphone.
-         */
         const [
           cloudStories,
           localStories,
@@ -79,16 +87,14 @@ export default function SavedStoriesScreen() {
             const localStory =
               localStories.find(
                 (story: any) =>
-                  String(story.id) ===
+                  String(
+                    story.id
+                  ) ===
                   String(
                     cloudStory.id
                   )
               );
 
-            /*
-             * Si aucune copie locale n'existe,
-             * on conserve simplement la version Firebase.
-             */
             if (!localStory) {
               return cloudStory;
             }
@@ -111,11 +117,6 @@ export default function SavedStoriesScreen() {
                       return {
                         ...cloudScene,
 
-                        /*
-                         * Priorité :
-                         * 1. image Firebase si elle existe
-                         * 2. sinon image locale du téléphone
-                         */
                         imageUrl:
                           cloudScene?.imageUrl ||
                           localScene?.imageUrl ||
@@ -134,15 +135,13 @@ export default function SavedStoriesScreen() {
           }
         );
 
-        /*
-         * On ajoute également les éventuelles histoires locales
-         * qui n'existent pas encore dans Firebase.
-         */
         const cloudIds =
           new Set(
             cloudStories.map(
               (story: any) =>
-                String(story.id)
+                String(
+                  story.id
+                )
             )
           );
 
@@ -160,23 +159,9 @@ export default function SavedStoriesScreen() {
           ...data,
           ...localOnlyStories,
         ];
-
-        console.log(
-          "Histoires Firebase + locales chargées :",
-          data.length
-        );
       } else {
-        /*
-         * Visiteur :
-         * les histoires restent uniquement sur le téléphone.
-         */
         data =
           await getStories();
-
-        console.log(
-          "Histoires chargées depuis le téléphone :",
-          data.length
-        );
       }
 
       const sorted = [
@@ -214,14 +199,10 @@ export default function SavedStoriesScreen() {
         error
       );
 
-      /*
-       * En cas de problème Firebase,
-       * on affiche la sauvegarde locale.
-       */
       const localStories =
         await getStories();
 
-      const sortedLocalStories =
+      const sorted =
         [
           ...localStories,
         ].sort(
@@ -229,20 +210,6 @@ export default function SavedStoriesScreen() {
             a: any,
             b: any
           ) => {
-            if (
-              a.favorite &&
-              !b.favorite
-            ) {
-              return -1;
-            }
-
-            if (
-              !a.favorite &&
-              b.favorite
-            ) {
-              return 1;
-            }
-
             return (
               Number(b.id) -
               Number(a.id)
@@ -250,9 +217,7 @@ export default function SavedStoriesScreen() {
           }
         );
 
-      setStories(
-        sortedLocalStories
-      );
+      setStories(sorted);
     } finally {
       setLoading(false);
     }
@@ -262,7 +227,59 @@ export default function SavedStoriesScreen() {
     story: any
   ) {
     setCurrentStory(story);
-    router.push("/player");
+
+    router.push(
+      "/player"
+    );
+  }
+
+  /*
+   * 🎬 NOUVEAU
+   *
+   * Depuis Mes histoires :
+   *
+   * - on sélectionne l'histoire ;
+   * - on ouvre le Player ;
+   * - resumeVideo demande au Player
+   *   d'ouvrir la fenêtre vidéo.
+   */
+  function createVideoFromStory(
+    story: any
+  ) {
+    const sceneCount =
+      Array.isArray(
+        story?.scenes
+      )
+        ? story.scenes.length
+        : 0;
+
+    if (
+      sceneCount !== 4 &&
+      sceneCount !== 6
+    ) {
+      Alert.alert(
+        "Dessin animé indisponible",
+        "Seules les histoires de 4 ou 6 scènes peuvent être transformées en dessin animé."
+      );
+
+      return;
+    }
+
+    setCurrentStory(
+      story
+    );
+
+    router.push({
+      pathname:
+        "/player",
+
+      params: {
+        resumeVideo:
+          String(
+            Date.now()
+          ),
+      },
+    });
   }
 
   async function toggleFavorite(
@@ -291,9 +308,7 @@ export default function SavedStoriesScreen() {
             newFavorite
           );
 
-        if (
-          !cloudResult
-        ) {
+        if (!cloudResult) {
           Alert.alert(
             "Erreur",
             "Le favori n'a pas pu être synchronisé."
@@ -312,9 +327,7 @@ export default function SavedStoriesScreen() {
           currentStories
         ) =>
           currentStories.map(
-            (
-              item: any
-            ) =>
+            (item: any) =>
               item.id === id
                 ? {
                     ...item,
@@ -338,92 +351,100 @@ export default function SavedStoriesScreen() {
   }
 
   async function shareStory(
-  story: any
-) {
-  try {
-    const user =
-      auth.currentUser;
+    story: any
+  ) {
+    try {
+      const user =
+        auth.currentUser;
 
-    if (!user) {
+      if (!user) {
+        Alert.alert(
+          "Connexion requise",
+          "Connecte-toi pour partager cette histoire."
+        );
+
+        return;
+      }
+
+      const token =
+        await user.getIdToken(
+          true
+        );
+
+      const response =
+        await fetch(
+          `${BACKEND_URL}/share/create`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${token}`,
+            },
+
+            body:
+              JSON.stringify({
+                type:
+                  "story",
+
+                contentId:
+                  String(
+                    story.id
+                  ),
+
+                story,
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Impossible de créer le lien de partage."
+        );
+      }
+
+      if (
+        !data?.shareUrl
+      ) {
+        throw new Error(
+          "Lien de partage manquant."
+        );
+      }
+
+      await Share.share({
+        title:
+          story.prompt ||
+          "Une histoire ConteMagiqueIA",
+
+        message:
+          "✨ Découvre cette histoire créée avec ConteMagiqueIA !\n\n" +
+          data.shareUrl,
+
+        url:
+          data.shareUrl,
+      });
+    } catch (error) {
+      console.error(
+        "Erreur partage histoire :",
+        error
+      );
+
       Alert.alert(
-        "Connexion requise",
-        "Connecte-toi pour partager cette histoire."
-      );
+        "Partage impossible",
 
-      return;
-    }
-
-    const token =
-      await user.getIdToken(
-        true
-      );
-
-    const response =
-      await fetch(
-        "https://conte-magique-ai.onrender.com/share/create",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            Authorization:
-              `Bearer ${token}`,
-          },
-
-          body:
-            JSON.stringify({
-              type: "story",
-              contentId:
-                String(story.id),
-              story,
-            }),
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data?.error ||
-          "Impossible de créer le lien de partage."
+        error instanceof Error
+          ? error.message
+          : "L'histoire n'a pas pu être partagée."
       );
     }
-
-    if (!data?.shareUrl) {
-      throw new Error(
-        "Lien de partage manquant."
-      );
-    }
-
-    await Share.share({
-      title:
-        story.prompt ||
-        "Une histoire ConteMagiqueIA",
-
-      message:
-        "✨ Découvre cette histoire créée avec ConteMagiqueIA !\n\n" +
-        data.shareUrl,
-
-      url:
-        data.shareUrl,
-    });
-  } catch (error) {
-    console.error(
-      "Erreur partage histoire :",
-      error
-    );
-
-    Alert.alert(
-      "Partage impossible",
-      error instanceof Error
-        ? error.message
-        : "L'histoire n'a pas pu être partagée."
-    );
   }
-}
 
   function confirmDelete(
     id: number
@@ -433,31 +454,31 @@ export default function SavedStoriesScreen() {
       "Tu veux vraiment supprimer cette histoire ?",
       [
         {
-          text: "Annuler",
-          style: "cancel",
+          text:
+            "Annuler",
+          style:
+            "cancel",
         },
+
         {
-          text: "Supprimer",
+          text:
+            "Supprimer",
+
           style:
             "destructive",
+
           onPress:
             async () => {
               try {
                 if (
                   auth.currentUser
                 ) {
-                  /*
-                   * Suppression dans Firebase :
-                   * document Firestore + images Storage.
-                   */
                   const cloudDeleted =
                     await deleteCloudStory(
                       id
                     );
 
-                  if (
-                    !cloudDeleted
-                  ) {
+                  if (!cloudDeleted) {
                     Alert.alert(
                       "Erreur",
                       "La suppression dans le cloud a échoué."
@@ -466,9 +487,6 @@ export default function SavedStoriesScreen() {
                     return;
                   }
 
-                  /*
-                   * Suppression de la copie locale.
-                   */
                   await deleteStory(
                     id
                   );
@@ -479,9 +497,7 @@ export default function SavedStoriesScreen() {
                 }
 
                 await load();
-              } catch (
-                error
-              ) {
+              } catch (error) {
                 console.log(
                   "Erreur suppression histoire :",
                   error
@@ -501,9 +517,7 @@ export default function SavedStoriesScreen() {
   const displayedStories =
     showFavoritesOnly
       ? stories.filter(
-          (
-            story: any
-          ) =>
+          (story: any) =>
             story.favorite
         )
       : stories;
@@ -535,6 +549,7 @@ export default function SavedStoriesScreen() {
           <TouchableOpacity
             style={[
               styles.filterButton,
+
               !showFavoritesOnly &&
                 styles.filterButtonActive,
             ]}
@@ -547,6 +562,7 @@ export default function SavedStoriesScreen() {
             <Text
               style={[
                 styles.filterText,
+
                 !showFavoritesOnly &&
                   styles.filterTextActive,
               ]}
@@ -558,6 +574,7 @@ export default function SavedStoriesScreen() {
           <TouchableOpacity
             style={[
               styles.filterButton,
+
               showFavoritesOnly &&
                 styles.filterButtonActive,
             ]}
@@ -570,6 +587,7 @@ export default function SavedStoriesScreen() {
             <Text
               style={[
                 styles.filterText,
+
                 showFavoritesOnly &&
                   styles.filterTextActive,
               ]}
@@ -624,7 +642,9 @@ export default function SavedStoriesScreen() {
             keyExtractor={(
               item: any
             ) =>
-              item.id.toString()
+              String(
+                item.id
+              )
             }
             contentContainerStyle={
               styles.listContent
@@ -637,145 +657,187 @@ export default function SavedStoriesScreen() {
                   0
                 ]?.imageUrl;
 
+              const sceneCount =
+                Array.isArray(
+                  item.scenes
+                )
+                  ? item.scenes.length
+                  : 0;
+
+              const videoCompatible =
+                sceneCount === 4 ||
+                sceneCount === 6;
+
               return (
                 <View
                   style={
                     styles.card
                   }
                 >
-                  <TouchableOpacity
+                  <View
                     style={
-                      styles.storyMain
-                    }
-                    onPress={() =>
-                      openStory(
-                        item
-                      )
+                      styles.topRow
                     }
                   >
-                    {thumbnail ? (
-                      <Image
-                        source={{
-                          uri:
-                            thumbnail,
-                        }}
-                        style={
-                          styles.thumbnail
-                        }
-                      />
-                    ) : (
+                    <TouchableOpacity
+                      style={
+                        styles.storyMain
+                      }
+                      onPress={() =>
+                        openStory(
+                          item
+                        )
+                      }
+                    >
+                      {thumbnail ? (
+                        <Image
+                          source={{
+                            uri:
+                              thumbnail,
+                          }}
+                          style={
+                            styles.thumbnail
+                          }
+                        />
+                      ) : (
+                        <View
+                          style={
+                            styles.placeholder
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.placeholderText
+                            }
+                          >
+                            ✨
+                          </Text>
+                        </View>
+                      )}
+
                       <View
                         style={
-                          styles.placeholder
+                          styles.storyInfo
                         }
                       >
                         <Text
                           style={
-                            styles.placeholderText
+                            styles.text
+                          }
+                          numberOfLines={
+                            2
                           }
                         >
-                          ✨
+                          {item.prompt ||
+                            "Histoire magique"}
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.date
+                          }
+                        >
+                          {sceneCount}{" "}
+                          scènes
+                          {" • "}
+
+                          {item.createdAt
+                            ? new Date(
+                                item.createdAt
+                              ).toLocaleDateString(
+                                "fr-FR"
+                              )
+                            : ""}
                         </Text>
                       </View>
-                    )}
+                    </TouchableOpacity>
 
                     <View
                       style={
-                        styles.storyInfo
+                        styles.actions
                       }
                     >
-                      <Text
+                      <TouchableOpacity
                         style={
-                          styles.text
+                          styles.iconButton
                         }
-                        numberOfLines={
-                          2
+                        onPress={() =>
+                          toggleFavorite(
+                            item.id
+                          )
                         }
                       >
-                        {item.prompt ||
-                          "Histoire magique"}
-                      </Text>
+                        <Text
+                          style={
+                            styles.favoriteText
+                          }
+                        >
+                          {item.favorite
+                            ? "❤️"
+                            : "🤍"}
+                        </Text>
+                      </TouchableOpacity>
 
-                      <Text
+                      <TouchableOpacity
                         style={
-                          styles.date
+                          styles.iconButton
+                        }
+                        onPress={() =>
+                          shareStory(
+                            item
+                          )
                         }
                       >
-                        {item.createdAt
-                          ? new Date(
-                              item.createdAt
-                            ).toLocaleDateString(
-                              "fr-FR"
-                            )
-                          : ""}
-                      </Text>
+                        <Text
+                          style={
+                            styles.shareText
+                          }
+                        >
+                          📤
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={
+                          styles.iconButton
+                        }
+                        onPress={() =>
+                          confirmDelete(
+                            item.id
+                          )
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.deleteText
+                          }
+                        >
+                          🗑️
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                  </TouchableOpacity>
+                  </View>
 
-                  <View
-                    style={
-                      styles.actions
-                    }
-                  >
+                  {videoCompatible ? (
                     <TouchableOpacity
                       style={
-                        styles.iconButton
+                        styles.videoButton
                       }
                       onPress={() =>
-                        toggleFavorite(
-                          item.id
-                        )
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.favoriteText
-                        }
-                      >
-                        {item.favorite
-                          ? "❤️"
-                          : "🤍"}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={
-                        styles.iconButton
-                      }
-                      onPress={() =>
-                        shareStory(
+                        createVideoFromStory(
                           item
                         )
                       }
                     >
                       <Text
                         style={
-                          styles.shareText
+                          styles.videoButtonText
                         }
                       >
-                        📤
+                        🎬 Créer le dessin animé
                       </Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={
-                        styles.iconButton
-                      }
-                      onPress={() =>
-                        confirmDelete(
-                          item.id
-                        )
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.deleteText
-                        }
-                      >
-                        🗑️
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                  ) : null}
                 </View>
               );
             }}
@@ -813,8 +875,7 @@ const styles =
 
     container: {
       flex: 1,
-      paddingHorizontal:
-        18,
+      paddingHorizontal: 18,
       paddingTop: 20,
       paddingBottom: 18,
       backgroundColor:
@@ -823,15 +884,13 @@ const styles =
 
     title: {
       fontSize: 30,
-      fontWeight:
-        "900",
+      fontWeight: "900",
       marginBottom: 20,
       color: "white",
     },
 
     filterRow: {
-      flexDirection:
-        "row",
+      flexDirection: "row",
       gap: 10,
       marginBottom: 18,
     },
@@ -842,8 +901,7 @@ const styles =
       borderRadius: 14,
       backgroundColor:
         "rgba(255,255,255,0.12)",
-      alignItems:
-        "center",
+      alignItems: "center",
     },
 
     filterButtonActive: {
@@ -853,8 +911,7 @@ const styles =
 
     filterText: {
       color: "white",
-      fontWeight:
-        "900",
+      fontWeight: "900",
     },
 
     filterTextActive: {
@@ -862,67 +919,57 @@ const styles =
     },
 
     listContent: {
-      paddingBottom:
-        12,
+      paddingBottom: 12,
       width: "100%",
       maxWidth: 800,
-      alignSelf:
-        "center",
+      alignSelf: "center",
     },
 
     emptyBox: {
       flex: 1,
-      justifyContent:
-        "center",
-      alignItems:
-        "center",
-      paddingHorizontal:
-        20,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 20,
     },
 
     emptyText: {
       color: "white",
       fontSize: 16,
-      textAlign:
-        "center",
+      textAlign: "center",
       opacity: 0.8,
     },
 
     loadingText: {
       color: "white",
       fontSize: 15,
-      fontWeight:
-        "700",
+      fontWeight: "700",
       marginTop: 14,
       opacity: 0.8,
     },
 
     card: {
-      backgroundColor:
-        "white",
+      backgroundColor: "white",
       padding: 12,
       borderRadius: 18,
       marginBottom: 12,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
+    },
+
+    topRow: {
+      flexDirection: "row",
+      alignItems: "center",
     },
 
     storyMain: {
       flex: 1,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
+      flexDirection: "row",
+      alignItems: "center",
     },
 
     thumbnail: {
       width: 74,
       height: 74,
       borderRadius: 14,
-      backgroundColor:
-        "#111",
+      backgroundColor: "#111",
       marginRight: 12,
     },
 
@@ -930,12 +977,9 @@ const styles =
       width: 74,
       height: 74,
       borderRadius: 14,
-      backgroundColor:
-        "#EEE",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+      backgroundColor: "#EEE",
+      alignItems: "center",
+      justifyContent: "center",
       marginRight: 12,
     },
 
@@ -949,8 +993,7 @@ const styles =
 
     text: {
       fontSize: 16,
-      fontWeight:
-        "900",
+      fontWeight: "900",
       color: "#111",
     },
 
@@ -961,8 +1004,7 @@ const styles =
     },
 
     actions: {
-      flexDirection:
-        "row",
+      flexDirection: "row",
       marginLeft: 8,
       gap: 4,
     },
@@ -983,21 +1025,35 @@ const styles =
       fontSize: 21,
     },
 
+    videoButton: {
+      marginTop: 12,
+      backgroundColor: "#7C3AED",
+      borderRadius: 14,
+      minHeight: 46,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 14,
+    },
+
+    videoButtonText: {
+      color: "#ffffff",
+      fontSize: 14,
+      fontWeight: "900",
+      textAlign: "center",
+    },
+
     backButton: {
-      backgroundColor:
-        "#FFB703",
+      backgroundColor: "#FFB703",
       padding: 15,
       borderRadius: 15,
-      alignItems:
-        "center",
+      alignItems: "center",
       marginTop: 10,
       marginBottom: 4,
     },
 
     backText: {
       color: "#111",
-      fontWeight:
-        "900",
+      fontWeight: "900",
       fontSize: 16,
     },
   });

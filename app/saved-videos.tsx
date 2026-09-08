@@ -45,24 +45,17 @@ import {
   getSharedVideos,
 } from "../services/sharedVideoService";
 
+const BACKEND_URL =
+  "https://conte-magique-ai.onrender.com";
+
 type SavedVideo = {
   id: string;
   finalVideoUrl: string;
   sceneCount?: number;
   createdAt?: any;
   status?: string;
-
-  /**
-   * true = vidéo reçue par partage
-   * false/undefined = vidéo créée par l'utilisateur
-   */
   shared?: boolean;
-
-  /**
-   * Présent uniquement pour une vidéo reçue.
-   */
   shareToken?: string;
-
   videoType?: string | null;
 };
 
@@ -73,26 +66,24 @@ export default function SavedVideosScreen() {
   const [loading, setLoading] =
     useState(true);
 
-  const [thumbnails, setThumbnails] =
-    useState<Record<string, string>>(
-      {}
-    );
+  const [
+    thumbnails,
+    setThumbnails,
+  ] = useState<
+    Record<string, string>
+  >({});
 
-  const [deletingId, setDeletingId] =
-    useState<string | null>(
-      null
-    );
+  const [
+    deletingId,
+    setDeletingId,
+  ] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     void loadVideos();
   }, []);
 
-  /**
-   * Permet d'avoir une clé unique,
-   * même si une vidéo créée et une
-   * vidéo reçue avaient par hasard
-   * le même ID.
-   */
   function getVideoKey(
     video: SavedVideo
   ) {
@@ -101,14 +92,6 @@ export default function SavedVideosScreen() {
       : `owned-${video.id}`;
   }
 
-  /**
-   * Charge :
-   *
-   * 1. les vidéos créées par l'utilisateur ;
-   * 2. les vidéos reçues et enregistrées.
-   *
-   * Puis fusionne les deux listes.
-   */
   async function loadVideos() {
     try {
       setLoading(true);
@@ -120,12 +103,6 @@ export default function SavedVideosScreen() {
         setVideos([]);
         return;
       }
-
-      /*
-       * ==========================
-       * VIDÉOS CRÉÉES
-       * ==========================
-       */
 
       const videosQuery =
         query(
@@ -146,12 +123,6 @@ export default function SavedVideosScreen() {
           )
         );
 
-      /*
-       * On charge en parallèle :
-       *
-       * - les vidéos créées ;
-       * - les vidéos partagées enregistrées.
-       */
       const [
         snapshot,
         receivedVideos,
@@ -197,16 +168,12 @@ export default function SavedVideosScreen() {
           )
           .filter(
             (video) =>
-              video.finalVideoUrl &&
+              Boolean(
+                video.finalVideoUrl
+              ) &&
               video.status ===
                 "completed"
           );
-
-      /*
-       * ==========================
-       * VIDÉOS REÇUES
-       * ==========================
-       */
 
       const sharedVideos:
         SavedVideo[] =
@@ -245,19 +212,11 @@ export default function SavedVideosScreen() {
               )
           );
 
-      /*
-       * Fusion des deux types
-       * de vidéos.
-       */
       const mergedVideos = [
         ...ownedVideos,
         ...sharedVideos,
       ];
 
-      /*
-       * Tri du plus récent
-       * au plus ancien.
-       */
       mergedVideos.sort(
         (a, b) =>
           getDateValue(
@@ -272,9 +231,6 @@ export default function SavedVideosScreen() {
         mergedVideos
       );
 
-      /*
-       * Génération des miniatures.
-       */
       void generateThumbnails(
         mergedVideos
       );
@@ -293,10 +249,6 @@ export default function SavedVideosScreen() {
     }
   }
 
-  /**
-   * Convertit les différentes formes
-   * possibles de createdAt en timestamp.
-   */
   function getDateValue(
     value: any
   ): number {
@@ -325,7 +277,9 @@ export default function SavedVideosScreen() {
       }
 
       const date =
-        new Date(value);
+        new Date(
+          value
+        );
 
       const time =
         date.getTime();
@@ -340,10 +294,6 @@ export default function SavedVideosScreen() {
     }
   }
 
-  /**
-   * Génère une miniature locale
-   * pour chaque vidéo.
-   */
   async function generateThumbnails(
     videoList: SavedVideo[]
   ) {
@@ -366,9 +316,7 @@ export default function SavedVideosScreen() {
               );
 
             setThumbnails(
-              (
-                previous
-              ) => ({
+              (previous) => ({
                 ...previous,
 
                 [key]:
@@ -428,26 +376,10 @@ export default function SavedVideosScreen() {
     }
   }
 
-  /**
-   * Partage d'une vidéo.
-   *
-   * - vidéo créée :
-   *   création d'un nouveau lien sécurisé
-   *   via le backend.
-   *
-   * - vidéo reçue :
-   *   on réutilise simplement son lien
-   *   de partage existant.
-   */
   async function shareVideo(
     video: SavedVideo
   ) {
     try {
-      /*
-       * ==========================
-       * VIDÉO REÇUE
-       * ==========================
-       */
       if (video.shared) {
         if (
           !video.shareToken
@@ -477,12 +409,6 @@ export default function SavedVideosScreen() {
         return;
       }
 
-      /*
-       * ==========================
-       * VIDÉO CRÉÉE PAR LE COMPTE
-       * ==========================
-       */
-
       const user =
         auth.currentUser;
 
@@ -502,10 +428,9 @@ export default function SavedVideosScreen() {
 
       const response =
         await fetch(
-          "https://conte-magique-ai.onrender.com/share/create",
+          `${BACKEND_URL}/share/create`,
           {
-            method:
-              "POST",
+            method: "POST",
 
             headers: {
               "Content-Type":
@@ -563,6 +488,7 @@ export default function SavedVideosScreen() {
 
       Alert.alert(
         "Partage impossible",
+
         error instanceof Error
           ? error.message
           : "La vidéo n'a pas pu être partagée."
@@ -570,17 +496,13 @@ export default function SavedVideosScreen() {
     }
   }
 
-  /**
-   * Demande confirmation avant
-   * la suppression.
-   */
   function askDeleteVideo(
     video: SavedVideo
   ) {
     const message =
       video.shared
         ? "Cette vidéo sera retirée de Mes vidéos. La vidéo originale de son créateur ne sera pas supprimée."
-        : "Cette vidéo sera supprimée définitivement de tes vidéos enregistrées.";
+        : "Cette vidéo sera supprimée de Mes vidéos.";
 
     Alert.alert(
       video.shared
@@ -593,6 +515,7 @@ export default function SavedVideosScreen() {
         {
           text:
             "Annuler",
+
           style:
             "cancel",
         },
@@ -616,17 +539,6 @@ export default function SavedVideosScreen() {
     );
   }
 
-  /**
-   * Suppression sécurisée.
-   *
-   * Vidéo reçue :
-   * on supprime UNIQUEMENT la référence
-   * personnelle dans users/{uid}/sharedVideos.
-   *
-   * Vidéo créée :
-   * comportement historique :
-   * suppression Storage + videoGenerations.
-   */
   async function deleteVideo(
     video: SavedVideo
   ) {
@@ -661,28 +573,8 @@ export default function SavedVideosScreen() {
           );
         }
 
-        setVideos(
-          (previous) =>
-            previous.filter(
-              (item) =>
-                getVideoKey(
-                  item
-                ) !== key
-            )
-        );
-
-        setThumbnails(
-          (previous) => {
-            const next = {
-              ...previous,
-            };
-
-            delete next[
-              key
-            ];
-
-            return next;
-          }
+        removeVideoFromScreen(
+          key
         );
 
         Alert.alert(
@@ -697,12 +589,17 @@ export default function SavedVideosScreen() {
        * ==========================
        * VIDÉO CRÉÉE
        * ==========================
+       *
+       * IMPORTANT :
+       *
+       * La suppression Storage ne bloque
+       * plus la suppression Firestore.
        */
 
-      const storage =
-        getStorage();
-
       try {
+        const storage =
+          getStorage();
+
         const videoRef =
           ref(
             storage,
@@ -712,17 +609,34 @@ export default function SavedVideosScreen() {
         await deleteObject(
           videoRef
         );
+
+        console.log(
+          "🗑️ Fichier vidéo Storage supprimé :",
+          video.id
+        );
       } catch (
-        error: any
+        storageError: any
       ) {
-        if (
-          error?.code !==
-          "storage/object-not-found"
-        ) {
-          throw error;
-        }
+        /*
+         * Le fichier peut être :
+         * - déjà supprimé ;
+         * - inaccessible par les règles ;
+         * - référencé par une URL distante.
+         *
+         * On ne bloque PAS la suppression
+         * de la vidéo dans Mes vidéos.
+         */
+        console.log(
+          "ℹ️ Suppression Storage ignorée :",
+          storageError?.code ||
+            storageError
+        );
       }
 
+      /*
+       * On supprime maintenant le document
+       * Firestore même si Storage a échoué.
+       */
       await deleteDoc(
         doc(
           db,
@@ -731,42 +645,38 @@ export default function SavedVideosScreen() {
         )
       );
 
-      setVideos(
-        (previous) =>
-          previous.filter(
-            (item) =>
-              getVideoKey(
-                item
-              ) !== key
-          )
+      console.log(
+        "🗑️ Document videoGenerations supprimé :",
+        video.id
       );
 
-      setThumbnails(
-        (previous) => {
-          const next = {
-            ...previous,
-          };
-
-          delete next[
-            key
-          ];
-
-          return next;
-        }
+      removeVideoFromScreen(
+        key
       );
 
       Alert.alert(
         "Vidéo supprimée",
-        "Le dessin animé a bien été supprimé."
+        "Le dessin animé a bien été supprimé de Mes vidéos."
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "Erreur suppression vidéo :",
         error
       );
 
+      console.error(
+        "Code erreur :",
+        error?.code
+      );
+
+      console.error(
+        "Message erreur :",
+        error?.message
+      );
+
       Alert.alert(
         "Suppression impossible",
+
         video.shared
           ? "La vidéo n'a pas pu être retirée. Réessaie dans quelques instants."
           : "La vidéo n'a pas pu être supprimée. Réessaie dans quelques instants."
@@ -776,6 +686,34 @@ export default function SavedVideosScreen() {
         null
       );
     }
+  }
+
+  function removeVideoFromScreen(
+    key: string
+  ) {
+    setVideos(
+      (previous) =>
+        previous.filter(
+          (item) =>
+            getVideoKey(
+              item
+            ) !== key
+        )
+    );
+
+    setThumbnails(
+      (previous) => {
+        const next = {
+          ...previous,
+        };
+
+        delete next[
+          key
+        ];
+
+        return next;
+      }
+    );
   }
 
   if (loading) {
@@ -1021,7 +959,6 @@ export default function SavedVideosScreen() {
                     style={
                       styles.watchButton
                     }
-
                     onPress={() =>
                       router.push({
                         pathname:
@@ -1033,7 +970,6 @@ export default function SavedVideosScreen() {
                         },
                       })
                     }
-
                     disabled={
                       isDeleting
                     }
@@ -1051,13 +987,11 @@ export default function SavedVideosScreen() {
                     style={
                       styles.shareButton
                     }
-
                     onPress={() =>
                       shareVideo(
                         item
                       )
                     }
-
                     disabled={
                       isDeleting
                     }
@@ -1075,13 +1009,11 @@ export default function SavedVideosScreen() {
                     style={
                       styles.deleteButton
                     }
-
                     onPress={() =>
                       askDeleteVideo(
                         item
                       )
                     }
-
                     disabled={
                       isDeleting
                     }
@@ -1120,14 +1052,11 @@ const styles =
 
     header: {
       height: 64,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
+      flexDirection: "row",
+      alignItems: "center",
       justifyContent:
         "space-between",
-      paddingHorizontal:
-        16,
+      paddingHorizontal: 16,
     },
 
     backButton: {
@@ -1136,18 +1065,14 @@ const styles =
       borderRadius: 22,
       backgroundColor:
         "rgba(255,255,255,0.10)",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+      alignItems: "center",
+      justifyContent: "center",
     },
 
     backText: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 26,
-      fontWeight:
-        "700",
+      fontWeight: "700",
     },
 
     headerSpacer: {
@@ -1155,26 +1080,21 @@ const styles =
     },
 
     title: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 20,
-      fontWeight:
-        "800",
+      fontWeight: "800",
     },
 
     center: {
       flex: 1,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+      alignItems: "center",
+      justifyContent: "center",
       padding: 30,
     },
 
     loadingText: {
       marginTop: 12,
-      color:
-        "#cbd5e1",
+      color: "#cbd5e1",
     },
 
     emptyIcon: {
@@ -1183,20 +1103,16 @@ const styles =
     },
 
     emptyTitle: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 22,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       marginBottom: 8,
     },
 
     emptyText: {
-      color:
-        "#cbd5e1",
+      color: "#cbd5e1",
       fontSize: 16,
-      textAlign:
-        "center",
+      textAlign: "center",
     },
 
     listContent: {
@@ -1208,36 +1124,27 @@ const styles =
       backgroundColor:
         "rgba(255,255,255,0.08)",
       borderRadius: 20,
-      overflow:
-        "hidden",
+      overflow: "hidden",
       paddingBottom: 16,
     },
 
     thumbnailContainer: {
-      width:
-        "100%",
+      width: "100%",
       height: 190,
-      backgroundColor:
-        "#020617",
-      position:
-        "relative",
+      backgroundColor: "#020617",
+      position: "relative",
     },
 
     thumbnail: {
-      width:
-        "100%",
-      height:
-        "100%",
-      resizeMode:
-        "cover",
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
     },
 
     thumbnailFallback: {
       flex: 1,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+      alignItems: "center",
+      justifyContent: "center",
       gap: 8,
     },
 
@@ -1246,147 +1153,109 @@ const styles =
     },
 
     sceneBadge: {
-      position:
-        "absolute",
+      position: "absolute",
       right: 12,
       bottom: 12,
       backgroundColor:
         "rgba(0,0,0,0.72)",
-      paddingHorizontal:
-        10,
-      paddingVertical:
-        6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
       borderRadius: 12,
     },
 
     sceneBadgeText: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 12,
-      fontWeight:
-        "800",
+      fontWeight: "800",
     },
 
     sharedBadge: {
-      position:
-        "absolute",
+      position: "absolute",
       left: 12,
       bottom: 12,
       backgroundColor:
         "rgba(49,46,129,0.90)",
-      paddingHorizontal:
-        10,
-      paddingVertical:
-        6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
       borderRadius: 12,
     },
 
     sharedBadgeText: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 12,
-      fontWeight:
-        "800",
+      fontWeight: "800",
     },
 
     cardTitle: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 18,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       marginTop: 14,
-      marginHorizontal:
-        16,
+      marginHorizontal: 16,
     },
 
     cardMeta: {
       marginTop: 6,
-      marginHorizontal:
-        16,
-      color:
-        "#cbd5e1",
+      marginHorizontal: 16,
+      color: "#cbd5e1",
       fontSize: 14,
     },
 
     actionsRow: {
-      flexDirection:
-        "row",
+      flexDirection: "row",
       gap: 8,
       marginTop: 16,
-      marginHorizontal:
-        16,
+      marginHorizontal: 16,
     },
 
     watchButton: {
       flex: 1,
       minHeight: 48,
       borderRadius: 14,
-      backgroundColor:
-        "#312e81",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      paddingHorizontal:
-        6,
+      backgroundColor: "#312e81",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 6,
     },
 
     watchButtonText: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 13,
-      fontWeight:
-        "800",
-      textAlign:
-        "center",
+      fontWeight: "800",
+      textAlign: "center",
     },
 
     shareButton: {
       flex: 1,
       minHeight: 48,
       borderRadius: 14,
-      backgroundColor:
-        "#0369A1",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      paddingHorizontal:
-        6,
+      backgroundColor: "#0369A1",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 6,
     },
 
     shareButtonText: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 13,
-      fontWeight:
-        "800",
-      textAlign:
-        "center",
+      fontWeight: "800",
+      textAlign: "center",
     },
 
     deleteButton: {
       flex: 1,
       minHeight: 48,
       borderRadius: 14,
-      backgroundColor:
-        "#7f1d1d",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      paddingHorizontal:
-        6,
+      backgroundColor: "#7f1d1d",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 6,
     },
 
     deleteButtonText: {
-      color:
-        "#ffffff",
+      color: "#ffffff",
       fontSize: 13,
-      fontWeight:
-        "800",
-      textAlign:
-        "center",
+      fontWeight: "800",
+      textAlign: "center",
     },
   });
