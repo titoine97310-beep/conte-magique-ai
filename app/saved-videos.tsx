@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as VideoThumbnails from "expo-video-thumbnails";
 
 import {
@@ -18,6 +18,7 @@ import {
 } from "firebase/storage";
 
 import {
+  useCallback,
   useEffect,
   useState,
 } from "react";
@@ -44,6 +45,12 @@ import {
   deleteSharedVideo,
   getSharedVideos,
 } from "../services/sharedVideoService";
+
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
 
 const BACKEND_URL =
   "https://conte-magique-ai.onrender.com";
@@ -79,6 +86,32 @@ export default function SavedVideosScreen() {
   ] = useState<
     string | null
   >(null);
+
+  const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshLanguage() {
+        const savedLanguage =
+          await loadLanguage();
+
+        if (isActive) {
+          setLanguage(savedLanguage);
+        }
+      }
+
+      void refreshLanguage();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   useEffect(() => {
     void loadVideos();
@@ -241,8 +274,8 @@ export default function SavedVideosScreen() {
       );
 
       Alert.alert(
-        "Chargement impossible",
-        "Tes vidéos n'ont pas pu être chargées."
+        t.savedVideos.loadingErrorTitle,
+        t.savedVideos.loadingErrorMessage
       );
     } finally {
       setLoading(false);
@@ -340,8 +373,15 @@ export default function SavedVideosScreen() {
   ) {
     try {
       if (!value) {
-        return "Date inconnue";
+        return t.savedVideos.unknownDate;
       }
+
+      const locale =
+        language === "en"
+          ? "en-GB"
+          : language === "es"
+            ? "es-ES"
+            : "fr-FR";
 
       if (
         typeof value?.toDate ===
@@ -350,7 +390,7 @@ export default function SavedVideosScreen() {
         return value
           .toDate()
           .toLocaleDateString(
-            "fr-FR"
+            locale
           );
       }
 
@@ -359,20 +399,19 @@ export default function SavedVideosScreen() {
         "number"
       ) {
         return new Date(
-          value.seconds *
-            1000
+          value.seconds * 1000
         ).toLocaleDateString(
-          "fr-FR"
+          locale
         );
       }
 
       return new Date(
         value
       ).toLocaleDateString(
-        "fr-FR"
+        locale
       );
     } catch {
-      return "Date inconnue";
+      return t.savedVideos.unknownDate;
     }
   }
 
@@ -385,7 +424,7 @@ export default function SavedVideosScreen() {
           !video.shareToken
         ) {
           throw new Error(
-            "Le lien de partage de cette vidéo est introuvable."
+            t.savedVideos.shareLinkMissing
           );
         }
 
@@ -396,11 +435,10 @@ export default function SavedVideosScreen() {
 
         await Share.share({
           title:
-            "Dessin animé ConteMagiqueIA",
+            t.savedVideos.shareTitle,
 
           message:
-            "🎬 Découvre ce dessin animé créé avec ConteMagiqueIA ! ✨\n\n" +
-            shareUrl,
+            `${t.savedVideos.shareMessage}\n\n${shareUrl}`,
 
           url:
             shareUrl,
@@ -414,8 +452,8 @@ export default function SavedVideosScreen() {
 
       if (!user) {
         Alert.alert(
-          "Connexion requise",
-          "Connecte-toi pour partager cette vidéo."
+          t.savedVideos.loginRequired,
+          t.savedVideos.loginRequiredShare
         );
 
         return;
@@ -471,11 +509,10 @@ export default function SavedVideosScreen() {
 
       await Share.share({
         title:
-          "Dessin animé ConteMagiqueIA",
+          t.savedVideos.shareTitle,
 
         message:
-          "🎬 Découvre ce dessin animé créé avec ConteMagiqueIA ! ✨\n\n" +
-          data.shareUrl,
+          `${t.savedVideos.shareMessage}\n\n${data.shareUrl}`,
 
         url:
           data.shareUrl,
@@ -487,11 +524,8 @@ export default function SavedVideosScreen() {
       );
 
       Alert.alert(
-        "Partage impossible",
-
-        error instanceof Error
-          ? error.message
-          : "La vidéo n'a pas pu être partagée."
+        t.savedVideos.shareImpossible,
+        t.savedVideos.shareError
       );
     }
   }
@@ -501,20 +535,20 @@ export default function SavedVideosScreen() {
   ) {
     const message =
       video.shared
-        ? "Cette vidéo sera retirée de Mes vidéos. La vidéo originale de son créateur ne sera pas supprimée."
-        : "Cette vidéo sera supprimée de Mes vidéos.";
+        ? t.savedVideos.removeConfirmMessage
+        : t.savedVideos.deleteConfirmMessage;
 
     Alert.alert(
       video.shared
-        ? "Retirer cette vidéo ?"
-        : "Supprimer cette vidéo ?",
+        ? t.savedVideos.removeConfirmTitle
+        : t.savedVideos.deleteConfirmTitle,
 
       message,
 
       [
         {
           text:
-            "Annuler",
+            t.common.cancel,
 
           style:
             "cancel",
@@ -523,8 +557,8 @@ export default function SavedVideosScreen() {
         {
           text:
             video.shared
-              ? "Retirer"
-              : "Supprimer",
+              ? t.savedVideos.removeAction
+              : t.savedVideos.deleteAction,
 
           style:
             "destructive",
@@ -578,8 +612,8 @@ export default function SavedVideosScreen() {
         );
 
         Alert.alert(
-          "Vidéo retirée",
-          "La vidéo a été retirée de Mes vidéos. L'originale n'a pas été supprimée."
+          t.savedVideos.removedTitle,
+          t.savedVideos.removedMessage
         );
 
         return;
@@ -655,8 +689,8 @@ export default function SavedVideosScreen() {
       );
 
       Alert.alert(
-        "Vidéo supprimée",
-        "Le dessin animé a bien été supprimé de Mes vidéos."
+        t.savedVideos.deletedTitle,
+        t.savedVideos.deletedMessage
       );
     } catch (error: any) {
       console.error(
@@ -675,11 +709,10 @@ export default function SavedVideosScreen() {
       );
 
       Alert.alert(
-        "Suppression impossible",
-
+        t.savedVideos.deleteImpossible,
         video.shared
-          ? "La vidéo n'a pas pu être retirée. Réessaie dans quelques instants."
-          : "La vidéo n'a pas pu être supprimée. Réessaie dans quelques instants."
+          ? t.savedVideos.removeError
+          : t.savedVideos.deleteError
       );
     } finally {
       setDeletingId(
@@ -737,7 +770,7 @@ export default function SavedVideosScreen() {
               styles.loadingText
             }
           >
-            Chargement de tes vidéos...
+            {t.savedVideos.loading}
           </Text>
         </View>
       </SafeAreaView>
@@ -777,7 +810,7 @@ export default function SavedVideosScreen() {
             styles.title
           }
         >
-          🎬 Mes vidéos
+          {t.savedVideos.title}
         </Text>
 
         <View
@@ -807,7 +840,7 @@ export default function SavedVideosScreen() {
               styles.emptyTitle
             }
           >
-            Aucune vidéo
+            {t.savedVideos.emptyTitle}
           </Text>
 
           <Text
@@ -815,7 +848,7 @@ export default function SavedVideosScreen() {
               styles.emptyText
             }
           >
-            Tes dessins animés créés ou reçus apparaîtront ici.
+            {t.savedVideos.emptyMessage}
           </Text>
         </View>
       ) : (
@@ -918,7 +951,7 @@ export default function SavedVideosScreen() {
                           styles.sharedBadgeText
                         }
                       >
-                        🎁 Reçue
+                        {t.savedVideos.receivedBadge}
                       </Text>
                     </View>
                   ) : null}
@@ -931,8 +964,8 @@ export default function SavedVideosScreen() {
                     }
                   >
                     {item.shared
-                      ? "🎁 Dessin animé reçu"
-                      : "🎬 Dessin animé"}
+                      ? t.savedVideos.receivedVideo
+                      : t.savedVideos.animatedVideo}
                   </Text>
 
                   <Text
@@ -942,7 +975,9 @@ export default function SavedVideosScreen() {
                   >
                     {item.sceneCount ||
                       "?"}{" "}
-                    scènes
+                    {(item.sceneCount || 0) === 1
+                      ? t.savedVideos.scene
+                      : t.savedVideos.scenes}
                     {" • "}
                     {formatDate(
                       item.createdAt
@@ -979,7 +1014,7 @@ export default function SavedVideosScreen() {
                         styles.watchButtonText
                       }
                     >
-                      ▶️ Regarder
+                      {t.savedVideos.watch}
                     </Text>
                   </TouchableOpacity>
 
@@ -1001,7 +1036,7 @@ export default function SavedVideosScreen() {
                         styles.shareButtonText
                       }
                     >
-                      📤 Partager
+                      {t.savedVideos.share}
                     </Text>
                   </TouchableOpacity>
 
@@ -1027,8 +1062,8 @@ export default function SavedVideosScreen() {
                         }
                       >
                         {item.shared
-                          ? "🗑️ Retirer"
-                          : "🗑️ Supprimer"}
+                          ? t.savedVideos.remove
+                          : t.savedVideos.delete}
                       </Text>
                     )}
                   </TouchableOpacity>

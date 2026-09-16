@@ -1,68 +1,133 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 
 import {
-    Alert,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
 } from "react-native";
 
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../services/firebase";
 
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
+
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
 
+  const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshLanguage() {
+        const savedLanguage = await loadLanguage();
+
+        if (isActive) {
+          setLanguage(savedLanguage);
+        }
+      }
+
+      void refreshLanguage();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
   async function handleResetPassword() {
     if (!email.trim()) {
-      Alert.alert("Erreur", "Entre ton adresse email.");
+      Alert.alert(
+        t.account.forgotPasswordTitle,
+        t.account.forgotPasswordMissingEmail
+      );
       return;
     }
 
     try {
-      await sendPasswordResetEmail(auth, email.trim());
-
-      Alert.alert(
-        "Email envoyé 📩",
-        "Si ce compte existe, tu recevras un lien pour réinitialiser ton mot de passe."
+      await sendPasswordResetEmail(
+        auth,
+        email.trim().toLowerCase()
       );
 
-      router.back();
-    } catch (e: any) {
       Alert.alert(
-        "Erreur",
-        e?.message || "Impossible d’envoyer l’email."
+        t.account.forgotPasswordSentTitle,
+        t.account.forgotPasswordSentMessage,
+        [
+          {
+            text: "OK",
+            onPress: () => router.back(),
+          },
+        ],
+        {
+          cancelable: false,
+        }
+      );
+    } catch (error) {
+      console.log(
+        "Erreur réinitialisation mot de passe :",
+        error
+      );
+
+      Alert.alert(
+        t.account.forgotPasswordTitle,
+        t.account.forgotPasswordSendError
       );
     }
   }
 
   return (
-    <LinearGradient colors={["#020617", "#312E81"]} style={styles.container}>
-      <Text style={styles.title}>Mot de passe oublié ?</Text>
+    <LinearGradient
+      colors={["#020617", "#312E81"]}
+      style={styles.container}
+    >
+      <Text style={styles.title}>
+        {t.account.forgotPasswordTitle}
+      </Text>
 
       <Text style={styles.subtitle}>
-        Entre ton email pour recevoir un lien de réinitialisation.
+        {t.account.forgotPasswordSubtitle}
       </Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder={t.account.forgotPasswordEmail}
         placeholderTextColor="#999"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
+        autoCorrect={false}
         keyboardType="email-address"
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
-        <Text style={styles.buttonText}>Envoyer le lien</Text>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleResetPassword}
+      >
+        <Text style={styles.buttonText}>
+          {t.account.forgotPasswordSend}
+        </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backText}>Retour</Text>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.back()}
+      >
+        <Text style={styles.backText}>
+          {t.account.forgotPasswordBack}
+        </Text>
       </TouchableOpacity>
     </LinearGradient>
   );

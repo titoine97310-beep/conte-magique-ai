@@ -1,31 +1,39 @@
 import {
-    AVPlaybackStatus,
-    ResizeMode,
-    Video,
+  AVPlaybackStatus,
+  ResizeMode,
+  Video,
 } from "expo-av";
 
 import {
-    router,
-    useLocalSearchParams,
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
 } from "expo-router";
 
 import {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 
 import {
-    ActivityIndicator,
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
 
 export default function VideoPlayerScreen() {
   const params = useLocalSearchParams<{
@@ -43,6 +51,32 @@ export default function VideoPlayerScreen() {
 
   const [errorMessage, setErrorMessage] =
     useState("");
+
+  const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshLanguage() {
+        const savedLanguage =
+          await loadLanguage();
+
+        if (isActive) {
+          setLanguage(savedLanguage);
+        }
+      }
+
+      void refreshLanguage();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   const rawUrl = params.url;
 
@@ -210,10 +244,8 @@ const videoUrl = useMemo(() => {
       );
 
       Alert.alert(
-        "Erreur",
-        error instanceof Error
-          ? error.message
-          : String(error)
+        t.videoPlayer.error,
+        t.videoPlayer.playbackErrorMessage
       );
     }
   }
@@ -238,10 +270,8 @@ const videoUrl = useMemo(() => {
       );
 
       Alert.alert(
-        "Erreur",
-        error instanceof Error
-          ? error.message
-          : String(error)
+        t.videoPlayer.error,
+        t.videoPlayer.playbackErrorMessage
       );
     }
   }
@@ -392,8 +422,8 @@ const videoUrl = useMemo(() => {
             );
 
             Alert.alert(
-              "Lecture impossible",
-              `Erreur vidéo :\n\n${message}`
+              t.videoPlayer.playbackError,
+              t.videoPlayer.playbackErrorMessage
             );
           }}
         />

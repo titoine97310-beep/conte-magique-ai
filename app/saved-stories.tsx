@@ -1,6 +1,6 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -18,6 +18,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setCurrentStory } from "../services/currentStory";
 import { auth } from "../services/firebase";
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
 
 import {
   deleteStory,
@@ -48,6 +53,31 @@ export default function SavedStoriesScreen() {
 
   const [authReady, setAuthReady] =
     useState(false);
+
+  const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshLanguage() {
+        const savedLanguage = await loadLanguage();
+
+        if (isActive) {
+          setLanguage(savedLanguage);
+        }
+      }
+
+      refreshLanguage();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   useEffect(() => {
     const unsubscribe =
@@ -258,8 +288,8 @@ export default function SavedStoriesScreen() {
       sceneCount !== 6
     ) {
       Alert.alert(
-        "Dessin animé indisponible",
-        "Seules les histoires de 4 ou 6 scènes peuvent être transformées en dessin animé."
+        t.savedStories.videoUnavailableTitle,
+        t.savedStories.videoUnavailableMessage
       );
 
       return;
@@ -310,8 +340,8 @@ export default function SavedStoriesScreen() {
 
         if (!cloudResult) {
           Alert.alert(
-            "Erreur",
-            "Le favori n'a pas pu être synchronisé."
+            t.common.error,
+            t.savedStories.favoriteSyncError
           );
 
           return;
@@ -344,8 +374,8 @@ export default function SavedStoriesScreen() {
       );
 
       Alert.alert(
-        "Erreur",
-        "Impossible de modifier ce favori pour le moment."
+        t.common.error,
+        t.savedStories.favoriteUpdateError
       );
     }
   }
@@ -359,8 +389,8 @@ export default function SavedStoriesScreen() {
 
       if (!user) {
         Alert.alert(
-          "Connexion requise",
-          "Connecte-toi pour partager cette histoire."
+          t.savedStories.loginRequired,
+          t.savedStories.loginRequiredShare
         );
 
         return;
@@ -421,11 +451,10 @@ export default function SavedStoriesScreen() {
       await Share.share({
         title:
           story.prompt ||
-          "Une histoire ConteMagiqueIA",
+          t.savedStories.shareTitle,
 
         message:
-          "✨ Découvre cette histoire créée avec ConteMagiqueIA !\n\n" +
-          data.shareUrl,
+          `${t.savedStories.shareMessage}\n\n${data.shareUrl}`,
 
         url:
           data.shareUrl,
@@ -437,11 +466,8 @@ export default function SavedStoriesScreen() {
       );
 
       Alert.alert(
-        "Partage impossible",
-
-        error instanceof Error
-          ? error.message
-          : "L'histoire n'a pas pu être partagée."
+        t.savedStories.shareImpossible,
+        t.savedStories.shareError
       );
     }
   }
@@ -450,22 +476,17 @@ export default function SavedStoriesScreen() {
     id: number
   ) {
     Alert.alert(
-      "Supprimer",
-      "Tu veux vraiment supprimer cette histoire ?",
+      t.savedStories.deleteTitle,
+      t.savedStories.deleteConfirm,
       [
         {
-          text:
-            "Annuler",
-          style:
-            "cancel",
+          text: t.common.cancel,
+          style: "cancel",
         },
 
         {
-          text:
-            "Supprimer",
-
-          style:
-            "destructive",
+          text: t.common.delete,
+          style: "destructive",
 
           onPress:
             async () => {
@@ -480,8 +501,8 @@ export default function SavedStoriesScreen() {
 
                   if (!cloudDeleted) {
                     Alert.alert(
-                      "Erreur",
-                      "La suppression dans le cloud a échoué."
+                      t.common.error,
+                      t.savedStories.cloudDeleteError
                     );
 
                     return;
@@ -504,8 +525,8 @@ export default function SavedStoriesScreen() {
                 );
 
                 Alert.alert(
-                  "Erreur",
-                  "Impossible de supprimer cette histoire."
+                  t.common.error,
+                  t.savedStories.deleteError
                 );
               }
             },
@@ -538,7 +559,7 @@ export default function SavedStoriesScreen() {
             styles.title
           }
         >
-          Mes histoires
+          {t.savedStories.title}
         </Text>
 
         <View
@@ -567,7 +588,7 @@ export default function SavedStoriesScreen() {
                   styles.filterTextActive,
               ]}
             >
-              Toutes
+              {t.savedStories.all}
             </Text>
           </TouchableOpacity>
 
@@ -592,7 +613,7 @@ export default function SavedStoriesScreen() {
                   styles.filterTextActive,
               ]}
             >
-              Favoris ❤️
+              {t.savedStories.favorites}
             </Text>
           </TouchableOpacity>
         </View>
@@ -613,8 +634,7 @@ export default function SavedStoriesScreen() {
                 styles.loadingText
               }
             >
-              Chargement de tes
-              histoires…
+              {t.savedStories.loading}
             </Text>
           </View>
         ) : displayedStories.length ===
@@ -630,8 +650,8 @@ export default function SavedStoriesScreen() {
               }
             >
               {showFavoritesOnly
-                ? "Aucune histoire favorite pour l’instant."
-                : "Aucune histoire sauvegardée pour l’instant."}
+                ? t.savedStories.emptyFavorites
+                : t.savedStories.empty}
             </Text>
           </View>
         ) : (
@@ -729,7 +749,7 @@ export default function SavedStoriesScreen() {
                           }
                         >
                           {item.prompt ||
-                            "Histoire magique"}
+                            t.savedStories.defaultStoryTitle}
                         </Text>
 
                         <Text
@@ -738,14 +758,20 @@ export default function SavedStoriesScreen() {
                           }
                         >
                           {sceneCount}{" "}
-                          scènes
+                          {sceneCount === 1
+                            ? t.savedStories.scene
+                            : t.savedStories.scenes}
                           {" • "}
 
                           {item.createdAt
                             ? new Date(
                                 item.createdAt
                               ).toLocaleDateString(
-                                "fr-FR"
+                                language === "en"
+                                  ? "en-GB"
+                                  : language === "es"
+                                    ? "es-ES"
+                                    : "fr-FR"
                               )
                             : ""}
                         </Text>
@@ -834,7 +860,7 @@ export default function SavedStoriesScreen() {
                           styles.videoButtonText
                         }
                       >
-                        🎬 Créer le dessin animé
+                        {t.savedStories.createVideo}
                       </Text>
                     </TouchableOpacity>
                   ) : null}
@@ -857,7 +883,7 @@ export default function SavedStoriesScreen() {
               styles.backText
             }
           >
-            Retour accueil
+            {t.savedStories.backHome}
           </Text>
         </TouchableOpacity>
       </View>

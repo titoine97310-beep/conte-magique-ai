@@ -14,6 +14,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
+
 
 import { setCurrentStory } from "../services/currentStory";
 import { generateImage, generateStory } from "../services/openaiService";
@@ -110,6 +116,107 @@ function getStylePrompt(style: ImageStyle) {
 }
 
 export default function CreateStoryScreen() {
+  const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  function getImageStyleLabel(style: ImageStyle) {
+  if (style === "cartoon") {
+    return t.createStory.cartoon;
+  }
+
+  if (style === "fantasy") {
+    return t.createStory.fantasy;
+  }
+
+  if (style === "realistic") {
+    return t.createStory.realistic;
+  }
+
+  return t.createStory.comic;
+}
+
+function getStoryTypeLabel(type: StoryType) {
+  if (type === "funny") {
+    return t.createStory.funny;
+  }
+
+  if (type === "adventure") {
+    return t.createStory.adventure;
+  }
+
+  if (type === "magic") {
+    return t.createStory.magic;
+  }
+
+  return t.createStory.mystery;
+}
+
+function getStoryLengthLabel(length: StoryLength) {
+  if (length === "short") {
+    return t.createStory.short;
+  }
+
+  if (length === "medium") {
+    return t.createStory.medium;
+  }
+
+  return t.createStory.long;
+}
+
+function getNarratorSubtitle(narratorId: Narrator) {
+  if (narratorId === "narratrice") {
+    return t.createStory.eliseSubtitle;
+  }
+
+  if (narratorId === "narrateur") {
+    return t.createStory.arthurSubtitle;
+  }
+
+  if (narratorId === "magicien") {
+    return t.createStory.merlinSubtitle;
+  }
+
+  if (narratorId === "fee") {
+    return t.createStory.lunaSubtitle;
+  }
+
+  return t.createStory.bedtimeSubtitle;
+}
+
+  const [prompt, setPrompt] = useState("");
+  const [imageStyle, setImageStyle] =
+    useState<ImageStyle>("cartoon");
+
+  const [referencePhoto, setReferencePhoto] =
+    useState<string | null>(null);
+
+  const [
+    referencePhotoBase64,
+    setReferencePhotoBase64,
+  ] = useState<string | null>(null);
+
+  useFocusEffect(
+  useCallback(() => {
+    let isActive = true;
+
+    async function refreshLanguage() {
+      const savedLanguage = await loadLanguage();
+
+      if (isActive) {
+        setLanguage(savedLanguage);
+      }
+    }
+
+    refreshLanguage();
+
+    return () => {
+      isActive = false;
+    };
+  }, [])
+);
+
   useEffect(() => {
     const enableAdmin = async () => {
       const isAdmin = false;
@@ -121,12 +228,7 @@ export default function CreateStoryScreen() {
 
     enableAdmin();
   }, []);
-
-  const [prompt, setPrompt] = useState("");
-  const [imageStyle, setImageStyle] = useState<ImageStyle>("cartoon");
-  const [referencePhoto, setReferencePhoto] = useState<string | null>(null);
-  const [referencePhotoBase64, setReferencePhotoBase64] =
-  useState<string | null>(null);
+  
   const [referencePhotoMimeType, setReferencePhotoMimeType] =
   useState<string>("image/jpeg");
 
@@ -180,63 +282,87 @@ export default function CreateStoryScreen() {
     await AsyncStorage.setItem(storageKey, nextPack);
   }, []);
 
-  const selectPack = useCallback(async (pack: PackType) => {
+  const selectPack = useCallback(
+  async (pack: PackType) => {
     const currentUser = auth.currentUser;
 
     if (!currentUser) return;
 
     if (pack === "text" && textRemaining <= 0) {
-      Alert.alert("Carnet vide", "Ton carnet Texte ne contient plus d’histoire.");
+      Alert.alert(
+        t.createStory.emptyPack,
+        t.createStory.emptyTextPack
+      );
       return;
     }
 
     if (pack === "illustrated" && illustratedRemaining <= 0) {
       Alert.alert(
-        "Carnet vide",
-        "Ton carnet Illustré ne contient plus d’histoire."
+        t.createStory.emptyPack,
+        t.createStory.emptyIllustratedPack
       );
       return;
     }
 
     setSelectedPack(pack);
-    await AsyncStorage.setItem(`ACTIVE_STORY_PACK:${currentUser.uid}`, pack);
-  }, [textRemaining, illustratedRemaining]);
 
-  const openPackSelector = useCallback(() => {
-    if (!isConnected || loading) return;
-
-    const options: any[] = [];
-
-    if (textRemaining > 0) {
-      options.push({
-        text: `📖 Texte · ${textRemaining} restante${textRemaining > 1 ? "s" : ""}`,
-        onPress: () => selectPack("text"),
-      });
-    }
-
-    if (illustratedRemaining > 0) {
-      options.push({
-        text: `🎨 Illustré · ${illustratedRemaining} restante${
-          illustratedRemaining > 1 ? "s" : ""
-        }`,
-        onPress: () => selectPack("illustrated"),
-      });
-    }
-
-    options.push({ text: "Annuler", style: "cancel" });
-
-    Alert.alert(
-      "Choisir un carnet",
-      "Le carnet choisi sera utilisé pour la prochaine histoire.",
-      options
+    await AsyncStorage.setItem(
+      `ACTIVE_STORY_PACK:${currentUser.uid}`,
+      pack
     );
-  }, [
-    illustratedRemaining,
-    isConnected,
-    loading,
-    selectPack,
+  },
+  [
     textRemaining,
-  ]);
+    illustratedRemaining,
+    language,
+  ]
+);
+
+const openPackSelector = useCallback(() => {
+  if (!isConnected || loading) return;
+
+  const options: any[] = [];
+
+  if (textRemaining > 0) {
+    options.push({
+      text: `${t.createStory.textPackChoice} · ${textRemaining} ${
+        textRemaining === 1
+          ? t.createStory.remainingStory
+          : t.createStory.remainingStories
+      }`,
+      onPress: () => selectPack("text"),
+    });
+  }
+
+  if (illustratedRemaining > 0) {
+    options.push({
+      text: `${t.createStory.illustratedPackChoice} · ${illustratedRemaining} ${
+        illustratedRemaining === 1
+          ? t.createStory.remainingStory
+          : t.createStory.remainingStories
+      }`,
+      onPress: () => selectPack("illustrated"),
+    });
+  }
+
+  options.push({
+    text: t.common.cancel,
+    style: "cancel",
+  });
+
+  Alert.alert(
+    t.createStory.choosePack,
+    t.createStory.choosePackMessage,
+    options
+  );
+}, [
+  illustratedRemaining,
+  isConnected,
+  loading,
+  selectPack,
+  textRemaining,
+  language,
+]);
 
   useFocusEffect(
     useCallback(() => {
@@ -259,9 +385,9 @@ export default function CreateStoryScreen() {
         welcomeShownRef.current = true;
 
         Alert.alert(
-          "✨ Bienvenue dans ConteMagiqueIA",
-          "Tu peux découvrir gratuitement 2 histoires :\n\n📖 La première en texte\n🎨 La deuxième avec des illustrations\n\nEnsuite, tu pourras créer un compte et recevoir 2 nouvelles histoires texte offertes.",
-          [{ text: "Commencer" }],
+          t.createStory.guestWelcomeTitle,
+          t.createStory.guestWelcomeMessage,
+          [{ text: t.createStory.guestWelcomeButton }],
           { cancelable: false }
         );
       }
@@ -270,7 +396,7 @@ export default function CreateStoryScreen() {
     showGuestWelcome().catch((error) => {
       console.log("Erreur message de bienvenue :", error);
     });
-  }, []);
+  }, [language]);
 
   async function choosePhotoFromGallery() {
   try {
@@ -279,9 +405,9 @@ export default function CreateStoryScreen() {
 
     if (!permission.granted) {
       Alert.alert(
-        "Autorisation nécessaire",
-        "Autorise l'accès aux photos pour choisir une photo."
-      );
+  t.createStory.permissionRequired,
+  t.createStory.galleryPermission
+);
       return;
     }
 
@@ -309,18 +435,18 @@ export default function CreateStoryScreen() {
         setImageStyle("cartoon");
 
         Alert.alert(
-          "Style Cartoon activé 🎨",
-          "Le style Réaliste est indisponible lorsqu'une photo est utilisée."
-        );
+  t.createStory.cartoonActivated,
+  t.createStory.realisticPhotoBlocked
+);
       }
     }
   } catch (error) {
     console.log("Erreur sélection photo :", error);
 
     Alert.alert(
-      "Erreur",
-      "Impossible de sélectionner la photo."
-    );
+  t.common.error,
+  t.createStory.photoSelectionError
+);
   }
 }
 
@@ -331,9 +457,9 @@ async function takeReferencePhoto() {
 
     if (!permission.granted) {
       Alert.alert(
-        "Autorisation nécessaire",
-        "Autorise l'accès à l'appareil photo pour prendre une photo."
-      );
+  t.createStory.permissionRequired,
+  t.createStory.cameraPermission
+);
       return;
     }
 
@@ -359,18 +485,18 @@ async function takeReferencePhoto() {
         setImageStyle("cartoon");
 
         Alert.alert(
-          "Style Cartoon activé 🎨",
-          "Le style Réaliste est indisponible lorsqu'une photo est utilisée."
-        );
+  t.createStory.cartoonActivated,
+  t.createStory.realisticPhotoBlocked
+);
       }
     }
   } catch (error) {
     console.log("Erreur appareil photo :", error);
 
     Alert.alert(
-      "Erreur",
-      "Impossible de prendre la photo."
-    );
+  t.common.error,
+  t.createStory.cameraError
+);
   }
 }
 
@@ -378,28 +504,31 @@ function openPhotoSelector() {
   if (loading) return;
 
   Alert.alert(
-    "📷 Ajouter une photo",
-    "Ajoute une photo de référence pour personnaliser les illustrations : enfant, parent, famille, frères et sœurs, animal, doudou ou autre élément important.",
-    [
-      {
-        text: "Prendre une photo",
-        onPress: takeReferencePhoto,
-      },
-      {
-        text: "Choisir dans la galerie",
-        onPress: choosePhotoFromGallery,
-      },
-      {
-        text: "Annuler",
-        style: "cancel",
-      },
-    ]
-  );
+  t.createStory.photoTitle,
+  t.createStory.photoDescription,
+  [
+    {
+      text: t.createStory.takePhoto,
+      onPress: takeReferencePhoto,
+    },
+    {
+      text: t.createStory.chooseGallery,
+      onPress: choosePhotoFromGallery,
+    },
+    {
+      text: t.common.cancel,
+      style: "cancel",
+    },
+  ]
+);
 }
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      Alert.alert("Erreur", "Écris une idée avant de générer une histoire.");
+      Alert.alert(
+  t.common.error,
+  t.createStory.missingIdea
+);
       return;
     }
 
@@ -415,9 +544,9 @@ function openPhotoSelector() {
 
       if (!profile) {
         Alert.alert(
-          "Profil introuvable",
-          "Ton compte est connecté, mais ton profil n’a pas été trouvé."
-        );
+  t.createStory.profileNotFound,
+  t.createStory.profileNotFoundMessage
+);
         return;
       }
 
@@ -457,16 +586,19 @@ function openPhotoSelector() {
     if (!usage.allowed) {
       if (currentUser) {
         Alert.alert(
-          "📚 Tes carnets sont terminés",
-          "Tu n’as plus d’histoire disponible. Choisis un nouveau carnet pour continuer.",
-          [
-            { text: "Plus tard", style: "cancel" },
-            {
-              text: "Voir les carnets",
-              onPress: () => router.replace("/premium"),
-            },
-          ]
-        );
+  t.createStory.packsFinished,
+  t.createStory.packsFinishedMessage,
+  [
+    {
+      text: t.createStory.later,
+      style: "cancel",
+    },
+    {
+      text: t.createStory.viewPacks,
+      onPress: () => router.replace("/premium"),
+    },
+  ]
+);
       } else {
         router.replace("/continue-adventure" as any);
       }
@@ -476,11 +608,16 @@ function openPhotoSelector() {
     if (usage.mode === "guest-second-story") {
       await new Promise<void>((resolve) => {
         Alert.alert(
-          "🎨 Une surprise t’attend",
-          "Cette deuxième histoire sera illustrée. Après cette aventure, tu pourras créer un compte et recevoir 2 histoires texte offertes.",
-          [{ text: "Découvrir les illustrations", onPress: () => resolve() }],
-          { cancelable: false }
-        );
+  t.createStory.surpriseTitle,
+  t.createStory.surpriseMessage,
+  [
+    {
+      text: t.createStory.discoverIllustrations,
+      onPress: () => resolve(),
+    },
+  ],
+  { cancelable: false }
+);
       });
     }
 
@@ -490,7 +627,7 @@ function openPhotoSelector() {
 
     try {
       setLoading(true);
-      setLoadingText("Création de l’histoire...");
+      setLoadingText(t.createStory.creatingStory);
 
       const sceneCount =
         storyLength === "short" ? 4 : storyLength === "medium" ? 6 : 8;
@@ -514,10 +651,11 @@ Une photo de référence a été ajoutée.
   : prompt;
 
       const storyData = await generateStory(
-        storyPrompt,
-        storyType,
-        sceneCount
-      );
+  storyPrompt,
+  storyType,
+  sceneCount,
+  language
+);
       const scenes = storyData.scenes || [];
       const selectedStylePrompt = getStylePrompt(imageStyle);
       const charactersDescription = storyData.characters || "";
@@ -535,7 +673,9 @@ Une photo de référence a été ajoutée.
           continue;
         }
 
-        setLoadingText(`Création de l’image ${i + 1} / ${scenes.length}...`);
+        setLoadingText(
+  `${t.createStory.creatingImage} ${i + 1}/${sceneCount}...`
+);
 
         const styledImagePrompt = `
 ${selectedStylePrompt}
@@ -625,30 +765,37 @@ const imageUrl = await generateImage(
       }
 
       if (finishedPack) {
-        const label = finishedPack === "text" ? "Texte" : "Illustré";
+  const label =
+    finishedPack === "text"
+      ? t.createStory.textShort.replace("📖 ", "")
+      : t.createStory.illustratedShort.replace("🎨 ", "");
 
-        Alert.alert(
-          `📖 Carnet ${label} terminé`,
-          "Ton histoire est prête. Tu viens d’utiliser la dernière histoire de ce carnet.",
-          [
-            {
-              text: "Lire mon histoire",
-              onPress: () => router.push("/player"),
-            },
-            {
-              text: "Acheter un carnet",
-              onPress: () => router.replace("/premium"),
-            },
-          ],
-          { cancelable: false }
-        );
-        return;
-      }
+  Alert.alert(
+    `📖 ${label}`,
+    t.createStory.packsFinishedMessage,
+    [
+      {
+        text: t.createStory.readStory,
+        onPress: () => router.push("/player"),
+      },
+      {
+        text: t.createStory.buyAnotherPack,
+        onPress: () => router.replace("/premium"),
+      },
+    ],
+    { cancelable: false }
+  );
+
+  return;
+}
 
       router.push("/player");
     } catch (e) {
       console.log("Erreur génération :", e);
-      Alert.alert("Erreur", "Impossible de générer l’histoire.");
+      Alert.alert(
+  t.common.error,
+  t.createStory.generationError
+);
     } finally {
       setLoading(false);
       setLoadingText("");
@@ -665,13 +812,19 @@ const imageUrl = await generateImage(
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>Parle à l’IA</Text>
+        <Text style={styles.title}>
+  {t.createStory.title}
+</Text>
 
-        <Text style={styles.subtitle}>Écris ton idée d’histoire ✨</Text>
+<Text style={styles.subtitle}>
+  {t.createStory.subtitle}
+</Text>
 
         {isConnected && (
           <View style={styles.carnetsCard}>
-            <Text style={styles.activePackEyebrow}>Carnet actif</Text>
+            <Text style={styles.activePackEyebrow}>
+  {t.createStory.activePack}
+</Text>
 
             <TouchableOpacity
               style={styles.activePackButton}
@@ -681,18 +834,24 @@ const imageUrl = await generateImage(
             >
               <View style={styles.activePackTextBox}>
                 <Text style={styles.activePackTitle}>
-                  {selectedPack === "text" ? "📖 Carnet Texte" : "🎨 Carnet Illustré"}
+                  {selectedPack === "text"
+  ? t.createStory.textPack
+  : t.createStory.illustratedPack}
                 </Text>
 
                 <Text style={styles.activePackSubtitle}>
-                  {selectedPack === "text"
-                    ? `${textRemaining} histoire${textRemaining > 1 ? "s" : ""} restante${
-                        textRemaining > 1 ? "s" : ""
-                      }`
-                    : `${illustratedRemaining} histoire${
-                        illustratedRemaining > 1 ? "s" : ""
-                      } restante${illustratedRemaining > 1 ? "s" : ""}`}
-                </Text>
+  {selectedPack === "text"
+    ? `${textRemaining} ${
+        textRemaining === 1
+          ? t.createStory.remainingStory
+          : t.createStory.remainingStories
+      }`
+    : `${illustratedRemaining} ${
+        illustratedRemaining === 1
+          ? t.createStory.remainingStory
+          : t.createStory.remainingStories
+      }`}
+</Text>
               </View>
 
               {textRemaining > 0 && illustratedRemaining > 0 ? (
@@ -702,28 +861,35 @@ const imageUrl = await generateImage(
 
             {textRemaining > 0 && illustratedRemaining > 0 ? (
               <Text style={styles.changePackHint}>
-                Appuie pour changer de carnet
+                {t.createStory.changePack}
               </Text>
             ) : null}
 
             <View style={styles.packMiniRow}>
-              <Text style={styles.packMiniText}>📖 Texte : {textRemaining}</Text>
-              <Text style={styles.packMiniText}>🎨 Illustré : {illustratedRemaining}</Text>
-            </View>
+  <Text style={styles.packMiniText}>
+    {t.createStory.textShort} : {textRemaining}
+  </Text>
+
+  <Text style={styles.packMiniText}>
+    {t.createStory.illustratedShort} : {illustratedRemaining}
+  </Text>
+</View>
 
             <TouchableOpacity
               style={styles.buyCarnetButton}
               onPress={() => router.push("/premium" as any)}
               disabled={loading}
             >
-              <Text style={styles.buyCarnetButtonText}>Acheter un carnet</Text>
+              <Text style={styles.buyCarnetButtonText}>
+  {t.createStory.buyPack}
+</Text>
             </TouchableOpacity>
           </View>
         )}
 
         <TextInput
           style={styles.input}
-          placeholder="Ex : un dragon gentil sur une île magique..."
+          placeholder={t.createStory.ideaPlaceholder}
           placeholderTextColor="#AAA"
           value={prompt}
           onChangeText={setPrompt}
@@ -731,8 +897,9 @@ const imageUrl = await generateImage(
         />
 
         <Text style={styles.photoHelpText}>
-  📸 Photo de référence facultative{"\n"}
-  Utilise une photo nette où les personnes ou éléments importants sont bien visibles.
+  {t.createStory.optionalPhoto}
+  {"\n"}
+  {t.createStory.photoHelp}
 </Text>
 
         <TouchableOpacity
@@ -742,8 +909,8 @@ const imageUrl = await generateImage(
 >
   <Text style={styles.photoButtonText}>
     {referencePhoto
-      ? "📷 Changer la photo"
-      : "📷 Ajouter une photo à mon histoire"}
+      ? t.createStory.changePhoto
+      : t.createStory.addPhoto}
   </Text>
 </TouchableOpacity>
 
@@ -756,7 +923,7 @@ const imageUrl = await generateImage(
     />
 
     <Text style={styles.photoPreviewText}>
-      Photo de référence ajoutée ✓
+      {t.createStory.photoAdded}
     </Text>
   </View>
 )}
@@ -771,12 +938,14 @@ const imageUrl = await generateImage(
     disabled={loading}
   >
     <Text style={styles.removePhotoButtonText}>
-      Supprimer la photo
+      {t.createStory.removePhoto}
     </Text>
   </TouchableOpacity>
 )}
 
-        <Text style={styles.sectionTitle}>Style des images</Text>
+        <Text style={styles.sectionTitle}>
+  {t.createStory.imageStyleTitle}
+</Text>
 
         <View style={styles.grid}>
           {imageStyles.map((item) => {
@@ -795,9 +964,9 @@ const imageUrl = await generateImage(
       onPress={() => {
         if (isRealisticBlocked) {
           Alert.alert(
-            "Style indisponible",
-            "🔒 Le style Réaliste est indisponible lorsqu'une photo est utilisée."
-          );
+  t.createStory.styleUnavailable,
+  `🔒 ${t.createStory.realisticPhotoBlocked}`
+);
           return;
         }
 
@@ -811,15 +980,17 @@ const imageUrl = await generateImage(
           isActive && styles.optionTextActive,
         ]}
       >
-        {item.label}
-        {isRealisticBlocked ? " 🔒" : ""}
+        {getImageStyleLabel(item.id)}
+{isRealisticBlocked ? " 🔒" : ""}
       </Text>
     </TouchableOpacity>
   );
 })}
         </View>
 
-        <Text style={styles.sectionTitle}>Type d’histoire</Text>
+        <Text style={styles.sectionTitle}>
+  {t.createStory.storyTypeTitle}
+</Text>
 
         <View style={styles.grid}>
           {storyTypes.map((item) => {
@@ -838,14 +1009,16 @@ const imageUrl = await generateImage(
                     isActive && styles.optionTextActive,
                   ]}
                 >
-                  {item.label}
+                  {getStoryTypeLabel(item.id)}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={styles.sectionTitle}>Longueur</Text>
+        <Text style={styles.sectionTitle}>
+  {t.createStory.lengthTitle}
+</Text>
 
         <View style={styles.grid}>
           {storyLengths.map((item) => {
@@ -872,15 +1045,19 @@ const imageUrl = await generateImage(
                     isActive && styles.optionTextActive,
                   ]}
                 >
-                  {item.label}
-                  {item.disabled ? " 🔒 Bientôt" : ""}
+                  {getStoryLengthLabel(item.id)}
+{item.disabled
+  ? ` 🔒 ${t.createStory.comingSoon}`
+  : ""}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={styles.sectionTitle}>Qui raconte l’histoire ?</Text>
+        <Text style={styles.sectionTitle}>
+  {t.createStory.narratorTitle}
+</Text>
 
 <View style={styles.narratorGrid}>
   {narrators.map((item) => {
@@ -911,7 +1088,7 @@ const imageUrl = await generateImage(
             isActive && styles.narratorSubtitleActive,
           ]}
         >
-          {item.subtitle}
+          {getNarratorSubtitle(item.id)}
         </Text>
       </TouchableOpacity>
     );
@@ -924,7 +1101,9 @@ const imageUrl = await generateImage(
           disabled={loading}
         >
           <Text style={styles.buttonText}>
-            {loading ? loadingText || "Génération..." : "Générer l’histoire"}
+            {loading
+  ? loadingText || t.createStory.generating
+  : t.createStory.generate}
           </Text>
         </TouchableOpacity>
 
@@ -933,7 +1112,9 @@ const imageUrl = await generateImage(
           onPress={() => router.push("/")}
           disabled={loading}
         >
-          <Text style={styles.backText}>Retour accueil</Text>
+          <Text style={styles.backText}>
+  {t.createStory.backHome}
+</Text>
         </TouchableOpacity>
             </ScrollView>
     </SafeAreaView>

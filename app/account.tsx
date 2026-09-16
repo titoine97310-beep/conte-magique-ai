@@ -25,6 +25,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as Application from "expo-application";
 import { auth } from "../services/firebase";
 import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
+import {
   deleteUserProfile,
   getUserProfile,
   updateUserDisplayName,
@@ -45,6 +50,30 @@ export default function AccountScreen() {
   const [displayNameInput, setDisplayNameInput] = useState("");
 
   const [savingDisplayName, setSavingDisplayName] = useState(false);
+
+  const [language, setLanguage] = useState<AppLanguage>("fr");
+  const t = getTranslations(language);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      void loadLanguage().then((savedLanguage) => {
+        if (active) setLanguage(savedLanguage);
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const locale =
+    language === "en"
+      ? "en-US"
+      : language === "es"
+        ? "es-ES"
+        : "fr-FR";
 
   const appVersion = Application.nativeApplicationVersion ?? "1.0.0";
 const buildVersion = Application.nativeBuildVersion ?? "-";
@@ -88,8 +117,8 @@ const buildVersion = Application.nativeBuildVersion ?? "-";
         console.log("Erreur chargement profil :", error);
 
         Alert.alert(
-          "Chargement impossible",
-          "Impossible de récupérer les informations de ton compte pour le moment."
+          t.account.profileLoadImpossible,
+          t.account.profileLoadError
         );
       } finally {
         setLoadingProfile(false);
@@ -136,16 +165,16 @@ async function handleSaveDisplayName() {
 
   if (!currentUser) {
     Alert.alert(
-      "Erreur",
-      "Ton compte utilisateur est introuvable."
+      t.common.error,
+      t.account.noConnectedUser
     );
     return;
   }
 
   if (!cleanedDisplayName) {
     Alert.alert(
-      "Nom obligatoire",
-      "Entre un nom avant d’enregistrer."
+      t.account.nameRequired,
+      t.account.nameRequiredMessage
     );
     return;
   }
@@ -173,8 +202,8 @@ async function handleSaveDisplayName() {
     setDisplayNameInput("");
 
     Alert.alert(
-      "Nom modifié",
-      "Ton nom affiché a bien été enregistré."
+      t.account.nameChanged,
+      t.account.nameChangedMessage
     );
   } catch (error) {
     console.log(
@@ -183,8 +212,8 @@ async function handleSaveDisplayName() {
     );
 
     Alert.alert(
-      "Erreur",
-      "Impossible de modifier ton nom pour le moment."
+      t.common.error,
+      t.account.nameChangeError
     );
   } finally {
     setSavingDisplayName(false);
@@ -194,9 +223,13 @@ async function handleSaveDisplayName() {
   const handleContact = async () => {
   const email = "contact@contemagiqueia.fr";
   const subject = encodeURIComponent("Support ConteMagiqueIA");
-  const body = encodeURIComponent(
-    "Bonjour,\n\nJe vous contacte au sujet de l'application ConteMagiqueIA.\n\n"
-  );
+  const contactBody =
+    language === "en"
+      ? "Hello,\n\nI am contacting you about the ConteMagiqueIA app.\n\n"
+      : language === "es"
+        ? "Hola,\n\nMe pongo en contacto con ustedes acerca de la aplicación ConteMagiqueIA.\n\n"
+        : "Bonjour,\n\nJe vous contacte au sujet de l'application ConteMagiqueIA.\n\n";
+  const body = encodeURIComponent(contactBody);
 
   const url = `mailto:${email}?subject=${subject}&body=${body}`;
 
@@ -205,8 +238,8 @@ async function handleSaveDisplayName() {
 
     if (!supported) {
       Alert.alert(
-        "Application de messagerie indisponible",
-        `Tu peux nous contacter à l'adresse : ${email}`
+        t.account.mailUnavailable,
+        `${t.account.contactAt} ${email}`
       );
       return;
     }
@@ -216,31 +249,31 @@ async function handleSaveDisplayName() {
     console.error("Erreur lors de l'ouverture de la messagerie :", error);
 
     Alert.alert(
-      "Une erreur est survenue",
-      `Tu peux nous contacter à l'adresse : ${email}`
+      t.account.genericError,
+      `${t.account.contactAt} ${email}`
     );
   }
 };
 
   const handleDeleteAccount = () => {
   Alert.alert(
-    "Supprimer mon compte",
-    "Cette action est définitive.\n\nTon profil et les données liées à ton compte seront supprimés.\n\nVeux-tu vraiment continuer ?",
+    t.account.deleteAccount,
+    t.account.deleteAccountConfirm,
     [
       {
-        text: "Annuler",
+        text: t.common.cancel,
         style: "cancel",
       },
       {
-        text: "Supprimer",
+        text: t.common.delete,
         style: "destructive",
         onPress: async () => {
           const currentUser = auth.currentUser;
 
           if (!currentUser) {
             Alert.alert(
-              "Erreur",
-              "Aucun utilisateur connecté n’a été trouvé."
+              t.common.error,
+              t.account.noConnectedUser
             );
             return;
           }
@@ -266,15 +299,15 @@ async function handleSaveDisplayName() {
 
             if (error?.code === "auth/requires-recent-login") {
               Alert.alert(
-                "Reconnexion nécessaire",
-                "Pour des raisons de sécurité, déconnecte-toi puis reconnecte-toi avant de supprimer ton compte."
+                t.account.recentLoginRequired,
+                t.account.recentLoginMessage
               );
               return;
             }
 
             Alert.alert(
-              "Erreur",
-              "La suppression du compte n’a pas pu être terminée."
+              t.common.error,
+              t.account.deleteAccountError
             );
           } finally {
             setDeletingAccount(false);
@@ -287,15 +320,15 @@ async function handleSaveDisplayName() {
 
 function handleLogout() {
   Alert.alert(
-    "Se déconnecter",
-    "Veux-tu vraiment te déconnecter de ton compte ?",
+    t.account.logout,
+    t.account.logoutConfirm,
     [
       {
-        text: "Annuler",
+        text: t.common.cancel,
         style: "cancel",
       },
       {
-        text: "Se déconnecter",
+        text: t.account.logout,
         style: "destructive",
         onPress: async () => {
           try {
@@ -308,8 +341,8 @@ function handleLogout() {
             console.log("Erreur déconnexion :", error);
 
             Alert.alert(
-              "Erreur",
-              "Impossible de te déconnecter pour le moment."
+              t.common.error,
+              t.account.logoutError
             );
           } finally {
             setLoggingOut(false);
@@ -329,14 +362,14 @@ function handleLogout() {
       return displayName.split(" ")[0];
     }
 
-    return "à toi";
+    return t.account.you;
   }
 
   function getDisplayName() {
     return (
       profile?.displayName ||
       user?.displayName ||
-      "Non renseigné"
+      t.account.notProvided
     );
   }
 
@@ -344,13 +377,13 @@ function handleLogout() {
     return (
       profile?.email ||
       user?.email ||
-      "Non disponible"
+      t.account.notAvailable
     );
   }
 
   function formatDate(
     value: string | null | undefined,
-    emptyText = "Non disponible"
+    emptyText = t.account.notAvailable
   ) {
     if (!value) {
       return emptyText;
@@ -362,7 +395,7 @@ function handleLogout() {
       return emptyText;
     }
 
-    return date.toLocaleDateString("fr-FR", {
+    return date.toLocaleDateString(locale, {
       day: "2-digit",
       month: "long",
       year: "numeric",
@@ -370,20 +403,22 @@ function handleLogout() {
   }
 
   function formatDateTime(
-    value: string | null | undefined,
-    emptyText = "Non disponible"
-  ) {
+  value: unknown,
+  emptyText: string = t.account.notAvailable
+) {
     if (!value) {
       return emptyText;
     }
 
-    const date = new Date(value);
+    const date = new Date(
+  value as string | number | Date
+);
 
     if (Number.isNaN(date.getTime())) {
       return emptyText;
     }
 
-    return date.toLocaleString("fr-FR", {
+    return date.toLocaleString(locale, {
       day: "2-digit",
       month: "long",
       year: "numeric",
@@ -403,41 +438,41 @@ function handleLogout() {
   function getRoleLabel() {
     switch (profile?.role) {
       case "admin":
-        return "Administrateur";
+        return t.account.roleAdmin;
 
       case "user":
-        return "Utilisateur";
+        return t.account.roleUser;
 
       case "guest":
-        return "Invité";
+        return t.account.roleGuest;
 
       default:
-        return "Utilisateur";
+        return t.account.roleUser;
     }
   }
 
   function formatStoryCount(amount: number) {
     if (amount === 0) {
-      return "Aucune histoire restante";
+      return t.account.noStoryRemaining;
     }
 
     if (amount === 1) {
-      return "1 histoire restante";
+      return t.account.oneStoryRemaining;
     }
 
-    return `${amount} histoires restantes`;
+    return `${amount} ${t.account.storiesRemaining}`;
   }
 
   function formatPurchaseCount(amount: number) {
     if (amount === 0) {
-      return "Aucun achat";
+      return t.account.noPurchase;
     }
 
     if (amount === 1) {
-      return "1 achat";
+      return t.account.onePurchase;
     }
 
-    return `${amount} achats`;
+    return `${amount} ${t.account.purchases}`;
   }
 
   if (checkingAuth || loadingProfile) {
@@ -449,7 +484,7 @@ function handleLogout() {
         <ActivityIndicator size="large" color="#FFB703" />
 
         <Text style={styles.loadingText}>
-          Chargement de ton compte...
+          {t.account.profileLoading}
         </Text>
       </LinearGradient>
     );
@@ -494,7 +529,7 @@ function handleLogout() {
             onPress={() => router.replace("/")}
             disabled={loggingOut}
           >
-            <Text style={styles.backText}>← Accueil</Text>
+            <Text style={styles.backText}>{t.account.home}</Text>
           </TouchableOpacity>
 
           <View style={styles.header}>
@@ -503,29 +538,29 @@ function handleLogout() {
             </View>
 
             <Text style={styles.title}>
-              Bonjour {getFirstName()} 👋
+              {t.account.hello} {getFirstName()} 👋
             </Text>
 
             <Text style={styles.subtitle}>
-              Retrouve ici les informations de ton compte ConteMagiqueIA.
+              {t.account.profileSubtitle}
             </Text>
           </View>
 
           {!profile && (
             <View style={styles.warningCard}>
               <Text style={styles.warningTitle}>
-                Profil incomplet
+                {t.account.incompleteProfile}
               </Text>
 
               <Text style={styles.warningText}>
-                Ton compte Firebase existe, mais son profil Firestore n’a pas été trouvé.
+                {t.account.incompleteProfileMessage}
               </Text>
             </View>
           )}
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>
-              Mes informations
+              {t.account.myInformation}
             </Text>
 
             <View style={styles.infoRow}>
@@ -534,7 +569,7 @@ function handleLogout() {
               </View>
 
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Nom affiché</Text>
+                <Text style={styles.infoLabel}>{t.account.displayName}</Text>
 
                 <Text style={styles.infoValue}>
                   {getDisplayName()}
@@ -546,7 +581,7 @@ function handleLogout() {
                   style={styles.editNameButton}
                 >
                   <Text style={styles.editNameButtonText}>
-                    Modifier
+                    {t.account.edit}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -561,7 +596,7 @@ function handleLogout() {
 
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>
-                  Adresse e-mail
+                  {t.account.email}
                 </Text>
 
                 <Text style={styles.infoValue}>
@@ -579,7 +614,7 @@ function handleLogout() {
 
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>
-                  Compte créé le
+                  {t.account.accountCreated}
                 </Text>
 
                 <Text style={styles.infoValue}>
@@ -597,7 +632,7 @@ function handleLogout() {
 
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>
-                  Type de compte
+                  {t.account.accountType}
                 </Text>
 
                 <Text style={styles.infoValue}>
@@ -609,7 +644,7 @@ function handleLogout() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>
-              Mes carnets
+              {t.account.myPacks}
             </Text>
 
             <View style={styles.packRow}>
@@ -619,11 +654,11 @@ function handleLogout() {
 
               <View style={styles.packContent}>
                 <Text style={styles.packName}>
-                  Carnet Texte
+                  {t.account.textPack}
                 </Text>
 
                 <Text style={styles.packDescription}>
-                  Histoires sans illustration
+                  {t.account.textPackDescription}
                 </Text>
 
                 <Text style={styles.packRemaining}>
@@ -647,11 +682,11 @@ function handleLogout() {
 
               <View style={styles.packContent}>
                 <Text style={styles.packName}>
-                  Carnet Illustré
+                  {t.account.illustratedPack}
                 </Text>
 
                 <Text style={styles.packDescription}>
-                  Histoires avec texte et images
+                  {t.account.illustratedPackDescription}
                 </Text>
 
                 <Text style={styles.packRemaining}>
@@ -672,14 +707,14 @@ function handleLogout() {
               disabled={loggingOut}
             >
               <Text style={styles.premiumButtonText}>
-                Acheter un carnet
+                {t.account.buyPack}
               </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>
-              Mon activité
+              {t.account.myActivity}
             </Text>
 
             <View style={styles.activityRow}>
@@ -689,7 +724,7 @@ function handleLogout() {
 
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>
-                  Dernière connexion
+                  {t.account.lastLogin}
                 </Text>
 
                 <Text style={styles.infoValue}>
@@ -707,13 +742,13 @@ function handleLogout() {
 
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>
-                  Dernière histoire créée
+                  {t.account.lastStoryCreated}
                 </Text>
 
                 <Text style={styles.infoValue}>
                   {formatDateTime(
                     profile?.lastStoryCreatedAt,
-                    "Aucune histoire créée"
+                    t.account.noStoryCreated
                   )}
                 </Text>
               </View>
@@ -722,13 +757,13 @@ function handleLogout() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>
-              Mes achats
+              {t.account.myPurchases}
             </Text>
 
             <View style={styles.purchaseRow}>
               <View>
                 <Text style={styles.purchaseName}>
-                  ✍️ Carnet Texte
+                  ✍️ {t.account.textPack}
                 </Text>
 
                 <Text style={styles.purchaseValue}>
@@ -746,7 +781,7 @@ function handleLogout() {
             <View style={styles.purchaseRow}>
               <View>
                 <Text style={styles.purchaseName}>
-                  🎨 Carnet Illustré
+                  🎨 {t.account.illustratedPack}
                 </Text>
 
                 <Text style={styles.purchaseValue}>
@@ -762,7 +797,7 @@ function handleLogout() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>
-              Mon espace
+              {t.account.mySpace}
             </Text>
 
             <TouchableOpacity
@@ -775,7 +810,7 @@ function handleLogout() {
               <Text style={styles.menuIcon}>❤️</Text>
 
               <Text style={styles.menuText}>
-                Mes histoires
+                {t.account.myStories}
               </Text>
 
               <Text style={styles.menuArrow}>›</Text>
@@ -792,11 +827,11 @@ function handleLogout() {
 
               <View style={styles.menuTextContainer}>
                 <Text style={styles.menuText}>
-                  Centre juridique
+                  {t.account.legalCenter}
                 </Text>
 
                 <Text style={styles.menuSubText}>
-                  CGU, confidentialité, mentions légales...
+                  {t.account.legalCenterSubtitle}
                 </Text>
               </View>
 
@@ -814,7 +849,7 @@ function handleLogout() {
 
               <View style={styles.menuTextContainer}>
                 <Text style={styles.menuText}>
-                  Nous contacter
+                  {t.account.contactUs}
                 </Text>
 
                 <Text style={styles.menuSubText}>
@@ -838,7 +873,7 @@ function handleLogout() {
               <ActivityIndicator color="#FCA5A5" />
             ) : (
               <Text style={styles.deleteAccountButtonText}>
-                🗑️ Supprimer mon compte
+                🗑️ {t.account.deleteAccount}
               </Text>
             )}
           </TouchableOpacity>
@@ -855,7 +890,7 @@ function handleLogout() {
               <ActivityIndicator color="white" />
             ) : (
               <Text style={styles.logoutButtonText}>
-                🚪 Se déconnecter
+                🚪 {t.account.logout}
               </Text>
             )}
           </TouchableOpacity>
@@ -866,7 +901,7 @@ function handleLogout() {
             </Text>
 
             <Text style={styles.footerVersion}>
-              Version {appVersion} ({buildVersion})
+              {t.account.version} {appVersion} ({buildVersion})
             </Text>
 
             <Text style={styles.footerCopyright}>
@@ -885,14 +920,14 @@ function handleLogout() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>
-              Modifier mon nom
+              {t.account.editNameTitle}
             </Text>
 
             <TextInput
               style={styles.modalInput}
               value={displayNameInput}
               onChangeText={setDisplayNameInput}
-              placeholder="Ton nom affiché"
+              placeholder={t.account.displayNamePlaceholder}
               placeholderTextColor="#94A3B8"
               autoCapitalize="words"
               editable={!savingDisplayName}
@@ -905,7 +940,7 @@ function handleLogout() {
                 disabled={savingDisplayName}
               >
                 <Text style={styles.cancelButtonText}>
-                  Annuler
+                  {t.common.cancel}
                 </Text>
               </TouchableOpacity>
 
@@ -918,7 +953,7 @@ function handleLogout() {
                   <ActivityIndicator color="#111827" />
                 ) : (
                   <Text style={styles.saveButtonText}>
-                    Enregistrer
+                    {t.common.save}
                   </Text>
                 )}
               </TouchableOpacity>

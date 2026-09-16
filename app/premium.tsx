@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -23,6 +23,12 @@ import {
 
 import { auth } from "../services/firebase";
 import { setUserMode } from "../services/usageService";
+
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
 
 const BACKEND_URL =
   "https://conte-magique-ai.onrender.com";
@@ -54,6 +60,32 @@ const STORE_NAME =
 export default function PremiumScreen() {
   const [processing, setProcessing] =
     useState(false);
+
+  const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshLanguage() {
+        const savedLanguage =
+          await loadLanguage();
+
+        if (isActive) {
+          setLanguage(savedLanguage);
+        }
+      }
+
+      void refreshLanguage();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   const {
     connected,
@@ -230,17 +262,17 @@ export default function PremiumScreen() {
 
           Alert.alert(
             isShort
-              ? "Dessin animé Court activé 🎬"
-              : "Dessin animé Moyen activé 🎬",
+              ? t.premium.shortVideoActivated
+              : t.premium.mediumVideoActivated,
 
             isShort
-              ? "Ton crédit vidéo de 4 scènes a bien été ajouté. Choisis maintenant l'histoire que tu veux transformer en dessin animé."
-              : "Ton crédit vidéo de 6 scènes a bien été ajouté. Choisis maintenant l'histoire que tu veux transformer en dessin animé.",
+              ? t.premium.shortVideoAdded
+              : t.premium.mediumVideoAdded,
 
             [
               {
                 text:
-                  "Choisir mon histoire",
+                  t.premium.chooseStory,
 
                 onPress: () =>
                   router.replace(
@@ -263,12 +295,12 @@ export default function PremiumScreen() {
           TEXT_PRODUCT_ID
         ) {
           Alert.alert(
-            "Carnet Texte activé 🎉",
-            "15 histoires en texte ont été ajoutées à ton compte.",
+            t.premium.textPackActivated,
+            t.premium.textPackAdded,
             [
               {
                 text:
-                  "Créer une histoire",
+                  t.premium.createStory,
 
                 onPress: () =>
                   router.replace(
@@ -286,12 +318,12 @@ export default function PremiumScreen() {
           ILLUSTRATED_PRODUCT_ID
         ) {
           Alert.alert(
-            "Carnet Illustré activé 🎉",
-            "15 histoires illustrées ont été ajoutées à ton compte.",
+            t.premium.illustratedPackActivated,
+            t.premium.illustratedPackAdded,
             [
               {
                 text:
-                  "Créer une histoire",
+                  t.premium.createStory,
 
                 onPress: () =>
                   router.replace(
@@ -305,8 +337,8 @@ export default function PremiumScreen() {
         }
 
         Alert.alert(
-          "Achat validé 🎉",
-          "Ton achat a été ajouté à ton compte."
+          t.premium.purchaseValidated,
+          t.premium.purchaseAdded
         );
       } catch (error: any) {
         console.error(
@@ -315,10 +347,8 @@ export default function PremiumScreen() {
         );
 
         Alert.alert(
-          "Achat non finalisé",
-
-          error?.message ||
-            `Impossible de valider l'achat avec ${STORE_NAME}. Ne relance pas immédiatement le paiement.`
+          t.premium.purchaseNotCompleted,
+          t.premium.purchaseValidationError
         );
       } finally {
         setProcessing(false);
@@ -345,10 +375,8 @@ export default function PremiumScreen() {
       }
 
       Alert.alert(
-        "Paiement impossible",
-
-        error.message ||
-          `${STORE_NAME} n'a pas pu effectuer le paiement.`
+        t.premium.paymentImpossible,
+        t.premium.paymentError
       );
     },
   });
@@ -374,14 +402,13 @@ export default function PremiumScreen() {
 
   function redirectToRegister() {
     Alert.alert(
-      "Compte requis",
-
-      "Crée gratuitement ton compte pour acheter et conserver tes carnets.",
+      t.premium.accountRequired,
+      t.premium.accountRequiredMessage,
 
       [
         {
           text:
-            "Créer mon compte",
+            t.premium.createAccount,
 
           onPress: () =>
             router.replace({
@@ -397,7 +424,7 @@ export default function PremiumScreen() {
 
         {
           text:
-            "J’ai déjà un compte",
+            t.premium.alreadyHaveAccount,
 
           onPress: () =>
             router.replace({
@@ -413,7 +440,7 @@ export default function PremiumScreen() {
 
         {
           text:
-            "Annuler",
+            t.common.cancel,
 
           style:
             "cancel",
@@ -435,8 +462,8 @@ export default function PremiumScreen() {
 
     if (!connected) {
       Alert.alert(
-        `${STORE_NAME} indisponible`,
-        `La connexion à ${STORE_NAME} n'est pas encore prête. Réessaie dans quelques secondes.`
+        `${STORE_NAME} ${t.premium.storeUnavailable}`,
+        t.premium.storeNotReady
       );
 
       return;
@@ -455,8 +482,8 @@ export default function PremiumScreen() {
 
     if (!storeProduct) {
       Alert.alert(
-        "Produit indisponible",
-        `Ce carnet n'est pas disponible sur ${STORE_NAME} pour le moment.`
+        t.premium.productUnavailable,
+        t.premium.productUnavailableMessage
       );
 
       return;
@@ -537,9 +564,8 @@ export default function PremiumScreen() {
       );
 
       Alert.alert(
-        "Paiement impossible",
-        error?.message ||
-          `Impossible d'ouvrir ${STORE_NAME}.`
+        t.premium.paymentImpossible,
+        t.premium.storeOpenError
       );
     }
   }
@@ -659,7 +685,7 @@ export default function PremiumScreen() {
                 styles.backText
               }
             >
-              ← Retour
+              {t.premium.back}
             </Text>
           </TouchableOpacity>
 
@@ -668,7 +694,7 @@ export default function PremiumScreen() {
               styles.title
             }
           >
-            Continue la magie ✨
+            {t.premium.title}
           </Text>
 
           <Text
@@ -676,9 +702,7 @@ export default function PremiumScreen() {
               styles.subtitle
             }
           >
-            Choisis ton carnet et
-            continue à créer des
-            histoires personnalisées.
+            {t.premium.subtitle}
           </Text>
 
           <View
@@ -691,7 +715,7 @@ export default function PremiumScreen() {
                 styles.benefit
               }
             >
-              🔊 Narration IA immersive
+              {t.premium.benefitNarration}
             </Text>
 
             <Text
@@ -699,7 +723,7 @@ export default function PremiumScreen() {
                 styles.benefit
               }
             >
-              🌙 Mode dodo magique
+              {t.premium.benefitBedtime}
             </Text>
 
             <Text
@@ -707,7 +731,7 @@ export default function PremiumScreen() {
                 styles.benefit
               }
             >
-              💾 Histoires sauvegardées
+              {t.premium.benefitSaved}
             </Text>
 
             <Text
@@ -715,8 +739,7 @@ export default function PremiumScreen() {
                 styles.benefit
               }
             >
-              🎨 Illustrations selon le
-              carnet
+              {t.premium.benefitIllustrations}
             </Text>
           </View>
 
@@ -733,7 +756,7 @@ export default function PremiumScreen() {
                   styles.storeStatusText
                 }
               >
-                Connexion à{" "}
+                {t.premium.storeConnecting}{" "}
                 {STORE_NAME}…
               </Text>
             </View>
@@ -757,7 +780,7 @@ export default function PremiumScreen() {
                 styles.cardTitle
               }
             >
-              Carnet Texte
+              {t.premium.textPackTitle}
             </Text>
 
             <Text
@@ -776,10 +799,7 @@ export default function PremiumScreen() {
                 styles.cardDescription
               }
             >
-              15 histoires en texte
-              seul. Idéal pour profiter
-              de la narration sans
-              générer d’illustrations.
+              {t.premium.textPackDescription}
             </Text>
 
             <TouchableOpacity
@@ -809,7 +829,7 @@ export default function PremiumScreen() {
                     styles.buttonText
                   }
                 >
-                  Choisir le carnet texte
+                  {t.premium.chooseTextPack}
                 </Text>
               )}
             </TouchableOpacity>
@@ -830,7 +850,7 @@ export default function PremiumScreen() {
                   styles.badgeText
                 }
               >
-                Le plus magique
+                {t.premium.mostMagical}
               </Text>
             </View>
 
@@ -847,7 +867,7 @@ export default function PremiumScreen() {
                 styles.cardTitle
               }
             >
-              Carnet Illustré
+              {t.premium.illustratedPackTitle}
             </Text>
 
             <Text
@@ -866,12 +886,7 @@ export default function PremiumScreen() {
                 styles.cardDescription
               }
             >
-              15 histoires complètes
-              avec texte et
-              illustrations.
-              L’expérience la plus
-              immersive de
-              ConteMagiqueIA.
+              {t.premium.illustratedPackDescription}
             </Text>
 
             <TouchableOpacity
@@ -901,8 +916,7 @@ export default function PremiumScreen() {
                     styles.premiumButtonText
                   }
                 >
-                  Choisir le carnet
-                  illustré
+                  {t.premium.chooseIllustratedPack}
                 </Text>
               )}
             </TouchableOpacity>
@@ -923,7 +937,7 @@ export default function PremiumScreen() {
                   styles.videoBadgeText
                 }
               >
-                🎬 4 scènes
+                {t.premium.fourScenes}
               </Text>
             </View>
 
@@ -940,7 +954,7 @@ export default function PremiumScreen() {
                 styles.cardTitle
               }
             >
-              Dessin animé Court
+              {t.premium.shortVideoTitle}
             </Text>
 
             <Text
@@ -959,10 +973,7 @@ export default function PremiumScreen() {
                 styles.cardDescription
               }
             >
-              Transforme une histoire
-              illustrée de 4 scènes en
-              dessin animé d’environ 20
-              secondes.
+              {t.premium.shortVideoDescription}
             </Text>
 
             <TouchableOpacity
@@ -992,7 +1003,7 @@ export default function PremiumScreen() {
                     styles.videoPurchaseButtonText
                   }
                 >
-                  🎬 Acheter le dessin animé Court
+                  {t.premium.buyShortVideo}
                 </Text>
               )}
             </TouchableOpacity>
@@ -1013,7 +1024,7 @@ export default function PremiumScreen() {
                   styles.videoBadgeText
                 }
               >
-                🎬 6 scènes
+                {t.premium.sixScenes}
               </Text>
             </View>
 
@@ -1030,7 +1041,7 @@ export default function PremiumScreen() {
                 styles.cardTitle
               }
             >
-              Dessin animé Moyen
+              {t.premium.mediumVideoTitle}
             </Text>
 
             <Text
@@ -1051,10 +1062,7 @@ export default function PremiumScreen() {
                 styles.cardDescription
               }
             >
-              Transforme une histoire
-              illustrée de 6 scènes en
-              dessin animé d’environ 30
-              secondes.
+              {t.premium.mediumVideoDescription}
             </Text>
 
             <TouchableOpacity
@@ -1084,7 +1092,7 @@ export default function PremiumScreen() {
                     styles.videoPurchaseButtonText
                   }
                 >
-                  🎬 Acheter le dessin animé Moyen
+                  {t.premium.buyMediumVideo}
                 </Text>
               )}
             </TouchableOpacity>
@@ -1095,9 +1103,8 @@ export default function PremiumScreen() {
               styles.footerText
             }
           >
-            Paiement sécurisé par{" "}
-            {STORE_NAME}. Chaque carnet
-            contient 15 créations.
+            {t.premium.securePayment}{" "}
+            {STORE_NAME}. {t.premium.packContains}
           </Text>
         </ScrollView>
       </SafeAreaView>

@@ -23,21 +23,39 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getCurrentStory, setCurrentStory } from "../services/currentStory";
 import { auth, db } from "../services/firebase";
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
 import { toggleFavoriteStory } from "../services/storageService";
-
 const TTS_URL = "https://conte-magique-ai.onrender.com/tts";
 const VIDEO_URL =
   "https://conte-magique-ai.onrender.com/video";
 
-const REPORT_REASONS = [
-  "Contenu inapproprié ou choquant",
-  "Violence ou contenu dangereux",
-  "Contenu à caractère sexuel",
-  "Autre problème",
-] as const;
-
 export default function PlayerScreen() {
   useKeepAwake();
+
+    const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  const reportReasons = [
+  t.player.reportInappropriate,
+  t.player.reportViolence,
+  t.player.reportSexual,
+  t.player.reportOther,
+];
+
+  useEffect(() => {
+    async function initializeLanguage() {
+      const savedLanguage = await loadLanguage();
+      setLanguage(savedLanguage);
+    }
+
+    initializeLanguage();
+  }, []);
 
   const params =
   useLocalSearchParams<{
@@ -99,22 +117,24 @@ const resumeVideoHandledRef =
     nightMode || bedtimeMode ? ["#020617", "#111827"] : ["#111827", "#312E81"];
 
   function styleLabel() {
-    if (story?.imageStyle === "cartoon") return "🎨 Cartoon";
-    if (story?.imageStyle === "fantasy") return "🧙 Fantasy";
-    if (story?.imageStyle === "realistic") return "🌍 Réaliste";
-    if (story?.imageStyle === "comic") return "📖 BD";
-    return "✨ Style magique";
-  }
+  if (story?.imageStyle === "cartoon") return "🎨 Cartoon";
+  if (story?.imageStyle === "fantasy") return "🧙 Fantasy";
+  if (story?.imageStyle === "realistic") return t.player.realistic;
+  if (story?.imageStyle === "comic") return t.player.comic;
+
+  return t.player.styleMagic;
+}
 
   function ambienceLabel() {
-    if (current?.ambience === "forest") return "🌳 Forêt";
-    if (current?.ambience === "ocean") return "🌊 Mer";
-    if (current?.ambience === "night") return "🌙 Nuit";
-    if (current?.ambience === "danger") return "⚠️ Danger";
-    if (current?.ambience === "calm") return "🕊️ Calme";
-    if (current?.ambience === "victory") return "🏆 Victoire";
-    return "✨ Magie";
-  }
+  if (current?.ambience === "forest") return t.player.forest;
+  if (current?.ambience === "ocean") return t.player.ocean;
+  if (current?.ambience === "night") return t.player.night;
+  if (current?.ambience === "danger") return t.player.danger;
+  if (current?.ambience === "calm") return t.player.calm;
+  if (current?.ambience === "victory") return t.player.victory;
+
+  return t.player.magic;
+}
 
   function getAmbienceSound(ambience?: string) {
     switch (ambience) {
@@ -258,6 +278,7 @@ const resumeVideoHandledRef =
   mode: isBedtime ? "bedtime" : "story",
   emotion: emotion || "warm",
   narrator: story?.narrator || "narratrice",
+  language,
 }),
       });
 
@@ -324,7 +345,12 @@ sound.setOnPlaybackStatusUpdate((status) => {
       console.log("Erreur TTS auto :", e);
 
       Speech.speak(text, {
-        language: "fr-FR",
+  language:
+    language === "en"
+      ? "en-US"
+      : language === "es"
+        ? "es-ES"
+        : "fr-FR",
         pitch: isBedtime ? 0.8 : 1,
         rate: isBedtime ? 0.75 : 0.9,
         onDone: () => {
@@ -364,7 +390,7 @@ sound.setOnPlaybackStatusUpdate((status) => {
     }
   }
 
-  async function submitReport(reason: (typeof REPORT_REASONS)[number]) {
+  async function submitReport(reason: string) {
     if (reportSending) return;
 
     try {
@@ -390,16 +416,16 @@ sound.setOnPlaybackStatusUpdate((status) => {
       setReportModalVisible(false);
 
       Alert.alert(
-        "Signalement envoyé",
-        "Merci. Ce contenu a bien été signalé et pourra être examiné."
-      );
+  t.player.reportSentTitle,
+  t.player.reportSentMessage
+);
     } catch (error) {
       console.log("Erreur signalement :", error);
 
       Alert.alert(
-        "Erreur",
-        "Impossible d'envoyer le signalement pour le moment. Réessaie plus tard."
-      );
+  t.common.error,
+  t.player.reportError
+);
     } finally {
       setReportSending(false);
     }
@@ -573,9 +599,9 @@ sound.setOnPlaybackStatusUpdate((status) => {
 
   if (scenes.length !== 4 && scenes.length !== 6) {
     Alert.alert(
-      "Dessin animé indisponible",
-      "Seules les histoires de 4 ou 6 scènes peuvent être transformées en dessin animé pour le moment."
-    );
+  t.player.videoUnavailableTitle,
+  t.player.videoUnavailableMessage
+);
     return;
   }
 
@@ -585,9 +611,9 @@ sound.setOnPlaybackStatusUpdate((status) => {
 
   if (missingImage) {
     Alert.alert(
-      "Illustrations manquantes",
-      "Toutes les scènes doivent avoir une illustration avant de créer le dessin animé."
-    );
+  t.player.missingImagesTitle,
+  t.player.missingImagesMessage
+);
     return;
   }
 
@@ -599,25 +625,25 @@ sound.setOnPlaybackStatusUpdate((status) => {
 
   if (remaining <= 0) {
     Alert.alert(
-      "Aucun crédit vidéo",
-      "Tu n'as pas encore de crédit pour créer un dessin animé.",
-      [
-        {
-          text: "Annuler",
-          style: "cancel",
-        },
-        {
-          text: "Obtenir un crédit",
-          onPress: () =>
-  router.push({
-    pathname: "/premium",
-    params: {
-      returnTo: "video",
+  t.player.noVideoCreditTitle,
+  t.player.noVideoCreditMessage,
+  [
+    {
+      text: t.player.cancel,
+      style: "cancel",
     },
-  }),
-        },
-      ]
-    );
+    {
+      text: t.player.getCredit,
+      onPress: () =>
+        router.push({
+          pathname: "/premium",
+          params: {
+            returnTo: "video",
+          },
+        }),
+    },
+  ]
+);
 
     return;
   }
@@ -625,9 +651,9 @@ sound.setOnPlaybackStatusUpdate((status) => {
   console.error("Erreur vérification crédits vidéo :", error);
 
   Alert.alert(
-    "Erreur",
-    "Impossible de vérifier tes crédits vidéo. Réessaie dans quelques instants."
-  );
+  t.common.error,
+  t.player.creditCheckError
+);
 
   return;
 }
@@ -734,9 +760,9 @@ useEffect(() => {
          * On ne lance surtout PAS Runway.
          */
         Alert.alert(
-          "Crédit en cours d’activation",
-          "Ton achat a bien été validé, mais ton crédit n'est pas encore visible. Retourne dans ton histoire dans quelques secondes puis appuie sur « Créer mon dessin animé »."
-        );
+  t.player.creditPendingTitle,
+  t.player.creditPendingMessage
+);
       } catch (error) {
         console.error(
           "Erreur reprise vidéo après achat :",
@@ -744,9 +770,9 @@ useEffect(() => {
         );
 
         Alert.alert(
-          "Erreur",
-          "Ton achat est conservé, mais le crédit vidéo n'a pas pu être vérifié. Réessaie depuis ton histoire."
-        );
+  t.common.error,
+  t.player.purchaseCreditError
+);
       }
     };
 
@@ -769,9 +795,9 @@ function closeVideoModal() {
 
   if (!user) {
     Alert.alert(
-      "Connexion requise",
-      "Connecte-toi pour créer ton dessin animé."
-    );
+  t.player.loginRequired,
+  t.player.loginRequiredMessage
+);
     return;
   }
 
@@ -876,6 +902,8 @@ function closeVideoModal() {
 
         mode:
           bedtimeMode ? "bedtime" : "story",
+        
+        language,
 
         videoModel: "gen4_turbo",
       }),
@@ -911,17 +939,15 @@ if (data?.finalVideoUrl) {
     setVideoModalVisible(false);
 
     Alert.alert(
-  "Dessin animé créé 🎉",
-  `${
-    data?.sceneCount || scenes.length
-  } scènes ont été animées avec succès.`,
+  t.player.videoCreatedTitle,
+  `${data?.sceneCount || scenes.length} ${t.player.videoCreatedMessage}`,
   [
     {
-      text: "Plus tard",
+      text: t.player.later,
       style: "cancel",
     },
     {
-      text: "🎬 Regarder la vidéo",
+      text: t.player.watchVideo,
       onPress: () => {
         if (data?.finalVideoUrl) {
           router.push({
@@ -943,11 +969,11 @@ if (data?.finalVideoUrl) {
     );
 
     Alert.alert(
-      "Création impossible",
-      error instanceof Error
-        ? error.message
-        : "Une erreur est survenue pendant la création du dessin animé."
-    );
+  t.player.videoCreationImpossible,
+  error instanceof Error
+    ? error.message
+    : t.player.videoCreationError
+);
   } finally {
     setVideoGenerating(false);
   }
@@ -995,10 +1021,12 @@ async function stopVoice() {
           ) : (
             <View style={styles.textOnlyFullscreen}>
               <Text style={styles.textOnlyIcon}>📖</Text>
-              <Text style={styles.textOnlyTitle}>Histoire texte</Text>
+              <Text style={styles.textOnlyTitle}>
+  {t.player.textStory}
+</Text>
               <Text style={styles.textOnlySubtitle}>
-                Cette histoire est disponible sans image.
-              </Text>
+  {t.player.textStoryFullscreen}
+</Text>
             </View>
           )}
 
@@ -1008,7 +1036,7 @@ async function stopVoice() {
 
           <View style={styles.fullscreenSceneBadge}>
             <Text style={styles.fullscreenSceneText}>
-              {bedtimeMode ? "🌙 Dodo " : ""}
+              {bedtimeMode ? `🌙 ${t.player.bedtimeShort} ` : ""}
               {index + 1} / {scenes.length}
             </Text>
           </View>
@@ -1021,7 +1049,9 @@ async function stopVoice() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#111827" }}>
       <LinearGradient colors={gradientColors} style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Ton histoire</Text>
+          <Text style={styles.title}>
+  {t.player.title}
+</Text>
 
           <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
             <Text style={styles.favoriteIcon}>{favorite ? "❤️" : "🤍"}</Text>
@@ -1045,8 +1075,13 @@ async function stopVoice() {
           ) : (
             <View style={styles.textOnlyImageFrame}>
               <Text style={styles.textOnlyIconSmall}>📖</Text>
-              <Text style={styles.textOnlyFrameTitle}>Histoire texte</Text>
-              <Text style={styles.textOnlyFrameSubtitle}>Lecture sans image</Text>
+              <Text style={styles.textOnlyFrameTitle}>
+  {t.player.textStory}
+</Text>
+
+<Text style={styles.textOnlyFrameSubtitle}>
+  {t.player.readingWithoutImage}
+</Text>
             </View>
           )}
 
@@ -1065,7 +1100,7 @@ async function stopVoice() {
         >
           <ScrollView>
             <Text style={styles.scene}>
-              Scène {index + 1} / {scenes.length}
+              {t.player.scene} {index + 1} / {scenes.length}
             </Text>
 
             <Text
@@ -1086,18 +1121,24 @@ async function stopVoice() {
         <View style={styles.voiceRow}>
           <TouchableOpacity style={styles.voiceButton} onPress={() => startIAStory(false)}>
             <Text style={styles.voiceText}>
-              {iaReading ? "🔊 Lecture IA..." : "🔊 Lire IA"}
+              {iaReading
+  ? `🔊 ${t.player.readingAI}`
+  : `🔊 ${t.player.readAI}`}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.voiceButton} onPress={() => startIAStory(false)}>
             <Text style={styles.voiceText}>
-              {iaReading ? "🎬 En cours..." : "🎬 Lecture auto"}
+              {iaReading
+  ? `🎬 ${t.player.autoPlaying}`
+  : `🎬 ${t.player.autoPlay}`}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.voiceButton} onPress={startFullscreenMode}>
-            <Text style={styles.voiceText}>🖼️ Plein écran</Text>
+            <Text style={styles.voiceText}>
+  🖼️ {t.player.fullscreen}
+</Text>
           </TouchableOpacity>
         </View>
 
@@ -1107,12 +1148,16 @@ async function stopVoice() {
             onPress={() => setNightMode(!nightMode)}
           >
             <Text style={[styles.voiceText, nightMode && styles.nightButtonText]}>
-              {nightMode ? "🌙 Nuit ON" : "🌙 Mode nuit"}
+              {nightMode
+  ? `🌙 ${t.player.nightOn}`
+  : `🌙 ${t.player.nightMode}`}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.voiceButton} onPress={replayStory}>
-            <Text style={styles.voiceText}>🔁 Rejouer</Text>
+            <Text style={styles.voiceText}>
+  🔁 {t.player.replay}
+</Text>
           </TouchableOpacity>
         </View>
 
@@ -1122,7 +1167,7 @@ async function stopVoice() {
             onPress={startBedtimeMode}
           >
             <Text style={[styles.voiceText, bedtimeMode && styles.nightButtonText]}>
-              🌙 Mode dodo
+              🌙 {t.player.bedtimeMode}
             </Text>
           </TouchableOpacity>
 
@@ -1131,22 +1176,30 @@ async function stopVoice() {
             onPress={toggleAmbience}
           >
             <Text style={styles.voiceText}>
-              {ambienceEnabled ? "🔈 Ambiance ON" : "🔇 Ambiance OFF"}
+              {ambienceEnabled
+  ? `🔈 ${t.player.ambienceOn}`
+  : `🔇 ${t.player.ambienceOff}`}
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.row}>
           <TouchableOpacity style={styles.btn} onPress={prev}>
-            <Text style={styles.btnText}>Retour</Text>
+            <Text style={styles.btnText}>
+  {t.player.previous}
+</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.btn} onPress={next}>
-            <Text style={styles.btnText}>Suite</Text>
+            <Text style={styles.btnText}>
+  {t.player.next}
+</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.stopButton} onPress={stopVoice}>
-            <Text style={styles.stopText}>Stop</Text>
+            <Text style={styles.stopText}>
+  {t.player.stop}
+</Text>
           </TouchableOpacity>
         </View>
 
@@ -1158,19 +1211,23 @@ async function stopVoice() {
   >
     <Text style={styles.videoButtonText}>
       {videoGenerating
-        ? "🎬 Création en cours..."
-        : "🎬 Créer mon dessin animé"}
+  ? `🎬 ${t.player.videoCreating}`
+  : `🎬 ${t.player.createVideo}`}
     </Text>
   </TouchableOpacity>
 )}
 
         <View style={styles.bottomActionRow}>
           <TouchableOpacity style={styles.homeButton} onPress={goHome}>
-            <Text style={styles.homeText}>Accueil</Text>
+            <Text style={styles.homeText}>
+  {t.player.home}
+</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.reportButton} onPress={openReportModal}>
-            <Text style={styles.reportButtonText}>🚩 Signaler</Text>
+            <Text style={styles.reportButtonText}>
+  🚩 {t.player.report}
+</Text>
           </TouchableOpacity>
         </View>
 
@@ -1183,20 +1240,20 @@ async function stopVoice() {
   <View style={styles.videoOverlay}>
     <View style={styles.videoModal}>
       <Text style={styles.videoModalTitle}>
-        🎬 Créer mon dessin animé
-      </Text>
+  {t.player.videoModalTitle}
+</Text>
 
-      <Text style={styles.videoModalText}>
-        Ton histoire contient {scenes.length} scènes.
-      </Text>
+<Text style={styles.videoModalText}>
+  {t.player.storyContains} {scenes.length} {t.player.scenes}
+</Text>
 
-      <Text style={styles.videoModalText}>
-        Durée estimée : environ {scenes.length * 5} secondes.
-      </Text>
+<Text style={styles.videoModalText}>
+  {t.player.estimatedDuration} {scenes.length * 5} {t.player.seconds}
+</Text>
 
-      <Text style={styles.videoCreditText}>
-        1 crédit vidéo
-      </Text>
+<Text style={styles.videoCreditText}>
+  {t.player.oneVideoCredit}
+</Text>
 
       <TouchableOpacity
   style={styles.videoConfirmButton}
@@ -1205,8 +1262,8 @@ async function stopVoice() {
 >
         <Text style={styles.videoConfirmButtonText}>
           {videoGenerating
-            ? "Création en cours..."
-            : "Créer le dessin animé"}
+  ? t.player.videoCreating
+  : t.player.createAnimation}
         </Text>
       </TouchableOpacity>
 
@@ -1216,8 +1273,8 @@ async function stopVoice() {
         disabled={videoGenerating}
       >
         <Text style={styles.videoCancelButtonText}>
-          Annuler
-        </Text>
+  {t.player.cancel}
+</Text>
       </TouchableOpacity>
     </View>
   </View>
@@ -1231,12 +1288,15 @@ async function stopVoice() {
         >
           <View style={styles.reportOverlay}>
             <View style={styles.reportModal}>
-              <Text style={styles.reportTitle}>Signaler ce contenu</Text>
-              <Text style={styles.reportSubtitle}>
-                Choisis le motif qui correspond le mieux au problème rencontré.
-              </Text>
+              <Text style={styles.reportTitle}>
+  {t.player.reportTitle}
+</Text>
 
-              {REPORT_REASONS.map((reason) => (
+<Text style={styles.reportSubtitle}>
+  {t.player.reportSubtitle}
+</Text>
+
+              {reportReasons.map((reason) => (
                 <TouchableOpacity
                   key={reason}
                   style={styles.reportReasonButton}
@@ -1254,7 +1314,9 @@ async function stopVoice() {
                 disabled={reportSending}
               >
                 <Text style={styles.reportCancelText}>
-                  {reportSending ? "Envoi..." : "Annuler"}
+                  {reportSending
+  ? t.player.reportSending
+  : t.player.cancel}
                 </Text>
               </TouchableOpacity>
             </View>

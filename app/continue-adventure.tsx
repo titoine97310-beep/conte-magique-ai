@@ -1,16 +1,50 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+} from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  useCallback,
+  useState,
+} from "react";
+import {
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
+
 export default function ContinueAdventureScreen() {
+  const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      void loadLanguage().then((savedLanguage) => {
+        if (active) {
+          setLanguage(savedLanguage);
+        }
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
   function goToRegister() {
     router.push({
       pathname: "/register",
@@ -45,7 +79,9 @@ export default function ContinueAdventureScreen() {
             style={styles.backButton}
             onPress={() => router.replace("/")}
           >
-            <Text style={styles.backText}>← Accueil</Text>
+            <Text style={styles.backText}>
+              {t.continueAdventure.backHome}
+            </Text>
           </TouchableOpacity>
 
           <View style={styles.starsContainer}>
@@ -58,18 +94,21 @@ export default function ContinueAdventureScreen() {
             <Text style={styles.giftEmoji}>🎁</Text>
           </View>
 
-          <Text style={styles.title}>Continue l’aventure</Text>
+          <Text style={styles.title}>
+            {t.continueAdventure.title}
+          </Text>
 
           <Text style={styles.subtitle}>
-            Tu as découvert les premières histoires de ConteMagiqueIA.
-            La magie ne fait que commencer.
+            {t.continueAdventure.subtitle}
           </Text>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Ton cadeau de bienvenue</Text>
+            <Text style={styles.cardTitle}>
+              {t.continueAdventure.welcomeGift}
+            </Text>
 
             <Text style={styles.cardDescription}>
-              Crée gratuitement ton compte et reçois ton premier carnet.
+              {t.continueAdventure.welcomeGiftDescription}
             </Text>
 
             <View style={styles.benefitRow}>
@@ -78,9 +117,12 @@ export default function ContinueAdventureScreen() {
               </View>
 
               <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Un carnet offert</Text>
+                <Text style={styles.benefitTitle}>
+                  {t.continueAdventure.freePackTitle}
+                </Text>
+
                 <Text style={styles.benefitText}>
-                  Commence une nouvelle collection d’aventures.
+                  {t.continueAdventure.freePackText}
                 </Text>
               </View>
             </View>
@@ -93,9 +135,12 @@ export default function ContinueAdventureScreen() {
               </View>
 
               <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>2 nouvelles histoires</Text>
+                <Text style={styles.benefitTitle}>
+                  {t.continueAdventure.twoStoriesTitle}
+                </Text>
+
                 <Text style={styles.benefitText}>
-                  Crée deux histoires personnalisées supplémentaires.
+                  {t.continueAdventure.twoStoriesText}
                 </Text>
               </View>
             </View>
@@ -108,9 +153,12 @@ export default function ContinueAdventureScreen() {
               </View>
 
               <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Tes histoires sauvegardées</Text>
+                <Text style={styles.benefitTitle}>
+                  {t.continueAdventure.savedStoriesTitle}
+                </Text>
+
                 <Text style={styles.benefitText}>
-                  Retrouve facilement les aventures que tu as créées.
+                  {t.continueAdventure.savedStoriesText}
                 </Text>
               </View>
             </View>
@@ -122,7 +170,7 @@ export default function ContinueAdventureScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.primaryButtonText}>
-              Créer mon compte gratuitement
+              {t.continueAdventure.createFreeAccount}
             </Text>
           </TouchableOpacity>
 
@@ -132,12 +180,12 @@ export default function ContinueAdventureScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.secondaryButtonText}>
-              J’ai déjà un compte
+              {t.continueAdventure.alreadyHaveAccount}
             </Text>
           </TouchableOpacity>
 
           <Text style={styles.reassurance}>
-            🔒 Aucune carte bancaire n’est demandée.
+            {t.continueAdventure.noCardRequired}
           </Text>
         </ScrollView>
       </SafeAreaView>

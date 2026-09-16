@@ -245,6 +245,7 @@ async function createNarrationMp3({
   mode = "story",
   emotion = "warm",
   narrator = "narratrice",
+  language = "fr",
 }) {
   if (!text?.trim()) {
     throw new Error(
@@ -254,6 +255,33 @@ async function createNarrationMp3({
 
   const profile =
     getNarratorProfile(narrator);
+
+    const supportedLanguages = ["fr", "en", "es"];
+
+const selectedLanguage =
+  supportedLanguages.includes(language)
+    ? language
+    : "fr";
+
+const languageInstructions = {
+  fr: `
+Lis le texte en français.
+Utilise une prononciation française naturelle et claire.
+Ne traduis pas le texte.
+`,
+
+  en: `
+Read the text in English.
+Use natural, clear English pronunciation.
+Do not translate the text.
+`,
+
+  es: `
+Lee el texto en español.
+Utiliza una pronunciación española natural y clara.
+No traduzcas el texto.
+`,
+};
 
   let emotionInstructions = "";
 
@@ -281,6 +309,8 @@ Parle calmement et marque davantage les pauses.
 
   const instructions = `
 ${profile.instructions}
+
+${languageInstructions[selectedLanguage]}
 
 ${emotionInstructions}
 
@@ -310,6 +340,7 @@ async function createNarratedSceneVideo({
   emotion,
   narrator,
   mode,
+  language = "fr",
   sceneIndex,
   tempDir,
 }) {
@@ -341,12 +372,13 @@ async function createNarratedSceneVideo({
   );
 
   const narrationBuffer =
-    await createNarrationMp3({
-      text: sceneText,
-      mode,
-      emotion,
-      narrator,
-    });
+  await createNarrationMp3({
+    text: sceneText,
+    mode,
+    emotion,
+    narrator,
+    language,
+  });
 
   await fs.promises.writeFile(
     narrationPath,
@@ -1729,16 +1761,48 @@ function detectRequestedLanguage(prompt = "") {
 
 app.post("/story", async (req, res) => {
   try {
-    const { prompt, type = "magic", sceneCount = 4 } = req.body;
+    const {
+  prompt,
+  type = "magic",
+  sceneCount = 4,
+  language = "fr",
+} = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: "Prompt manquant" });
     }
 
-    const requestedLanguage = detectRequestedLanguage(prompt);
+    const supportedLanguages = ["fr", "en", "es"];
 
-    console.log("Langue explicitement demandée :", requestedLanguage);
-    console.log("Prompt reçu :", prompt);
+const selectedLanguage = supportedLanguages.includes(language)
+  ? language
+  : "fr";
+
+const languageInstructions = {
+  fr: `
+LANGUE OBLIGATOIRE :
+- Écris toute l'histoire en français.
+- Le titre, les textes des scènes et les descriptions destinées à l'histoire doivent être en français.
+- Utilise un français naturel, chaleureux et adapté aux enfants.
+`,
+
+  en: `
+MANDATORY LANGUAGE:
+- Write the entire story in English.
+- The title, scene texts and story content must be in English.
+- Use natural, warm English suitable for children.
+`,
+
+  es: `
+IDIOMA OBLIGATORIO:
+- Escribe toda la historia en español.
+- El título, los textos de las escenas y el contenido de la historia deben estar en español.
+- Utiliza un español natural, cálido y apropiado para niños.
+`,
+};
+
+console.log("Langue choisie dans l'application :", selectedLanguage);
+console.log("Prompt reçu :", prompt);
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -1753,6 +1817,8 @@ Créer une histoire agréable à écouter à voix haute, avec du rythme, des ém
 
 Type d’histoire choisi : ${type}
 Nombre exact de scènes : ${sceneCount}
+
+${languageInstructions[selectedLanguage]}
 
 Réponds UNIQUEMENT en JSON strict :
 
@@ -2156,11 +2222,39 @@ app.post("/tts", async (req, res) => {
 
   try {
     const {
-      text,
-      mode = "story",
-      emotion = "warm",
-      narrator = "narratrice",
-    } = req.body;
+  text,
+  mode = "story",
+  emotion = "warm",
+  narrator = "narratrice",
+  language = "fr",
+} = req.body;
+
+const supportedLanguages = ["fr", "en", "es"];
+
+const selectedLanguage =
+  supportedLanguages.includes(language)
+    ? language
+    : "fr";
+
+    const languageInstructions = {
+  fr: `
+Lis le texte en français.
+Utilise une prononciation française naturelle et claire.
+Ne traduis pas le texte dans une autre langue.
+`,
+
+  en: `
+Read the text in English.
+Use natural, clear English pronunciation.
+Do not translate the text into another language.
+`,
+
+  es: `
+Lee el texto en español.
+Utiliza una pronunciación española natural y clara.
+No traduzcas el texto a otro idioma.
+`,
+};
 
     if (!text?.trim()) {
       return res.status(400).json({
@@ -2253,13 +2347,18 @@ Parle calmement et marque davantage les pauses.
     const instructions = `
 ${profile.instructions}
 
+${languageInstructions[selectedLanguage]}
+
 ${emotionInstructions}
 
 ${bedtimeInstructions}
 
-Respecte exactement la langue du texte fourni.
-Prononce les mots naturellement.
+Respecte exactement le texte fourni.
+Ne traduis jamais le contenu.
+Prononce les mots naturellement dans la langue sélectionnée.
 `;
+
+console.log("Langue TTS :", selectedLanguage);
 
     const response = await openai.audio.speech.create({
   model: "gpt-4o-mini-tts",
@@ -3208,6 +3307,11 @@ const narrator =
 const mode =
   req.body?.mode || "story";
 
+const language =
+  ["fr", "en", "es"].includes(req.body?.language)
+    ? req.body.language
+    : "fr";
+
 if (narrationScenes.length !== videoUrls.length) {
   throw new Error(
     "Le nombre de textes ne correspond pas au nombre de scènes vidéo."
@@ -3243,6 +3347,7 @@ try {
           sceneData.emotion || "warm",
         narrator,
         mode,
+        language,
         sceneIndex: index,
         tempDir: narrationTempDir,
       });

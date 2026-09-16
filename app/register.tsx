@@ -1,11 +1,11 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +18,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import { auth } from "../services/firebase";
+import { setUserMode } from "../services/usageService";
 import {
   addStories,
   createUserProfile,
@@ -26,9 +29,11 @@ import {
   updateLastLogin,
 } from "../services/userService";
 
-import { setUserMode } from "../services/usageService";
-
-import { auth } from "../services/firebase";
+import {
+  getTranslations,
+  loadLanguage,
+  type AppLanguage,
+} from "../services/languageService";
 
 type AuthMode = "login" | "register";
 
@@ -53,6 +58,32 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [language, setLanguage] =
+    useState<AppLanguage>("fr");
+
+  const t = getTranslations(language);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function refreshLanguage() {
+        const savedLanguage =
+          await loadLanguage();
+
+        if (isActive) {
+          setLanguage(savedLanguage);
+        }
+      }
+
+      void refreshLanguage();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
   const isLogin = mode === "login";
 
   function cleanEmail() {
@@ -62,44 +93,44 @@ export default function RegisterScreen() {
   function getFirebaseErrorMessage(errorCode?: string) {
     switch (errorCode) {
       case "auth/invalid-email":
-        return "L’adresse e-mail n’est pas valide.";
+        return t.account.invalidEmail;
 
       case "auth/missing-password":
-        return "Entre ton mot de passe.";
+        return t.account.missingPassword;
 
       case "auth/weak-password":
-        return "Le mot de passe doit contenir au moins 6 caractères.";
+        return t.account.passwordMinLength;
 
       case "auth/email-already-in-use":
-        return "Un compte existe déjà avec cette adresse e-mail.";
+        return t.account.emailAlreadyUsed;
 
       case "auth/invalid-credential":
-        return "L’adresse e-mail ou le mot de passe est incorrect.";
+        return t.account.invalidCredential;
 
       case "auth/user-not-found":
-        return "Aucun compte ne correspond à cette adresse e-mail.";
+        return t.account.userNotFound;
 
       case "auth/wrong-password":
-        return "Le mot de passe est incorrect.";
+        return t.account.wrongPassword;
 
       case "auth/too-many-requests":
-        return "Trop de tentatives. Réessaie dans quelques minutes.";
+        return t.account.tooManyRequests;
 
       case "auth/network-request-failed":
-        return "Problème de connexion Internet.";
+        return t.account.networkError;
 
       default:
         return isLogin
-          ? "Impossible de se connecter."
-          : "Impossible de créer le compte.";
+          ? t.account.defaultLoginError
+          : t.account.defaultRegisterError;
     }
   }
 
   async function handleLogin() {
     if (!email.trim() || !password) {
       Alert.alert(
-        "Informations manquantes",
-        "Entre ton adresse e-mail et ton mot de passe."
+        t.account.missingInfo,
+        t.account.loginMissingInfo
       );
       return;
     }
@@ -137,7 +168,7 @@ export default function RegisterScreen() {
       console.log("Erreur connexion :", error);
 
       Alert.alert(
-        "Connexion impossible",
+        t.account.loginImpossible,
         getFirebaseErrorMessage(error?.code)
       );
     } finally {
@@ -148,24 +179,24 @@ export default function RegisterScreen() {
   async function handleRegister() {
     if (!name.trim() || !email.trim() || !password) {
       Alert.alert(
-        "Informations manquantes",
-        "Remplis tous les champs."
+        t.account.missingInfo,
+        t.account.registerMissingInfo
       );
       return;
     }
 
     if (password.length < 6) {
       Alert.alert(
-        "Mot de passe trop court",
-        "Le mot de passe doit contenir au moins 6 caractères."
+        t.account.passwordTooShort,
+        t.account.passwordMinLength
       );
       return;
     }
 
     if (!acceptedCGU) {
       Alert.alert(
-        "Validation requise",
-        "Tu dois accepter les CGU et la politique de confidentialité."
+        t.account.validationRequired,
+        t.account.legalRequired
       );
       return;
     }
@@ -208,16 +239,16 @@ export default function RegisterScreen() {
       );
 
       Alert.alert(
-        "Bienvenue 🎁",
-        "Ton compte est prêt et tu as reçu 2 histoires texte gratuites. Tu peux aussi acheter un carnet dès maintenant.",
+        t.account.welcomeGift,
+        t.account.welcomeGiftMessage,
         [
           {
-            text: "Créer une histoire",
+            text: t.account.createStory,
             onPress: () =>
               router.replace("/create-story"),
           },
           {
-            text: "Voir les carnets",
+            text: t.account.viewPacks,
             onPress: () =>
               router.replace("/premium"),
           },
@@ -228,7 +259,7 @@ export default function RegisterScreen() {
       console.log("Erreur inscription :", error);
 
       Alert.alert(
-        "Création impossible",
+        t.account.registerImpossible,
         getFirebaseErrorMessage(error?.code)
       );
     } finally {
@@ -257,287 +288,243 @@ export default function RegisterScreen() {
       colors={["#111827", "#312E81"]}
       style={styles.container}
     >
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={
-          Platform.OS === "ios"
-            ? "padding"
-            : undefined
-        }
-      >
-        <ScrollView
-          contentContainerStyle={
-            styles.scrollContent
-          }
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.replace("/")}
-            disabled={loading}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.backText}>
-              ← Accueil
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.replace("/")}
+              disabled={loading}
+            >
+              <Text style={styles.backText}>
+                ← Accueil
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.title}>
+              {isLogin
+                ? t.account.welcomeBack
+                : t.account.createAccountTitle}
             </Text>
-          </TouchableOpacity>
 
-          <Text style={styles.title}>
-            {isLogin
-              ? "Bon retour ✨"
-              : "Crée ton compte ✨"}
-          </Text>
+            <Text style={styles.subtitle}>
+              {isLogin
+                ? t.account.loginSubtitle
+                : t.account.registerSubtitle}
+            </Text>
 
-          <Text style={styles.subtitle}>
-            {isLogin
-              ? "Connecte-toi pour continuer l’aventure"
-              : "Rejoins l’univers de ConteMagiqueIA"}
-          </Text>
-
-          <View style={styles.modeContainer}>
-            <TouchableOpacity
-              style={[
-                styles.modeButton,
-                isLogin &&
-                  styles.modeButtonActive,
-              ]}
-              onPress={() =>
-                changeMode("login")
-              }
-              disabled={loading}
-            >
-              <Text
+            <View style={styles.modeContainer}>
+              <TouchableOpacity
                 style={[
-                  styles.modeText,
-                  isLogin &&
-                    styles.modeTextActive,
+                  styles.modeButton,
+                  isLogin && styles.modeButtonActive,
                 ]}
+                onPress={() => changeMode("login")}
+                disabled={loading}
               >
-                Se connecter
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.modeText,
+                    isLogin && styles.modeTextActive,
+                  ]}
+                >
+                  Se connecter
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.modeButton,
-                !isLogin &&
-                  styles.modeButtonActive,
-              ]}
-              onPress={() =>
-                changeMode("register")
-              }
-              disabled={loading}
-            >
-              <Text
+              <TouchableOpacity
                 style={[
-                  styles.modeText,
-                  !isLogin &&
-                    styles.modeTextActive,
+                  styles.modeButton,
+                  !isLogin && styles.modeButtonActive,
                 ]}
+                onPress={() => changeMode("register")}
+                disabled={loading}
               >
-                Créer un compte
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <Text
+                  style={[
+                    styles.modeText,
+                    !isLogin && styles.modeTextActive,
+                  ]}
+                >
+                  Créer un compte
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-          {!isLogin && (
+            {!isLogin && (
+              <TextInput
+                style={styles.input}
+                placeholder={t.account.firstName}
+                placeholderTextColor="#999"
+                value={name}
+                onChangeText={setName}
+                editable={!loading}
+                autoCapitalize="words"
+              />
+            )}
+
             <TextInput
               style={styles.input}
-              placeholder="Prénom"
+              placeholder={t.account.email}
               placeholderTextColor="#999"
-              value={name}
-              onChangeText={setName}
+              value={email}
+              onChangeText={setEmail}
               editable={!loading}
-              autoCapitalize="words"
-            />
-          )}
-
-          <TextInput
-            style={styles.input}
-            placeholder="Adresse e-mail"
-            placeholderTextColor="#999"
-            value={email}
-            onChangeText={setEmail}
-            editable={!loading}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-          />
-
-          <View
-            style={styles.passwordContainer}
-          >
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Mot de passe"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={setPassword}
-              editable={!loading}
-              secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
+              keyboardType="email-address"
             />
 
-            <TouchableOpacity
-              onPress={() =>
-                setShowPassword(
-                  !showPassword
-                )
-              }
-              disabled={loading}
-            >
-              <Text style={styles.eyeText}>
-                {showPassword ? "🙈" : "👁️"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder={t.account.password}
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={setPassword}
+                editable={!loading}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
 
-          {isLogin && (
-            <TouchableOpacity
-              onPress={() =>
-                router.push(
-                  "/forgot-password" as any
-                )
-              }
-              disabled={loading}
-            >
-              <Text
-                style={
-                  styles.forgotPassword
-                }
-              >
-                Mot de passe oublié ?
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {!isLogin && (
-            <>
               <TouchableOpacity
-                style={styles.cguRow}
                 onPress={() =>
-                  setAcceptedCGU(
-                    !acceptedCGU
+                  setShowPassword(!showPassword)
+                }
+                disabled={loading}
+              >
+                <Text style={styles.eyeText}>
+                  {showPassword ? "🙈" : "👁️"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {isLogin && (
+              <TouchableOpacity
+                onPress={() =>
+                  router.push(
+                    "/forgot-password" as any
                   )
                 }
                 disabled={loading}
               >
-                <Text
-                  style={styles.checkbox}
-                >
-                  {acceptedCGU
-                    ? "☑️"
-                    : "⬜"}
-                </Text>
-
-                <Text
-                  style={styles.cguText}
-                >
-                  J’ai lu et j’accepte les
-                  CGU et je reconnais avoir
-                  pris connaissance de la
-                  politique de
-                  confidentialité
+                <Text style={styles.forgotPassword}>
+                  Mot de passe oublié ?
                 </Text>
               </TouchableOpacity>
-
-              <View
-                style={styles.legalLinks}
-              >
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push(
-                      "/legal/cgu" as any
-                    )
-                  }
-                  disabled={loading}
-                >
-                  <Text
-                    style={styles.link}
-                  >
-                    Lire les CGU
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push(
-                      "/legal/privacy" as any
-                    )
-                  }
-                  disabled={loading}
-                >
-                  <Text
-                    style={styles.link}
-                  >
-                    Politique de
-                    confidentialité
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          <TouchableOpacity
-            style={[
-              styles.button,
-              loading &&
-                styles.buttonDisabled,
-            ]}
-            onPress={handleContinue}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator
-                color="#111"
-              />
-            ) : (
-              <Text
-                style={styles.buttonText}
-              >
-                {isLogin
-                  ? "Se connecter"
-                  : "Créer mon compte"}
-              </Text>
             )}
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.switchButton}
-            onPress={() =>
-              changeMode(
-                isLogin
-                  ? "register"
-                  : "login"
-              )
-            }
-            disabled={loading}
-          >
-            <Text style={styles.switchText}>
-              {isLogin
-                ? "Pas encore de compte ? "
-                : "Tu as déjà un compte ? "}
+            {!isLogin && (
+              <>
+                <TouchableOpacity
+                  style={styles.cguRow}
+                  onPress={() =>
+                    setAcceptedCGU(!acceptedCGU)
+                  }
+                  disabled={loading}
+                >
+                  <Text style={styles.checkbox}>
+                    {acceptedCGU ? "☑️" : "⬜"}
+                  </Text>
 
-              <Text
-                style={
-                  styles.switchTextImportant
-                }
-              >
+                  <Text style={styles.cguText}>
+                    J’ai lu et j’accepte les CGU et je
+                    reconnais avoir pris connaissance de la
+                    politique de confidentialité
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.legalLinks}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push(
+                        "/legal/cgu" as any
+                      )
+                    }
+                    disabled={loading}
+                  >
+                    <Text style={styles.link}>
+                      Lire les CGU
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push(
+                        "/legal/privacy" as any
+                      )
+                    }
+                    disabled={loading}
+                  >
+                    <Text style={styles.link}>
+                      Politique de confidentialité
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                loading && styles.buttonDisabled,
+              ]}
+              onPress={handleContinue}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#111" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {isLogin
+                    ? t.account.login
+                    : t.account.createMyAccount}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.switchButton}
+              onPress={() =>
+                changeMode(
+                  isLogin ? "register" : "login"
+                )
+              }
+              disabled={loading}
+            >
+              <Text style={styles.switchText}>
                 {isLogin
-                  ? "Créer un compte"
-                  : "Se connecter"}
+                  ? t.account.noAccount
+                  : t.account.alreadyAccount}
+
+                <Text style={styles.switchTextImportant}>
+                  {isLogin
+                    ? t.account.createAccount
+                    : t.account.login}
+                </Text>
               </Text>
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+
+  safeArea: {
     flex: 1,
   },
 
@@ -548,8 +535,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",
-    padding: 24,
-    paddingTop: 60,
+    width: "100%",
+    maxWidth: 700,
+    alignSelf: "center",
+    paddingHorizontal: 24,
+    paddingTop: 20,
     paddingBottom: 40,
   },
 
@@ -579,8 +569,7 @@ const styles = StyleSheet.create({
 
   modeContainer: {
     flexDirection: "row",
-    backgroundColor:
-      "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 16,
     padding: 4,
     marginBottom: 22,
