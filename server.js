@@ -1772,11 +1772,13 @@ app.post("/story", async (req, res) => {
       return res.status(400).json({ error: "Prompt manquant" });
     }
 
-    const supportedLanguages = ["fr", "en", "es"];
+const supportedLanguages = ["fr", "en", "es"];
 
-const selectedLanguage = supportedLanguages.includes(language)
+const requestedLanguage = supportedLanguages.includes(language)
   ? language
   : "fr";
+
+const selectedLanguage = requestedLanguage;
 
 const languageInstructions = {
   fr: `
