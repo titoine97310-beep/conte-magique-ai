@@ -1768,6 +1768,52 @@ app.post("/story", async (req, res) => {
   language = "fr",
 } = req.body;
 
+const allowedStoryTypes = [
+  "funny",
+  "adventure",
+  "magic",
+  "mystery",
+];
+
+const rawStoryTypes = Array.isArray(type)
+  ? type
+  : [type];
+
+const storyTypes = [
+  ...new Set(
+    rawStoryTypes.filter((item) =>
+      allowedStoryTypes.includes(item)
+    )
+  ),
+].slice(0, 2);
+
+if (storyTypes.length === 0) {
+  storyTypes.push("magic");
+}
+
+const storyTypeDescription =
+  storyTypes.length === 1
+    ? storyTypes[0]
+    : `${storyTypes[0]} + ${storyTypes[1]}`;
+
+const mixedTypeInstructions =
+  storyTypes.length === 2
+    ? `
+FUSION DE DEUX TYPES OBLIGATOIRE :
+- Les deux types choisis sont : ${storyTypes[0]} et ${storyTypes[1]}.
+- Crée UNE SEULE intrigue cohérente qui mélange naturellement les deux univers.
+- Ne divise jamais l'histoire en une partie "${storyTypes[0]}" puis une partie "${storyTypes[1]}".
+- Les deux types doivent influencer l'intrigue du début à la fin.
+- Chaque scène doit rester reliée à la même quête, au même problème ou au même objectif principal.
+- Les événements d'une scène doivent avoir des conséquences logiques sur les scènes suivantes.
+- Le second type doit enrichir le premier sans rendre l'histoire confuse.
+- La résolution finale doit découler naturellement de ce qui a été construit dans les scènes précédentes.
+`
+    : `
+TYPE UNIQUE :
+- Construis toute l'histoire autour du type ${storyTypes[0]}.
+`;
+
     if (!prompt) {
       return res.status(400).json({ error: "Prompt manquant" });
     }
@@ -1817,7 +1863,9 @@ Tu es un conteur pour enfants talentueux, chaleureux et expressif.
 OBJECTIF :
 Créer une histoire agréable à écouter à voix haute, avec du rythme, des émotions et des pauses naturelles.
 
-Type d’histoire choisi : ${type}
+Type(s) d’histoire choisi(s) : ${storyTypeDescription}
+
+${mixedTypeInstructions}
 Nombre exact de scènes : ${sceneCount}
 
 ${languageInstructions[selectedLanguage]}
@@ -1879,7 +1927,7 @@ AMBIANCES :
 - calm : moment tendre, repos, discussion, douceur
 - victory : réussite, fête, fin heureuse, célébration
 
-Selon le type :
+Caractéristiques des types (utilise uniquement le ou les types sélectionnés) :
 - funny : drôle, absurde, léger, personnages rigolos.
 - adventure : action, exploration, défi, rythme dynamique.
 - magic : féerique, objets magiques, émerveillement.
