@@ -2,10 +2,14 @@ const BACKEND_URL = "https://conte-magique-ai.onrender.com";
 
 export async function generateStory(
   prompt: string,
-  type: string,
+  type: string | string[],
   sceneCount: number,
   language: "fr" | "en" | "es" = "fr"
 ) {
+  const types = Array.isArray(type)
+    ? type.slice(0, 2)
+    : [type];
+
   const response = await fetch(`${BACKEND_URL}/story`, {
     method: "POST",
     headers: {
@@ -13,7 +17,7 @@ export async function generateStory(
     },
     body: JSON.stringify({
       prompt,
-      type,
+      type: types,
       sceneCount,
       language,
     }),

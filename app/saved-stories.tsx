@@ -1,4 +1,5 @@
-import { router, useFocusEffect } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 import { useCallback, useEffect, useState } from "react";
 
@@ -40,6 +41,21 @@ const BACKEND_URL =
   "https://conte-magique-ai.onrender.com";
 
 export default function SavedStoriesScreen() {
+  const params = useLocalSearchParams<{
+    videoPack?: string | string[];
+  }>();
+
+  const rawVideoPack = Array.isArray(params.videoPack)
+    ? params.videoPack[0]
+    : params.videoPack;
+
+  const purchasedVideoScenes =
+    rawVideoPack === "4"
+      ? 4
+      : rawVideoPack === "6"
+        ? 6
+        : null;
+
   const [stories, setStories] =
     useState<any[]>([]);
 
@@ -308,6 +324,12 @@ export default function SavedStoriesScreen() {
           String(
             Date.now()
           ),
+        ...(purchasedVideoScenes
+          ? {
+              videoPack:
+                String(purchasedVideoScenes),
+            }
+          : {}),
       },
     });
   }
@@ -535,551 +557,651 @@ export default function SavedStoriesScreen() {
     );
   }
 
+  const videoPackStories = purchasedVideoScenes
+    ? stories.filter((story: any) => {
+        const sceneCount = Array.isArray(story?.scenes)
+          ? story.scenes.length
+          : 0;
+
+        return sceneCount === purchasedVideoScenes;
+      })
+    : stories;
+
   const displayedStories =
     showFavoritesOnly
-      ? stories.filter(
+      ? videoPackStories.filter(
           (story: any) =>
             story.favorite
         )
-      : stories;
+      : videoPackStories;
 
   return (
-    <SafeAreaView
-      style={
-        styles.safeArea
-      }
+    <LinearGradient
+      colors={["#121542", "#29246D", "#11133C", "#070B24"]}
+      locations={[0, 0.38, 0.72, 1]}
+      style={styles.safeArea}
     >
-      <View
-        style={
-          styles.container
-        }
-      >
-        <Text
-          style={
-            styles.title
-          }
-        >
-          {t.savedStories.title}
-        </Text>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <View style={styles.headerText}>
+              <Text style={styles.eyebrow}>✦  ✨  ✦</Text>
+              <Text style={styles.title}>{t.savedStories.title}</Text>
+              <Text style={styles.subtitle}>
+                {language === "fr"
+                  ? "Retrouve toutes tes aventures magiques"
+                  : language === "en"
+                    ? "Find all your magical adventures"
+                    : "Encuentra todas tus aventuras mágicas"}
+              </Text>
+            </View>
 
-        <View
-          style={
-            styles.filterRow
-          }
-        >
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-
-              !showFavoritesOnly &&
-                styles.filterButtonActive,
-            ]}
-            onPress={() =>
-              setShowFavoritesOnly(
-                false
-              )
-            }
-          >
-            <Text
-              style={[
-                styles.filterText,
-
-                !showFavoritesOnly &&
-                  styles.filterTextActive,
-              ]}
-            >
-              {t.savedStories.all}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-
-              showFavoritesOnly &&
-                styles.filterButtonActive,
-            ]}
-            onPress={() =>
-              setShowFavoritesOnly(
-                true
-              )
-            }
-          >
-            <Text
-              style={[
-                styles.filterText,
-
-                showFavoritesOnly &&
-                  styles.filterTextActive,
-              ]}
-            >
-              {t.savedStories.favorites}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View
-            style={
-              styles.emptyBox
-            }
-          >
-            <ActivityIndicator
-              size="large"
-              color="#FFB703"
+            <Image
+              source={require("../assets/images/magico.png")}
+              style={styles.magico}
+              resizeMode="contain"
             />
-
-            <Text
-              style={
-                styles.loadingText
-              }
-            >
-              {t.savedStories.loading}
-            </Text>
           </View>
-        ) : displayedStories.length ===
-          0 ? (
-          <View
-            style={
-              styles.emptyBox
-            }
-          >
-            <Text
-              style={
-                styles.emptyText
-              }
-            >
-              {showFavoritesOnly
-                ? t.savedStories.emptyFavorites
-                : t.savedStories.empty}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={
-              displayedStories
-            }
-            keyExtractor={(
-              item: any
-            ) =>
-              String(
-                item.id
-              )
-            }
-            contentContainerStyle={
-              styles.listContent
-            }
-            renderItem={({
-              item,
-            }: any) => {
-              const thumbnail =
-                item.scenes?.[
-                  0
-                ]?.imageUrl;
 
-              const sceneCount =
-                Array.isArray(
-                  item.scenes
-                )
+          {purchasedVideoScenes ? (
+            <LinearGradient
+              colors={["#6D28D9", "#4338CA", "#1D4ED8"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.videoPackBanner}
+            >
+              <Text style={styles.videoPackStars}>✦ ✨ ✦</Text>
+              <Text style={styles.videoPackTitle}>
+                {language === "fr"
+                  ? `Ton dessin animé ${purchasedVideoScenes} scènes`
+                  : language === "en"
+                    ? `Your ${purchasedVideoScenes}-scene animated story`
+                    : `Tu dibujo animado de ${purchasedVideoScenes} escenas`}
+              </Text>
+              <Text style={styles.videoPackSubtitle}>
+                {language === "fr"
+                  ? `Choisis une histoire de ${purchasedVideoScenes} scènes. Ton carnet vidéo est déjà sélectionné.`
+                  : language === "en"
+                    ? `Choose a ${purchasedVideoScenes}-scene story. Your video pack is already selected.`
+                    : `Elige una historia de ${purchasedVideoScenes} escenas. Tu paquete de vídeo ya está seleccionado.`}
+              </Text>
+            </LinearGradient>
+          ) : null}
+
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                !showFavoritesOnly && styles.filterButtonActive,
+              ]}
+              onPress={() => setShowFavoritesOnly(false)}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  !showFavoritesOnly && styles.filterTextActive,
+                ]}
+              >
+                ✨ {t.savedStories.all}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                showFavoritesOnly && styles.filterButtonActive,
+              ]}
+              onPress={() => setShowFavoritesOnly(true)}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  showFavoritesOnly && styles.filterTextActive,
+                ]}
+              >
+                ❤️ {t.savedStories.favorites}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {loading ? (
+            <View style={styles.emptyBox}>
+              <Image
+                source={require("../assets/images/magico.png")}
+                style={styles.emptyMagico}
+                resizeMode="contain"
+              />
+              <ActivityIndicator size="large" color="#FFCF4A" />
+              <Text style={styles.loadingText}>{t.savedStories.loading}</Text>
+            </View>
+          ) : displayedStories.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Image
+                source={require("../assets/images/magico.png")}
+                style={styles.emptyMagico}
+                resizeMode="contain"
+              />
+              <Text style={styles.emptyStars}>✦  ✨  ✦</Text>
+              <Text style={styles.emptyText}>
+                {purchasedVideoScenes
+                  ? language === "fr"
+                    ? `Tu n’as pas encore d’histoire de ${purchasedVideoScenes} scènes. Crée-en une pour utiliser ton carnet dessin animé.`
+                    : language === "en"
+                      ? `You don't have a ${purchasedVideoScenes}-scene story yet. Create one to use your animated-story pack.`
+                      : `Todavía no tienes una historia de ${purchasedVideoScenes} escenas. Crea una para usar tu paquete de vídeo.`
+                  : showFavoritesOnly
+                    ? t.savedStories.emptyFavorites
+                    : t.savedStories.empty}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={displayedStories}
+              keyExtractor={(item: any) => String(item.id)}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }: any) => {
+                const thumbnail = item.scenes?.[0]?.imageUrl;
+                const sceneCount = Array.isArray(item.scenes)
                   ? item.scenes.length
                   : 0;
+                const videoCompatible = sceneCount === 4 || sceneCount === 6;
 
-              const videoCompatible =
-                sceneCount === 4 ||
-                sceneCount === 6;
-
-              return (
-                <View
-                  style={
-                    styles.card
-                  }
-                >
-                  <View
-                    style={
-                      styles.topRow
-                    }
+                return (
+                  <LinearGradient
+                    colors={["rgba(91,47,176,0.94)", "rgba(43,31,112,0.97)", "rgba(24,24,73,0.98)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.card}
                   >
-                    <TouchableOpacity
-                      style={
-                        styles.storyMain
-                      }
-                      onPress={() =>
-                        openStory(
-                          item
-                        )
-                      }
-                    >
-                      {thumbnail ? (
-                        <Image
-                          source={{
-                            uri:
-                              thumbnail,
-                          }}
-                          style={
-                            styles.thumbnail
-                          }
-                        />
-                      ) : (
-                        <View
-                          style={
-                            styles.placeholder
-                          }
-                        >
-                          <Text
-                            style={
-                              styles.placeholderText
-                            }
-                          >
-                            ✨
-                          </Text>
-                        </View>
-                      )}
-
-                      <View
-                        style={
-                          styles.storyInfo
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.text
-                          }
-                          numberOfLines={
-                            2
-                          }
-                        >
-                          {item.prompt ||
-                            t.savedStories.defaultStoryTitle}
-                        </Text>
-
-                        <Text
-                          style={
-                            styles.date
-                          }
-                        >
-                          {sceneCount}{" "}
-                          {sceneCount === 1
-                            ? t.savedStories.scene
-                            : t.savedStories.scenes}
-                          {" • "}
-
-                          {item.createdAt
-                            ? new Date(
-                                item.createdAt
-                              ).toLocaleDateString(
-                                language === "en"
-                                  ? "en-GB"
-                                  : language === "es"
-                                    ? "es-ES"
-                                    : "fr-FR"
-                              )
-                            : ""}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    <View
-                      style={
-                        styles.actions
-                      }
-                    >
-                      <TouchableOpacity
-                        style={
-                          styles.iconButton
-                        }
-                        onPress={() =>
-                          toggleFavorite(
-                            item.id
-                          )
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.favoriteText
-                          }
-                        >
-                          {item.favorite
-                            ? "❤️"
-                            : "🤍"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={
-                          styles.iconButton
-                        }
-                        onPress={() =>
-                          shareStory(
-                            item
-                          )
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.shareText
-                          }
-                        >
-                          📤
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={
-                          styles.iconButton
-                        }
-                        onPress={() =>
-                          confirmDelete(
-                            item.id
-                          )
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.deleteText
-                          }
-                        >
-                          🗑️
-                        </Text>
-                      </TouchableOpacity>
+                    <View style={styles.cardSparkleOne}>
+                      <Text style={styles.cardSparkle}>✦</Text>
                     </View>
-                  </View>
+                    <View style={styles.cardSparkleTwo}>
+                      <Text style={styles.cardSparkleSmall}>✧</Text>
+                    </View>
 
-                  {videoCompatible ? (
-                    <TouchableOpacity
-                      style={
-                        styles.videoButton
-                      }
-                      onPress={() =>
-                        createVideoFromStory(
-                          item
-                        )
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.videoButtonText
-                        }
+                    <View style={styles.topRow}>
+                      <TouchableOpacity
+                        style={styles.storyMain}
+                        onPress={() => openStory(item)}
+                        activeOpacity={0.86}
                       >
-                        {t.savedStories.createVideo}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              );
-            }}
-          />
-        )}
+                        {thumbnail ? (
+                          <Image
+                            source={{ uri: thumbnail }}
+                            style={styles.thumbnail}
+                          />
+                        ) : (
+                          <LinearGradient
+                            colors={["#7137C8", "#342070"]}
+                            style={styles.placeholder}
+                          >
+                            <Text style={styles.placeholderText}>✨</Text>
+                          </LinearGradient>
+                        )}
 
-        <TouchableOpacity
-          style={
-            styles.backButton
-          }
-          onPress={() =>
-            router.push("/")
-          }
-        >
-          <Text
-            style={
-              styles.backText
-            }
+                        <View style={styles.storyInfo}>
+                          <Text style={styles.text} numberOfLines={2}>
+                            {item.prompt || t.savedStories.defaultStoryTitle}
+                          </Text>
+
+                          <View style={styles.metaPill}>
+                            <Text style={styles.date}>
+                              {sceneCount}{" "}
+                              {sceneCount === 1
+                                ? t.savedStories.scene
+                                : t.savedStories.scenes}
+                              {"  •  "}
+                              {item.createdAt
+                                ? new Date(item.createdAt).toLocaleDateString(
+                                    language === "en"
+                                      ? "en-GB"
+                                      : language === "es"
+                                        ? "es-ES"
+                                        : "fr-FR"
+                                  )
+                                : ""}
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+
+                      <View style={styles.actions}>
+                        <TouchableOpacity
+                          style={styles.iconButton}
+                          onPress={() => toggleFavorite(item.id)}
+                        >
+                          <Text style={styles.favoriteText}>
+                            {item.favorite ? "❤️" : "🤍"}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.iconButton}
+                          onPress={() => shareStory(item)}
+                        >
+                          <Text style={styles.shareText}>↗</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.iconButton}
+                          onPress={() => confirmDelete(item.id)}
+                        >
+                          <Text style={styles.deleteText}>🗑️</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <View style={styles.cardBottom}>
+                      <TouchableOpacity
+                        style={styles.openButton}
+                        onPress={() => openStory(item)}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.openButtonText}>
+                          {language === "fr"
+                            ? "📖 Ouvrir l’histoire"
+                            : language === "en"
+                              ? "📖 Open story"
+                              : "📖 Abrir historia"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {videoCompatible ? (
+                        <TouchableOpacity
+                          style={styles.videoButton}
+                          onPress={() => createVideoFromStory(item)}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.videoButtonText}>
+                            {purchasedVideoScenes
+                              ? language === "fr"
+                                ? "🎬 Utiliser cette histoire"
+                                : language === "en"
+                                  ? "🎬 Use this story"
+                                  : "🎬 Usar esta historia"
+                              : t.savedStories.createVideo}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </LinearGradient>
+                );
+              }}
+            />
+          )}
+
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.push("/")}
+            activeOpacity={0.86}
           >
-            {t.savedStories.backHome}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+            <Text style={styles.backText}>{t.savedStories.backHome}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor:
-        "#111827",
-    },
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
 
-    container: {
-      flex: 1,
-      paddingHorizontal: 18,
-      paddingTop: 20,
-      paddingBottom: 18,
-      backgroundColor:
-        "#111827",
-    },
+  container: {
+    flex: 1,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 14,
+  },
 
-    title: {
-      fontSize: 30,
-      fontWeight: "900",
-      marginBottom: 20,
-      color: "white",
-    },
+  header: {
+    minHeight: 132,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    overflow: "visible",
+  },
 
-    filterRow: {
-      flexDirection: "row",
-      gap: 10,
-      marginBottom: 18,
-    },
+  headerText: {
+    flex: 1,
+    zIndex: 2,
+    paddingLeft: 2,
+  },
 
-    filterButton: {
-      flex: 1,
-      padding: 13,
-      borderRadius: 14,
-      backgroundColor:
-        "rgba(255,255,255,0.12)",
-      alignItems: "center",
-    },
+  eyebrow: {
+    color: "#FFD45C",
+    fontSize: 14,
+    letterSpacing: 4,
+    marginBottom: 5,
+  },
 
-    filterButtonActive: {
-      backgroundColor:
-        "#FFB703",
-    },
+  title: {
+    fontSize: 30,
+    lineHeight: 35,
+    fontWeight: "900",
+    color: "white",
+  },
 
-    filterText: {
-      color: "white",
-      fontWeight: "900",
-    },
+  subtitle: {
+    color: "#D8D7F7",
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 5,
+    maxWidth: 230,
+  },
 
-    filterTextActive: {
-      color: "#111",
-    },
+  magico: {
+    width: 128,
+    height: 128,
+    marginRight: -8,
+  },
 
-    listContent: {
-      paddingBottom: 12,
-      width: "100%",
-      maxWidth: 800,
-      alignSelf: "center",
-    },
+  videoPackBanner: {
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 14,
+    borderWidth: 1.2,
+    borderColor: "rgba(255,212,92,0.68)",
+    alignItems: "center",
+    shadowColor: "#6D28D9",
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
 
-    emptyBox: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      paddingHorizontal: 20,
-    },
+  videoPackStars: {
+    color: "#FFD45C",
+    fontSize: 14,
+    letterSpacing: 3,
+    marginBottom: 3,
+  },
 
-    emptyText: {
-      color: "white",
-      fontSize: 16,
-      textAlign: "center",
-      opacity: 0.8,
-    },
+  videoPackTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+    textAlign: "center",
+  },
 
-    loadingText: {
-      color: "white",
-      fontSize: 15,
-      fontWeight: "700",
-      marginTop: 14,
-      opacity: 0.8,
-    },
+  videoPackSubtitle: {
+    color: "#E9E7FF",
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 4,
+  },
 
-    card: {
-      backgroundColor: "white",
-      padding: 12,
-      borderRadius: 18,
-      marginBottom: 12,
-    },
+  filterRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14,
+  },
 
-    topRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
+  filterButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(167,151,255,0.28)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
 
-    storyMain: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-    },
+  filterButtonActive: {
+    backgroundColor: "#FFC13D",
+    borderColor: "#FFE08A",
+  },
 
-    thumbnail: {
-      width: 74,
-      height: 74,
-      borderRadius: 14,
-      backgroundColor: "#111",
-      marginRight: 12,
-    },
+  filterText: {
+    color: "#EAE8FF",
+    fontWeight: "900",
+    fontSize: 14,
+  },
 
-    placeholder: {
-      width: 74,
-      height: 74,
-      borderRadius: 14,
-      backgroundColor: "#EEE",
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: 12,
-    },
+  filterTextActive: {
+    color: "#231B43",
+  },
 
-    placeholderText: {
-      fontSize: 28,
-    },
+  listContent: {
+    paddingBottom: 10,
+    width: "100%",
+    maxWidth: 800,
+    alignSelf: "center",
+  },
 
-    storyInfo: {
-      flex: 1,
-    },
+  emptyBox: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 28,
+  },
 
-    text: {
-      fontSize: 16,
-      fontWeight: "900",
-      color: "#111",
-    },
+  emptyMagico: {
+    width: 150,
+    height: 150,
+    marginBottom: 4,
+  },
 
-    date: {
-      marginTop: 6,
-      fontSize: 12,
-      color: "#666",
-    },
+  emptyStars: {
+    color: "#FFD45C",
+    fontSize: 18,
+    letterSpacing: 5,
+    marginBottom: 12,
+  },
 
-    actions: {
-      flexDirection: "row",
-      marginLeft: 8,
-      gap: 4,
-    },
+  emptyText: {
+    color: "#F5F3FF",
+    fontSize: 16,
+    lineHeight: 23,
+    textAlign: "center",
+    opacity: 0.92,
+  },
 
-    iconButton: {
-      padding: 5,
-    },
+  loadingText: {
+    color: "#E9E7FF",
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 14,
+  },
 
-    favoriteText: {
-      fontSize: 22,
-    },
+  card: {
+    minHeight: 166,
+    padding: 13,
+    borderRadius: 24,
+    marginBottom: 13,
+    borderWidth: 1.2,
+    borderColor: "rgba(176,153,255,0.58)",
+    overflow: "hidden",
+    shadowColor: "#6D28D9",
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
 
-    shareText: {
-      fontSize: 21,
-    },
+  cardSparkleOne: {
+    position: "absolute",
+    right: 18,
+    top: 9,
+  },
 
-    deleteText: {
-      fontSize: 21,
-    },
+  cardSparkleTwo: {
+    position: "absolute",
+    left: 8,
+    bottom: 10,
+  },
 
-    videoButton: {
-      marginTop: 12,
-      backgroundColor: "#7C3AED",
-      borderRadius: 14,
-      minHeight: 46,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 14,
-    },
+  cardSparkle: {
+    color: "rgba(255,212,92,0.75)",
+    fontSize: 16,
+  },
 
-    videoButtonText: {
-      color: "#ffffff",
-      fontSize: 14,
-      fontWeight: "900",
-      textAlign: "center",
-    },
+  cardSparkleSmall: {
+    color: "rgba(255,255,255,0.38)",
+    fontSize: 13,
+  },
 
-    backButton: {
-      backgroundColor: "#FFB703",
-      padding: 15,
-      borderRadius: 15,
-      alignItems: "center",
-      marginTop: 10,
-      marginBottom: 4,
-    },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
 
-    backText: {
-      color: "#111",
-      fontWeight: "900",
-      fontSize: 16,
-    },
-  });
+  storyMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  thumbnail: {
+    width: 82,
+    height: 82,
+    borderRadius: 18,
+    backgroundColor: "#111",
+    marginRight: 12,
+    borderWidth: 1.2,
+    borderColor: "rgba(255,212,92,0.55)",
+  },
+
+  placeholder: {
+    width: 82,
+    height: 82,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,212,92,0.45)",
+  },
+
+  placeholderText: {
+    fontSize: 30,
+  },
+
+  storyInfo: {
+    flex: 1,
+    paddingRight: 4,
+  },
+
+  text: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "900",
+    color: "white",
+  },
+
+  metaPill: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.09)",
+  },
+
+  date: {
+    fontSize: 11,
+    color: "#DCD8FF",
+    fontWeight: "700",
+  },
+
+  actions: {
+    marginLeft: 7,
+    gap: 5,
+  },
+
+  iconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
+  },
+
+  favoriteText: {
+    fontSize: 18,
+  },
+
+  shareText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "900",
+    marginTop: -2,
+  },
+
+  deleteText: {
+    fontSize: 17,
+  },
+
+  cardBottom: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+
+  openButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+
+  openButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  videoButton: {
+    flex: 1.15,
+    minHeight: 42,
+    borderRadius: 14,
+    backgroundColor: "#FFC13D",
+    borderWidth: 1,
+    borderColor: "#FFE08A",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+
+  videoButtonText: {
+    color: "#241A3E",
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  backButton: {
+    minHeight: 50,
+    backgroundColor: "rgba(42,35,108,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255,212,92,0.55)",
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+  },
+
+  backText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 15,
+  },
+});

@@ -59,8 +59,20 @@ export default function PlayerScreen() {
 
   const params =
   useLocalSearchParams<{
-    resumeVideo?: string;
+    resumeVideo?: string | string[];
+    videoPack?: string | string[];
   }>();
+
+  const rawVideoPack = Array.isArray(params.videoPack)
+    ? params.videoPack[0]
+    : params.videoPack;
+
+  const purchasedVideoScenes =
+    rawVideoPack === "4"
+      ? 4
+      : rawVideoPack === "6"
+        ? 6
+        : null;
 
 const resumeVideoHandledRef =
   useRef<string | null>(null);
@@ -114,7 +126,7 @@ const resumeVideoHandledRef =
   const current = scenes[index];
 
   const gradientColors: [string, string] =
-    nightMode || bedtimeMode ? ["#020617", "#111827"] : ["#111827", "#312E81"];
+    nightMode || bedtimeMode ? ["#020617", "#111827"] : ["#090B2F", "#2B176B"];
 
   function styleLabel() {
   if (story?.imageStyle === "cartoon") return "🎨 Cartoon";
@@ -663,9 +675,11 @@ sound.setOnPlaybackStatusUpdate((status) => {
 
 useEffect(() => {
   const resumeToken =
-    typeof params.resumeVideo === "string"
-      ? params.resumeVideo
-      : null;
+    Array.isArray(params.resumeVideo)
+      ? params.resumeVideo[0] || null
+      : typeof params.resumeVideo === "string"
+        ? params.resumeVideo
+        : null;
 
   if (!resumeToken) {
     return;
@@ -682,6 +696,26 @@ useEffect(() => {
     scenes.length !== 4 &&
     scenes.length !== 6
   ) {
+    return;
+  }
+
+  if (
+    purchasedVideoScenes &&
+    scenes.length !== purchasedVideoScenes
+  ) {
+    Alert.alert(
+      language === "fr"
+        ? "Histoire incompatible"
+        : language === "en"
+          ? "Incompatible story"
+          : "Historia incompatible",
+      language === "fr"
+        ? `Ton carnet acheté est prévu pour ${purchasedVideoScenes} scènes. Choisis une histoire de ${purchasedVideoScenes} scènes.`
+        : language === "en"
+          ? `Your purchased pack is for ${purchasedVideoScenes} scenes. Choose a ${purchasedVideoScenes}-scene story.`
+          : `Tu paquete comprado es para ${purchasedVideoScenes} escenas. Elige una historia de ${purchasedVideoScenes} escenas.`
+    );
+
     return;
   }
 
@@ -779,7 +813,10 @@ useEffect(() => {
   void resumeAfterPurchase();
 }, [
   params.resumeVideo,
+  params.videoPack,
   scenes.length,
+  purchasedVideoScenes,
+  language,
 ]);
 
 function closeVideoModal() {
@@ -1048,6 +1085,11 @@ async function stopVoice() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#111827" }}>
       <LinearGradient colors={gradientColors} style={styles.container}>
+        <ScrollView
+          style={styles.screenScroll}
+          contentContainerStyle={styles.screenScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.header}>
           <Text style={styles.title}>
   {t.player.title}
@@ -1247,6 +1289,16 @@ async function stopVoice() {
   {t.player.storyContains} {scenes.length} {t.player.scenes}
 </Text>
 
+{purchasedVideoScenes ? (
+  <Text style={styles.videoPackConfirmedText}>
+    {language === "fr"
+      ? `✓ Carnet ${purchasedVideoScenes} scènes sélectionné`
+      : language === "en"
+        ? `✓ ${purchasedVideoScenes}-scene pack selected`
+        : `✓ Paquete de ${purchasedVideoScenes} escenas seleccionado`}
+  </Text>
+) : null}
+
 <Text style={styles.videoModalText}>
   {t.player.estimatedDuration} {scenes.length * 5} {t.player.seconds}
 </Text>
@@ -1322,6 +1374,7 @@ async function stopVoice() {
             </View>
           </View>
         </Modal>
+        </ScrollView>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -1330,39 +1383,63 @@ async function stopVoice() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 12,
+  },
+  screenScroll: {
+    flex: 1,
+  },
+  screenScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 24,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 14,
+    marginBottom: 12,
+    paddingHorizontal: 2,
   },
   title: {
-    color: "white",
-    fontSize: 30,
+    color: "#FFFFFF",
+    fontSize: 28,
     fontWeight: "900",
+    letterSpacing: 0.2,
+    textShadowColor: "rgba(151,108,255,0.35)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   favoriteButton: {
-    backgroundColor: "white",
+    backgroundColor: "rgba(67,48,139,0.88)",
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,212,92,0.75)",
+    shadowColor: "#FFD45C",
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 6,
   },
   favoriteIcon: {
     fontSize: 25,
   },
   imageFrame: {
     width: "100%",
-    height: 215,
-    borderRadius: 20,
-    marginBottom: 14,
+    height: 190,
+    borderRadius: 24,
+    marginBottom: 12,
     overflow: "hidden",
-    backgroundColor: "#111",
+    backgroundColor: "#080A20",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,212,92,0.62)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.32,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
   image: {
     width: "100%",
@@ -1373,25 +1450,39 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.28)",
   },
   card: {
-    flex: 1,
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
+    height: 230,
+    backgroundColor: "rgba(44,31,105,0.92)",
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1.2,
+    borderColor: "rgba(176,149,255,0.38)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.20,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cardNight: {
-    backgroundColor: "#111827",
+    backgroundColor: "rgba(10,17,36,0.96)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(148,163,184,0.28)",
   },
   scene: {
     fontWeight: "900",
-    marginBottom: 10,
-    color: "#6930C3",
+    marginBottom: 8,
+    color: "#FFD45C",
+    fontSize: 14,
+    letterSpacing: 0.3,
   },
   styleTag: {
+    alignSelf: "flex-start",
     marginBottom: 12,
     fontWeight: "800",
-    color: "#666",
+    color: "#E8E3FA",
+    backgroundColor: "rgba(108,76,190,0.42)",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    overflow: "hidden",
   },
   styleTagNight: {
     color: "#DDD",
@@ -1399,7 +1490,8 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 18,
     lineHeight: 28,
-    color: "#111",
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   textNight: {
     color: "white",
@@ -1411,15 +1503,20 @@ const styles = StyleSheet.create({
   },
   voiceButton: {
     flex: 1,
-    backgroundColor: "white",
-    padding: 10,
-    borderRadius: 14,
+    minHeight: 48,
+    backgroundColor: "rgba(63,45,135,0.92)",
+    paddingHorizontal: 7,
+    paddingVertical: 10,
+    borderRadius: 15,
     alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(179,153,255,0.38)",
   },
   voiceText: {
-    color: "#111",
+    color: "#FFFFFF",
     fontWeight: "900",
-    fontSize: 12,
+    fontSize: 11.5,
     textAlign: "center",
   },
   nightButton: {
@@ -1440,10 +1537,16 @@ const styles = StyleSheet.create({
   },
   btn: {
     flex: 1,
-    backgroundColor: "#FFB703",
+    backgroundColor: "#FFC43D",
     padding: 13,
     borderRadius: 15,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#FFE39A",
+    shadowColor: "#FFC43D",
+    shadowOpacity: 0.20,
+    shadowRadius: 5,
+    elevation: 3,
   },
   btnText: {
     fontWeight: "900",
@@ -1468,13 +1571,15 @@ const styles = StyleSheet.create({
   },
   homeButton: {
     flex: 1,
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.10)",
     padding: 11,
     borderRadius: 14,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
   },
   homeText: {
-    color: "#111",
+    color: "#FFFFFF",
     fontWeight: "900",
   },
   reportButton: {
@@ -1625,11 +1730,17 @@ const styles = StyleSheet.create({
 
   videoButton: {
   marginTop: 12,
-  backgroundColor: "#7C3AED",
-  paddingVertical: 14,
-  borderRadius: 16,
+  backgroundColor: "#6D43D6",
+  paddingVertical: 15,
+  borderRadius: 17,
   alignItems: "center",
   justifyContent: "center",
+  borderWidth: 1.3,
+  borderColor: "#BCA5FF",
+  shadowColor: "#8B5CF6",
+  shadowOpacity: 0.30,
+  shadowRadius: 8,
+  elevation: 5,
 },
 
 videoButtonText: {
@@ -1647,30 +1758,40 @@ videoOverlay: {
 },
 
 videoModal: {
-  backgroundColor: "white",
+  backgroundColor: "#21164F",
   borderRadius: 24,
   padding: 22,
+  borderWidth: 1.2,
+  borderColor: "rgba(255,212,92,0.58)",
 },
 
 videoModalTitle: {
   fontSize: 22,
   fontWeight: "900",
-  color: "#111827",
+  color: "#FFFFFF",
   marginBottom: 14,
   textAlign: "center",
 },
 
 videoModalText: {
   fontSize: 15,
-  color: "#4B5563",
+  color: "#DDD6FE",
   marginBottom: 8,
+  textAlign: "center",
+},
+
+videoPackConfirmedText: {
+  fontSize: 14,
+  fontWeight: "900",
+  color: "#FFD45C",
+  marginBottom: 10,
   textAlign: "center",
 },
 
 videoCreditText: {
   fontSize: 20,
   fontWeight: "900",
-  color: "#7C3AED",
+  color: "#FFD45C",
   marginTop: 10,
   marginBottom: 18,
   textAlign: "center",

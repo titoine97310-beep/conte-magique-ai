@@ -1,10 +1,13 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -32,6 +35,13 @@ import {
 
 const BACKEND_URL =
   "https://conte-magique-ai.onrender.com";
+
+const MAGICO = require("../assets/images/magico.png");
+const PREMIUM_HERO = require("../assets/images/premium-magico-hero.png");
+const PREMIUM_TEXT = require("../assets/images/premium-carnet-texte.png");
+const PREMIUM_ILLUSTRATED = require("../assets/images/premium-carnet-illustre.png");
+const PREMIUM_VIDEO_SHORT = require("../assets/images/premium-video-court.png");
+const PREMIUM_VIDEO_MEDIUM = require("../assets/images/premium-video-moyen.png");
 
 const TEXT_PRODUCT_ID =
   "carnet_15_textes";
@@ -63,6 +73,79 @@ export default function PremiumScreen() {
 
   const [language, setLanguage] =
     useState<AppLanguage>("fr");
+
+  const [purchaseCelebration, setPurchaseCelebration] =
+    useState<null | {
+      title: string;
+      message: string;
+      actionText: string;
+      onContinue: () => void;
+    }>(null);
+
+  const sparkleOpacity = useRef(new Animated.Value(0)).current;
+  const sparkleScale = useRef(new Animated.Value(0.7)).current;
+  const magicoScale = useRef(new Animated.Value(0.75)).current;
+  const magicoOpacity = useRef(new Animated.Value(0)).current;
+
+  function playSparkles() {
+    sparkleOpacity.setValue(0);
+    sparkleScale.setValue(0.7);
+
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(sparkleOpacity, {
+          toValue: 1,
+          duration: 130,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sparkleOpacity, {
+          toValue: 0,
+          duration: 520,
+          delay: 90,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(sparkleScale, {
+        toValue: 1.35,
+        duration: 700,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }
+
+  function showPurchaseCelebration(
+    title: string,
+    message: string,
+    actionText: string,
+    onContinue: () => void
+  ) {
+    magicoScale.setValue(0.75);
+    magicoOpacity.setValue(0);
+
+    setPurchaseCelebration({
+      title,
+      message,
+      actionText,
+      onContinue,
+    });
+
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.spring(magicoScale, {
+          toValue: 1,
+          friction: 5,
+          tension: 70,
+          useNativeDriver: true,
+        }),
+        Animated.timing(magicoOpacity, {
+          toValue: 1,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  }
 
   const t = getTranslations(language);
 
@@ -260,26 +343,21 @@ export default function PremiumScreen() {
             productId ===
             VIDEO_SHORT_PRODUCT_ID;
 
-          Alert.alert(
+          showPurchaseCelebration(
             isShort
               ? t.premium.shortVideoActivated
               : t.premium.mediumVideoActivated,
-
             isShort
               ? t.premium.shortVideoAdded
               : t.premium.mediumVideoAdded,
-
-            [
-              {
-                text:
-                  t.premium.chooseStory,
-
-                onPress: () =>
-                  router.replace(
-                    "/saved-stories"
-                  ),
-              },
-            ]
+            t.premium.chooseStory,
+            () =>
+              router.replace({
+                pathname: "/saved-stories",
+                params: {
+                  videoPack: isShort ? "4" : "6",
+                },
+              } as any)
           );
 
           return;
@@ -294,20 +372,15 @@ export default function PremiumScreen() {
           productId ===
           TEXT_PRODUCT_ID
         ) {
-          Alert.alert(
+          showPurchaseCelebration(
             t.premium.textPackActivated,
             t.premium.textPackAdded,
-            [
-              {
-                text:
-                  t.premium.createStory,
-
-                onPress: () =>
-                  router.replace(
-                    "/create-story"
-                  ),
-              },
-            ]
+            t.premium.createStory,
+            () =>
+              router.replace({
+                pathname: "/create-story",
+                params: { pack: "text" },
+              } as any)
           );
 
           return;
@@ -317,20 +390,15 @@ export default function PremiumScreen() {
           productId ===
           ILLUSTRATED_PRODUCT_ID
         ) {
-          Alert.alert(
+          showPurchaseCelebration(
             t.premium.illustratedPackActivated,
             t.premium.illustratedPackAdded,
-            [
-              {
-                text:
-                  t.premium.createStory,
-
-                onPress: () =>
-                  router.replace(
-                    "/create-story"
-                  ),
-              },
-            ]
+            t.premium.createStory,
+            () =>
+              router.replace({
+                pathname: "/create-story",
+                params: { pack: "illustrated" },
+              } as any)
           );
 
           return;
@@ -649,8 +717,10 @@ export default function PremiumScreen() {
   return (
     <LinearGradient
       colors={[
-        "#020617",
+        "#07142F",
+        "#172A63",
         "#312E81",
+        "#120A32",
       ]}
       style={
         styles.container
@@ -689,13 +759,26 @@ export default function PremiumScreen() {
             </Text>
           </TouchableOpacity>
 
-          <Text
-            style={
-              styles.title
-            }
-          >
-            {t.premium.title}
-          </Text>
+          <View style={styles.heroRow}>
+            <View style={styles.heroCopy}>
+              <Text style={styles.eyebrow}>✦ CONTE MAGIQUE ✦</Text>
+              <Text style={styles.title}>
+                {t.premium.title}
+              </Text>
+            </View>
+
+            <View style={styles.heroImageFrame}>
+              <Image
+                source={PREMIUM_HERO}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={["transparent", "rgba(7,20,47,0.88)"]}
+                style={styles.heroImageShade}
+              />
+            </View>
+          </View>
 
           <Text
             style={
@@ -762,11 +845,36 @@ export default function PremiumScreen() {
             </View>
           )}
 
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>📚</Text>
+            <View style={styles.sectionHeaderCopy}>
+              <Text style={styles.sectionTitle}>
+                {language === "fr"
+                  ? "Histoires magiques"
+                  : language === "es"
+                  ? "Historias mágicas"
+                  : "Magical stories"}
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                {language === "fr"
+                  ? "Choisis le carnet qui correspond à ton aventure."
+                  : language === "es"
+                  ? "Elige el cuaderno que corresponde a tu aventura."
+                  : "Choose the story pack for your next adventure."}
+              </Text>
+            </View>
+          </View>
+
           <View
             style={
               styles.card
             }
           >
+            <Image
+              source={PREMIUM_TEXT}
+              style={styles.storyArtwork}
+              resizeMode="cover"
+            />
             <Text
               style={
                 styles.cardIcon
@@ -810,9 +918,10 @@ export default function PremiumScreen() {
                   processing) &&
                   styles.disabledButton,
               ]}
-              onPress={
-                buyTextPack
-              }
+              onPress={() => {
+                playSparkles();
+                void buyTextPack();
+              }}
               activeOpacity={
                 0.85
               }
@@ -840,6 +949,11 @@ export default function PremiumScreen() {
               styles.premiumCard
             }
           >
+            <Image
+              source={PREMIUM_ILLUSTRATED}
+              style={styles.storyArtwork}
+              resizeMode="cover"
+            />
             <View
               style={
                 styles.badge
@@ -897,9 +1011,10 @@ export default function PremiumScreen() {
                   processing) &&
                   styles.disabledButton,
               ]}
-              onPress={
-                buyPremiumPack
-              }
+              onPress={() => {
+                playSparkles();
+                void buyPremiumPack();
+              }}
               activeOpacity={
                 0.85
               }
@@ -922,11 +1037,37 @@ export default function PremiumScreen() {
             </TouchableOpacity>
           </View>
 
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>🎬</Text>
+            <View style={styles.sectionHeaderCopy}>
+              <Text style={styles.sectionTitle}>
+                {language === "fr"
+                  ? "Dessins animés magiques"
+                  : language === "es"
+                  ? "Dibujos animados mágicos"
+                  : "Magical animated stories"}
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                {language === "fr"
+                  ? "Transforme une histoire enregistrée en dessin animé."
+                  : language === "es"
+                  ? "Transforma una historia guardada en un dibujo animado."
+                  : "Turn a saved story into an animated adventure."}
+              </Text>
+            </View>
+          </View>
+
           <View
             style={
               styles.videoCard
             }
           >
+
+            <Image
+              source={PREMIUM_VIDEO_SHORT}
+              style={styles.videoArtwork}
+              resizeMode="cover"
+            />
             <View
               style={
                 styles.videoBadge
@@ -984,9 +1125,10 @@ export default function PremiumScreen() {
                   processing) &&
                   styles.disabledButton,
               ]}
-              onPress={
-                buyShortVideo
-              }
+              onPress={() => {
+                playSparkles();
+                void buyShortVideo();
+              }}
               activeOpacity={
                 0.85
               }
@@ -1014,6 +1156,11 @@ export default function PremiumScreen() {
               styles.videoCard
             }
           >
+            <Image
+              source={PREMIUM_VIDEO_MEDIUM}
+              style={styles.videoArtwork}
+              resizeMode="cover"
+            />
             <View
               style={
                 styles.videoBadge
@@ -1073,9 +1220,10 @@ export default function PremiumScreen() {
                   processing) &&
                   styles.disabledButton,
               ]}
-              onPress={
-                buyMediumVideo
-              }
+              onPress={() => {
+                playSparkles();
+                void buyMediumVideo();
+              }}
               activeOpacity={
                 0.85
               }
@@ -1107,6 +1255,72 @@ export default function PremiumScreen() {
             {STORE_NAME}. {t.premium.packContains}
           </Text>
         </ScrollView>
+
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.sparkleLayer,
+            {
+              opacity: sparkleOpacity,
+              transform: [{ scale: sparkleScale }],
+            },
+          ]}
+        >
+          <Text style={[styles.sparkle, styles.sparkleOne]}>✦</Text>
+          <Text style={[styles.sparkle, styles.sparkleTwo]}>✨</Text>
+          <Text style={[styles.sparkle, styles.sparkleThree]}>✧</Text>
+          <Text style={[styles.sparkle, styles.sparkleFour]}>★</Text>
+          <Text style={[styles.sparkle, styles.sparkleFive]}>✦</Text>
+        </Animated.View>
+
+        {purchaseCelebration && (
+          <View style={styles.celebrationOverlay}>
+            <LinearGradient
+              colors={["#17104A", "#312E81", "#11183E"]}
+              style={styles.celebrationCard}
+            >
+              <Text style={styles.celebrationStars}>✦ ✨ ✦</Text>
+
+              <Animated.Image
+                source={MAGICO}
+                resizeMode="contain"
+                style={[
+                  styles.celebrationMagico,
+                  {
+                    opacity: magicoOpacity,
+                    transform: [{ scale: magicoScale }],
+                  },
+                ]}
+              />
+
+              <View style={styles.successCheck}>
+                <Text style={styles.successCheckText}>✓</Text>
+              </View>
+
+              <Text style={styles.celebrationTitle}>
+                {purchaseCelebration.title}
+              </Text>
+
+              <Text style={styles.celebrationMessage}>
+                {purchaseCelebration.message}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.celebrationButton}
+                activeOpacity={0.85}
+                onPress={() => {
+                  const next = purchaseCelebration.onContinue;
+                  setPurchaseCelebration(null);
+                  next();
+                }}
+              >
+                <Text style={styles.celebrationButtonText}>
+                  {purchaseCelebration.actionText}
+                </Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -1128,7 +1342,200 @@ const styles =
       alignSelf: "center",
       paddingHorizontal: 24,
       paddingTop: 20,
-      paddingBottom: 40,
+      paddingBottom: 70,
+    },
+
+    heroRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      marginBottom: 4,
+    },
+
+    heroCopy: {
+      flex: 1,
+    },
+
+    eyebrow: {
+      color: "#F7C948",
+      fontSize: 12,
+      fontWeight: "900",
+      letterSpacing: 1.4,
+      marginBottom: 5,
+    },
+
+    heroImageFrame: {
+      width: 118,
+      height: 118,
+      borderRadius: 26,
+      overflow: "hidden",
+      borderWidth: 1.5,
+      borderColor: "rgba(247,201,72,0.75)",
+      backgroundColor: "#11183E",
+    },
+
+    heroImage: {
+      width: "100%",
+      height: "100%",
+    },
+
+    heroImageShade: {
+      ...StyleSheet.absoluteFillObject,
+    },
+
+    storyArtwork: {
+      width: "100%",
+      height: 210,
+      borderRadius: 20,
+      marginBottom: 18,
+    },
+
+    videoArtwork: {
+      width: "100%",
+      height: 210,
+      borderRadius: 20,
+      marginBottom: 18,
+    },
+
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      marginTop: 8,
+      marginBottom: 14,
+      paddingHorizontal: 4,
+    },
+
+    sectionIcon: {
+      fontSize: 30,
+    },
+
+    sectionHeaderCopy: {
+      flex: 1,
+    },
+
+    sectionTitle: {
+      color: "#FFFFFF",
+      fontSize: 21,
+      fontWeight: "900",
+    },
+
+    sectionSubtitle: {
+      color: "#C9D3EA",
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: 2,
+    },
+
+    sparkleLayer: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 40,
+    },
+
+    sparkle: {
+      position: "absolute",
+      color: "#FFD86B",
+      fontWeight: "900",
+      textShadowColor: "rgba(255,216,107,0.8)",
+      textShadowRadius: 8,
+    },
+
+    sparkleOne: { left: "16%", top: "35%", fontSize: 28 },
+    sparkleTwo: { right: "14%", top: "42%", fontSize: 30 },
+    sparkleThree: { left: "28%", top: "54%", fontSize: 22 },
+    sparkleFour: { right: "28%", top: "58%", fontSize: 20 },
+    sparkleFive: { left: "48%", top: "31%", fontSize: 25 },
+
+    celebrationOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 100,
+      backgroundColor: "rgba(2,6,23,0.82)",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 22,
+    },
+
+    celebrationCard: {
+      width: "100%",
+      maxWidth: 430,
+      borderRadius: 30,
+      borderWidth: 2,
+      borderColor: "#F7C948",
+      paddingHorizontal: 24,
+      paddingTop: 20,
+      paddingBottom: 24,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.35,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 16,
+    },
+
+    celebrationStars: {
+      color: "#FFD86B",
+      fontSize: 24,
+      fontWeight: "900",
+      marginBottom: 2,
+    },
+
+    celebrationMagico: {
+      width: 150,
+      height: 150,
+      marginTop: -4,
+      marginBottom: -12,
+    },
+
+    successCheck: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: "#F7C948",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+      borderWidth: 3,
+      borderColor: "#FFF2B5",
+    },
+
+    successCheckText: {
+      color: "#15204D",
+      fontSize: 30,
+      fontWeight: "900",
+      marginTop: -2,
+    },
+
+    celebrationTitle: {
+      color: "#FFFFFF",
+      fontSize: 25,
+      fontWeight: "900",
+      textAlign: "center",
+      marginBottom: 8,
+    },
+
+    celebrationMessage: {
+      color: "#DCE5F7",
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: "center",
+      marginBottom: 20,
+    },
+
+    celebrationButton: {
+      width: "100%",
+      backgroundColor: "#F7C948",
+      borderRadius: 18,
+      paddingVertical: 16,
+      paddingHorizontal: 18,
+      alignItems: "center",
+    },
+
+    celebrationButtonText: {
+      color: "#17204A",
+      fontSize: 16,
+      fontWeight: "900",
+      textAlign: "center",
     },
 
     backButton: {
@@ -1146,7 +1553,7 @@ const styles =
 
     title: {
       color: "white",
-      fontSize: 34,
+      fontSize: 32,
       fontWeight: "900",
       marginBottom: 10,
     },
@@ -1193,21 +1600,23 @@ const styles =
     },
 
     card: {
-      backgroundColor: "white",
+      backgroundColor: "rgba(11,28,70,0.96)",
       borderRadius: 26,
-      padding: 24,
+      borderWidth: 2,
+      borderColor: "#4DB8FF",
+      padding: 18,
       marginBottom: 22,
       alignItems: "center",
     },
 
     premiumCard: {
-      backgroundColor: "#FFB703",
+      backgroundColor: "rgba(54,24,105,0.97)",
       borderRadius: 28,
-      padding: 24,
+      padding: 18,
       marginBottom: 22,
       alignItems: "center",
       borderWidth: 2,
-      borderColor: "#FFE8A3",
+      borderColor: "#F7C948",
     },
 
     badge: {
@@ -1232,7 +1641,7 @@ const styles =
     cardTitle: {
       fontSize: 26,
       fontWeight: "900",
-      color: "#111",
+      color: "#FFFFFF",
       marginBottom: 6,
       textAlign: "center",
     },
@@ -1240,20 +1649,20 @@ const styles =
     cardPrice: {
       fontSize: 42,
       fontWeight: "900",
-      color: "#6930C3",
+      color: "#F7C948",
       marginBottom: 10,
     },
 
     cardDescription: {
       textAlign: "center",
       fontSize: 16,
-      color: "#333",
+      color: "#DCE5F7",
       marginBottom: 24,
       lineHeight: 24,
     },
 
     button: {
-      backgroundColor: "#111827",
+      backgroundColor: "#168CFF",
       paddingVertical: 16,
       paddingHorizontal: 28,
       borderRadius: 18,
@@ -1269,7 +1678,7 @@ const styles =
     },
 
     premiumButton: {
-      backgroundColor: "#111827",
+      backgroundColor: "#A52EFF",
       paddingVertical: 16,
       paddingHorizontal: 28,
       borderRadius: 18,
@@ -1285,13 +1694,13 @@ const styles =
     },
 
     videoCard: {
-      backgroundColor: "#EDE9FE",
+      backgroundColor: "rgba(38,22,91,0.97)",
       borderRadius: 28,
-      padding: 24,
+      padding: 18,
       marginBottom: 22,
       alignItems: "center",
       borderWidth: 2,
-      borderColor: "#C4B5FD",
+      borderColor: "#9B6CFF",
     },
 
     videoBadge: {

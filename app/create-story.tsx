@@ -1,11 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Image,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getTranslations,
   loadLanguage,
@@ -99,6 +101,108 @@ const narrators = [
   },
 ] as const;
 
+const imageStyleArtwork = {
+  cartoon: require("../assets/images/style-cartoon.png"),
+  fantasy: require("../assets/images/style-fantasy.png"),
+  realistic: require("../assets/images/style-realistic.png"),
+  comic: require("../assets/images/style-comic.png"),
+} as const;
+
+const storyTypeArtwork = {
+  funny: require("../assets/images/type-funny.png"),
+  adventure: require("../assets/images/type-adventure.png"),
+  magic: require("../assets/images/type-magic.png"),
+  mystery: require("../assets/images/type-mystery.png"),
+} as const;
+
+const narratorArtwork = {
+  narratrice: require("../assets/images/narrator-elise.png"),
+  narrateur: require("../assets/images/narrator-arthur.png"),
+  magicien: require("../assets/images/narrator-merlin.png"),
+  fee: require("../assets/images/narrator-luna.png"),
+  dodo: require("../assets/images/narrator-dodo.png"),
+} as const;
+
+type MagicChoiceCardProps = {
+  image: any;
+  title: string;
+  subtitle?: string;
+  active: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+  tall?: boolean;
+};
+
+function MagicChoiceCard({
+  image,
+  title,
+  subtitle,
+  active,
+  disabled = false,
+  onPress,
+  tall = false,
+}: MagicChoiceCardProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateTo = (value: number) => {
+    Animated.spring(scale, {
+      toValue: value,
+      useNativeDriver: true,
+      speed: 28,
+      bounciness: 5,
+    }).start();
+  };
+
+  return (
+    <Animated.View
+      style={[
+        styles.magicChoiceOuter,
+        tall && styles.magicChoiceOuterTall,
+        disabled && styles.magicChoiceDisabled,
+        { transform: [{ scale }] },
+      ]}
+    >
+      <TouchableOpacity
+        style={[
+          styles.magicChoiceTouchable,
+          active && styles.magicChoiceTouchableActive,
+        ]}
+        onPress={onPress}
+        onPressIn={() => animateTo(0.965)}
+        onPressOut={() => animateTo(active ? 1.025 : 1)}
+        disabled={disabled}
+        activeOpacity={0.96}
+      >
+        <ImageBackground
+          source={image}
+          style={styles.magicChoiceImage}
+          imageStyle={styles.magicChoiceImageRadius}
+          resizeMode="cover"
+        >
+          <LinearGradient
+            colors={[
+              "rgba(0,0,0,0)",
+              "rgba(0,0,0,0)",
+              "rgba(0,0,0,0)",
+            ]}
+            locations={[0, 0.48, 1]}
+            style={styles.magicChoiceShade}
+          >
+            {active ? (
+              <View style={styles.magicChoiceSelectedBadge}>
+                <Text style={styles.magicChoiceSelectedStar}>✦</Text>
+              </View>
+            ) : null}
+
+            {/* Le texte est déjà intégré directement dans les visuels.
+                On conserve uniquement l’image et l’indicateur de sélection. */}
+          </LinearGradient>
+        </ImageBackground>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 function getStylePrompt(style: ImageStyle) {
   if (style === "cartoon") {
     return "colorful cartoon style, children's animation, soft shapes";
@@ -116,6 +220,24 @@ function getStylePrompt(style: ImageStyle) {
 }
 
 export default function CreateStoryScreen() {
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{
+    pack?: string | string[];
+  }>();
+
+  const rawPurchasedPack = Array.isArray(params.pack)
+    ? params.pack[0]
+    : params.pack;
+
+  const purchasedPack: PackType | null =
+    rawPurchasedPack === "text"
+      ? "text"
+      : rawPurchasedPack === "illustrated"
+        ? "illustrated"
+        : null;
+
+  const purchasedPackHandledRef = useRef<string | null>(null);
+
   const [language, setLanguage] =
     useState<AppLanguage>("fr");
 
@@ -232,7 +354,7 @@ function getNarratorSubtitle(narratorId: Narrator) {
   const [referencePhotoMimeType, setReferencePhotoMimeType] =
   useState<string>("image/jpeg");
 
-  const [storyType, setStoryType] = useState<StoryType>("magic");
+  const [selectedStoryTypes, setSelectedStoryTypes] = useState<StoryType[]>(["magic"]);
   const [storyLength, setStoryLength] = useState<StoryLength>("short");
   const [narrator, setNarrator] =
   useState<Narrator>("narratrice");
@@ -281,6 +403,44 @@ function getNarratorSubtitle(narratorId: Narrator) {
     setSelectedPack(nextPack);
     await AsyncStorage.setItem(storageKey, nextPack);
   }, []);
+
+  useEffect(() => {
+    if (!purchasedPack || !isConnected) {
+      return;
+    }
+
+    const available =
+      purchasedPack === "text"
+        ? textRemaining
+        : illustratedRemaining;
+
+    if (available <= 0) {
+      return;
+    }
+
+    const token = `${purchasedPack}:${available}`;
+
+    if (purchasedPackHandledRef.current === token) {
+      return;
+    }
+
+    purchasedPackHandledRef.current = token;
+    setSelectedPack(purchasedPack);
+
+    const currentUser = auth.currentUser;
+
+    if (currentUser) {
+      void AsyncStorage.setItem(
+        `ACTIVE_STORY_PACK:${currentUser.uid}`,
+        purchasedPack
+      );
+    }
+  }, [
+    purchasedPack,
+    isConnected,
+    textRemaining,
+    illustratedRemaining,
+  ]);
 
   const selectPack = useCallback(
   async (pack: PackType) => {
@@ -523,6 +683,26 @@ function openPhotoSelector() {
 );
 }
 
+  const toggleStoryType = (type: StoryType) => {
+    setSelectedStoryTypes((current) => {
+      if (current.includes(type)) {
+        // On garde toujours au moins un univers sélectionné.
+        if (current.length === 1) {
+          return current;
+        }
+
+        return current.filter((item) => item !== type);
+      }
+
+      // Deux univers maximum pour conserver une histoire claire.
+      if (current.length >= 2) {
+        return current;
+      }
+
+      return [...current, type];
+    });
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       Alert.alert(
@@ -652,7 +832,7 @@ Une photo de référence a été ajoutée.
 
       const storyData = await generateStory(
   storyPrompt,
-  storyType,
+  selectedStoryTypes,
   sceneCount,
   language
 );
@@ -667,7 +847,7 @@ Une photo de référence a été ajoutée.
             ...scenes[i],
             imageUrl: null,
             imageStyle,
-            storyType,
+            storyType: selectedStoryTypes.join("+"),
             storyLength,
           });
           continue;
@@ -727,7 +907,7 @@ const imageUrl = await generateImage(
           ...scenes[i],
           imagePrompt: styledImagePrompt,
           imageStyle,
-          storyType,
+          storyType: selectedStoryTypes.join("+"),
           storyLength,
           imageUrl,
         });
@@ -736,7 +916,7 @@ const imageUrl = await generateImage(
       const finalStory = {
         prompt,
         imageStyle,
-        storyType,
+        storyType: selectedStoryTypes.join("+"),
         storyLength,
         narrator,
         scenes: scenesWithImages,
@@ -803,626 +983,1105 @@ const imageUrl = await generateImage(
   };
 
   return (
-  <LinearGradient
-    colors={["#0F172A", "#3B0764"]}
-    style={styles.container}
-  >
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Text style={styles.title}>
-  {t.createStory.title}
-</Text>
+    <LinearGradient
+      colors={["#10143F", "#35206F", "#21145B", "#080B25"]}
+      locations={[0, 0.34, 0.72, 1]}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: 34 + Math.max(insets.bottom, 20) },
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.hero}>
+            <View style={styles.heroText}>
+              <Text style={styles.heroStars}>✦  ✨  ✦</Text>
+              <Text style={styles.title}>{t.createStory.title}</Text>
+              <Text style={styles.subtitle}>{t.createStory.subtitle}</Text>
+            </View>
 
-<Text style={styles.subtitle}>
-  {t.createStory.subtitle}
-</Text>
+            <Image
+              source={require("../assets/images/magico.png")}
+              style={styles.magico}
+              resizeMode="contain"
+            />
+          </View>
 
-        {isConnected && (
-          <View style={styles.carnetsCard}>
-            <Text style={styles.activePackEyebrow}>
-  {t.createStory.activePack}
-</Text>
+          {isConnected && purchasedPack ? (
+            <LinearGradient
+              colors={
+                purchasedPack === "text"
+                  ? ["#1D4ED8", "#4338CA", "#6D28D9"]
+                  : ["#6D28D9", "#7C3AED", "#4338CA"]
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.purchasedPackBanner}
+            >
+              <Text style={styles.purchasedPackStars}>✦ ✨ ✦</Text>
+              <Text style={styles.purchasedPackTitle}>
+                {purchasedPack === "text" ? "📖 " : "🎨 "}
+                {language === "fr"
+                  ? purchasedPack === "text"
+                    ? "Carnet Texte sélectionné"
+                    : "Carnet Illustré sélectionné"
+                  : language === "en"
+                    ? purchasedPack === "text"
+                      ? "Text Pack selected"
+                      : "Illustrated Pack selected"
+                    : purchasedPack === "text"
+                      ? "Paquete de Texto seleccionado"
+                      : "Paquete Ilustrado seleccionado"}
+              </Text>
+              <Text style={styles.purchasedPackSubtitle}>
+                {language === "fr"
+                  ? purchasedPack === "text"
+                    ? "Ta prochaine histoire utilisera automatiquement ton carnet Texte."
+                    : "Ta prochaine histoire utilisera automatiquement ton carnet Illustré."
+                  : language === "en"
+                    ? purchasedPack === "text"
+                      ? "Your next story will automatically use your Text Pack."
+                      : "Your next story will automatically use your Illustrated Pack."
+                    : purchasedPack === "text"
+                      ? "Tu próxima historia usará automáticamente tu paquete de Texto."
+                      : "Tu próxima historia usará automáticamente tu paquete Ilustrado."}
+              </Text>
+            </LinearGradient>
+          ) : null}
+
+          {isConnected && (
+            <LinearGradient
+              colors={["rgba(82,49,154,0.92)", "rgba(38,31,101,0.96)"]}
+              style={styles.carnetsCard}
+            >
+              <View style={styles.packHeaderRow}>
+                <Text style={styles.activePackEyebrow}>
+                  ✨ {t.createStory.activePack}
+                </Text>
+                <Text style={styles.packSparkle}>✦</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.activePackButton}
+                onPress={openPackSelector}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                <View style={styles.activePackIcon}>
+                  <Text style={styles.activePackIconText}>
+                    {selectedPack === "text" ? "📖" : "🎨"}
+                  </Text>
+                </View>
+
+                <View style={styles.activePackTextBox}>
+                  <Text style={styles.activePackTitle}>
+                    {selectedPack === "text"
+                      ? t.createStory.textPack
+                      : t.createStory.illustratedPack}
+                  </Text>
+
+                  <Text style={styles.activePackSubtitle}>
+                    {selectedPack === "text"
+                      ? `${textRemaining} ${
+                          textRemaining === 1
+                            ? t.createStory.remainingStory
+                            : t.createStory.remainingStories
+                        }`
+                      : `${illustratedRemaining} ${
+                          illustratedRemaining === 1
+                            ? t.createStory.remainingStory
+                            : t.createStory.remainingStories
+                        }`}
+                  </Text>
+                </View>
+
+                {textRemaining > 0 && illustratedRemaining > 0 ? (
+                  <Text style={styles.activePackArrow}>⌄</Text>
+                ) : null}
+              </TouchableOpacity>
+
+              {textRemaining > 0 && illustratedRemaining > 0 ? (
+                <Text style={styles.changePackHint}>
+                  {t.createStory.changePack}
+                </Text>
+              ) : null}
+
+              <View style={styles.packMiniRow}>
+                <View style={styles.packMiniPill}>
+                  <Text style={styles.packMiniText}>
+                    {t.createStory.textShort} : {textRemaining}
+                  </Text>
+                </View>
+
+                <View style={styles.packMiniPill}>
+                  <Text style={styles.packMiniText}>
+                    {t.createStory.illustratedShort} : {illustratedRemaining}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.buyCarnetButton}
+                onPress={() => router.push("/premium" as any)}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.buyCarnetButtonText}>
+                  👑 {t.createStory.buyPack}
+                </Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          )}
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionNumber}>1</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>
+                  {language === "fr"
+                    ? "Imagine ton aventure"
+                    : language === "en"
+                      ? "Imagine your adventure"
+                      : "Imagina tu aventura"}
+                </Text>
+                <Text style={styles.sectionHint}>
+                  {language === "fr"
+                    ? "Raconte à Magico l’histoire que tu aimerais vivre."
+                    : language === "en"
+                      ? "Tell Magico the story you would like to experience."
+                      : "Cuéntale a Magico la historia que te gustaría vivir."}
+                </Text>
+              </View>
+            </View>
+
+            <TextInput
+              style={styles.input}
+              placeholder={t.createStory.ideaPlaceholder}
+              placeholderTextColor="#8E8AA8"
+              value={prompt}
+              onChangeText={setPrompt}
+              multiline
+              editable={!loading}
+            />
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionNumber}>2</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>
+                  {language === "fr"
+                    ? "Ajoute une photo"
+                    : language === "en"
+                      ? "Add a photo"
+                      : "Añade una foto"}
+                </Text>
+                <Text style={styles.sectionHint}>
+                  {t.createStory.optionalPhoto}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.photoHelpText}>{t.createStory.photoHelp}</Text>
 
             <TouchableOpacity
-              style={styles.activePackButton}
-              onPress={openPackSelector}
+              style={styles.photoButton}
+              onPress={openPhotoSelector}
               disabled={loading}
               activeOpacity={0.85}
             >
-              <View style={styles.activePackTextBox}>
-                <Text style={styles.activePackTitle}>
-                  {selectedPack === "text"
-  ? t.createStory.textPack
-  : t.createStory.illustratedPack}
-                </Text>
-
-                <Text style={styles.activePackSubtitle}>
-  {selectedPack === "text"
-    ? `${textRemaining} ${
-        textRemaining === 1
-          ? t.createStory.remainingStory
-          : t.createStory.remainingStories
-      }`
-    : `${illustratedRemaining} ${
-        illustratedRemaining === 1
-          ? t.createStory.remainingStory
-          : t.createStory.remainingStories
-      }`}
-</Text>
-              </View>
-
-              {textRemaining > 0 && illustratedRemaining > 0 ? (
-                <Text style={styles.activePackArrow}>⌄</Text>
-              ) : null}
-            </TouchableOpacity>
-
-            {textRemaining > 0 && illustratedRemaining > 0 ? (
-              <Text style={styles.changePackHint}>
-                {t.createStory.changePack}
+              <Text style={styles.photoButtonIcon}>📸</Text>
+              <Text style={styles.photoButtonText}>
+                {referencePhoto
+                  ? t.createStory.changePhoto
+                  : t.createStory.addPhoto}
               </Text>
-            ) : null}
-
-            <View style={styles.packMiniRow}>
-  <Text style={styles.packMiniText}>
-    {t.createStory.textShort} : {textRemaining}
-  </Text>
-
-  <Text style={styles.packMiniText}>
-    {t.createStory.illustratedShort} : {illustratedRemaining}
-  </Text>
-</View>
-
-            <TouchableOpacity
-              style={styles.buyCarnetButton}
-              onPress={() => router.push("/premium" as any)}
-              disabled={loading}
-            >
-              <Text style={styles.buyCarnetButtonText}>
-  {t.createStory.buyPack}
-</Text>
             </TouchableOpacity>
-          </View>
-        )}
 
-        <TextInput
-          style={styles.input}
-          placeholder={t.createStory.ideaPlaceholder}
-          placeholderTextColor="#AAA"
-          value={prompt}
-          onChangeText={setPrompt}
-          multiline
-        />
+            {referencePhoto && (
+              <View style={styles.photoPreviewCard}>
+                <Image
+                  source={{ uri: referencePhoto }}
+                  style={styles.photoPreview}
+                  resizeMode="cover"
+                />
 
-        <Text style={styles.photoHelpText}>
-  {t.createStory.optionalPhoto}
-  {"\n"}
-  {t.createStory.photoHelp}
-</Text>
+                <View style={styles.photoPreviewInfo}>
+                  <Text style={styles.photoPreviewCheck}>✓</Text>
+                  <Text style={styles.photoPreviewText}>
+                    {t.createStory.photoAdded}
+                  </Text>
+                </View>
+              </View>
+            )}
 
-        <TouchableOpacity
-  style={styles.photoButton}
-  onPress={openPhotoSelector}
-  disabled={loading}
->
-  <Text style={styles.photoButtonText}>
-    {referencePhoto
-      ? t.createStory.changePhoto
-      : t.createStory.addPhoto}
-  </Text>
-</TouchableOpacity>
-
-{referencePhoto && (
-  <View style={styles.photoPreviewCard}>
-    <Image
-      source={{ uri: referencePhoto }}
-      style={styles.photoPreview}
-      resizeMode="cover"
-    />
-
-    <Text style={styles.photoPreviewText}>
-      {t.createStory.photoAdded}
-    </Text>
-  </View>
-)}
-
-{referencePhoto && (
-  <TouchableOpacity
-    style={styles.removePhotoButton}
-    onPress={() => {
-  setReferencePhoto(null);
-  setReferencePhotoBase64(null);
-}}
-    disabled={loading}
-  >
-    <Text style={styles.removePhotoButtonText}>
-      {t.createStory.removePhoto}
-    </Text>
-  </TouchableOpacity>
-)}
-
-        <Text style={styles.sectionTitle}>
-  {t.createStory.imageStyleTitle}
-</Text>
-
-        <View style={styles.grid}>
-          {imageStyles.map((item) => {
-  const isActive = imageStyle === item.id;
-  const isRealisticBlocked =
-    Boolean(referencePhoto) && item.id === "realistic";
-
-  return (
-    <TouchableOpacity
-      key={item.id}
-      style={[
-        styles.optionButton,
-        isActive && styles.optionActive,
-        isRealisticBlocked && styles.optionDisabled,
-      ]}
-      onPress={() => {
-        if (isRealisticBlocked) {
-          Alert.alert(
-  t.createStory.styleUnavailable,
-  `🔒 ${t.createStory.realisticPhotoBlocked}`
-);
-          return;
-        }
-
-        setImageStyle(item.id);
-      }}
-      disabled={loading}
-    >
-      <Text
-        style={[
-          styles.optionText,
-          isActive && styles.optionTextActive,
-        ]}
-      >
-        {getImageStyleLabel(item.id)}
-{isRealisticBlocked ? " 🔒" : ""}
-      </Text>
-    </TouchableOpacity>
-  );
-})}
-        </View>
-
-        <Text style={styles.sectionTitle}>
-  {t.createStory.storyTypeTitle}
-</Text>
-
-        <View style={styles.grid}>
-          {storyTypes.map((item) => {
-            const isActive = storyType === item.id;
-
-            return (
+            {referencePhoto && (
               <TouchableOpacity
-                key={item.id}
-                style={[styles.optionButton, isActive && styles.optionActive]}
-                onPress={() => setStoryType(item.id)}
+                style={styles.removePhotoButton}
+                onPress={() => {
+                  setReferencePhoto(null);
+                  setReferencePhotoBase64(null);
+                }}
                 disabled={loading}
               >
-                <Text
-                  style={[
-                    styles.optionText,
-                    isActive && styles.optionTextActive,
-                  ]}
-                >
-                  {getStoryTypeLabel(item.id)}
+                <Text style={styles.removePhotoButtonText}>
+                  {t.createStory.removePhoto}
                 </Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
+            )}
+          </View>
 
-        <Text style={styles.sectionTitle}>
-  {t.createStory.lengthTitle}
-</Text>
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionNumber}>3</Text>
+              <Text style={styles.sectionTitle}>
+                {t.createStory.imageStyleTitle}
+              </Text>
+            </View>
 
-        <View style={styles.grid}>
-          {storyLengths.map((item) => {
-            const isActive = storyLength === item.id;
+            <View style={styles.magicGrid}>
+              {imageStyles.map((item) => {
+                const isActive = imageStyle === item.id;
+                const isRealisticBlocked =
+                  Boolean(referencePhoto) && item.id === "realistic";
 
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.optionButton,
-                  isActive && styles.optionActive,
-                  item.disabled && styles.optionDisabled,
-                ]}
-                onPress={() => {
-                  if (!item.disabled) {
-                    setStoryLength(item.id);
-                  }
-                }}
-                disabled={loading || item.disabled}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    isActive && styles.optionTextActive,
-                  ]}
-                >
-                  {getStoryLengthLabel(item.id)}
-{item.disabled
-  ? ` 🔒 ${t.createStory.comingSoon}`
-  : ""}
+                return (
+                  <MagicChoiceCard
+                    key={item.id}
+                    image={imageStyleArtwork[item.id]}
+                    title={getImageStyleLabel(item.id)}
+                    active={isActive}
+                    disabled={loading}
+                    onPress={() => {
+                      if (isRealisticBlocked) {
+                        Alert.alert(
+                          t.createStory.styleUnavailable,
+                          `🔒 ${t.createStory.realisticPhotoBlocked}`
+                        );
+                        return;
+                      }
+                      setImageStyle(item.id);
+                    }}
+                  />
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionNumber}>4</Text>
+              <Text style={styles.sectionTitle}>
+                {t.createStory.storyTypeTitle}
+              </Text>
+            </View>
+
+            <Text style={styles.storyTypeHint}>
+              {language === "fr"
+                ? "Choisis 1 ou 2 univers à mélanger ✨"
+                : language === "en"
+                  ? "Choose 1 or 2 worlds to blend ✨"
+                  : "Elige 1 o 2 universos para combinar ✨"}
+            </Text>
+
+            <View style={styles.magicGrid}>
+              {storyTypes.map((item) => {
+                const isActive = selectedStoryTypes.includes(item.id);
+
+                return (
+                  <MagicChoiceCard
+                    key={item.id}
+                    image={storyTypeArtwork[item.id]}
+                    title={getStoryTypeLabel(item.id)}
+                    active={isActive}
+                    disabled={loading}
+                    onPress={() => toggleStoryType(item.id)}
+                  />
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionNumber}>5</Text>
+              <Text style={styles.sectionTitle}>{t.createStory.lengthTitle}</Text>
+            </View>
+
+            <View style={styles.grid}>
+              {storyLengths.map((item) => {
+                const isActive = storyLength === item.id;
+
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.optionButton,
+                      isActive && styles.optionActive,
+                      item.disabled && styles.optionDisabled,
+                    ]}
+                    onPress={() => {
+                      if (!item.disabled) {
+                        setStoryLength(item.id);
+                      }
+                    }}
+                    disabled={loading || item.disabled}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        isActive && styles.optionTextActive,
+                      ]}
+                    >
+                      {getStoryLengthLabel(item.id)}
+                      {item.disabled
+                        ? ` 🔒 ${t.createStory.comingSoon}`
+                        : ""}
+                    </Text>
+                    {!item.disabled && isActive ? (
+                      <Text style={styles.selectedStar}>✦</Text>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionNumber}>6</Text>
+              <Text style={styles.sectionTitle}>
+                {t.createStory.narratorTitle}
+              </Text>
+            </View>
+
+            <View style={styles.magicGrid}>
+              {narrators.map((item) => {
+                const isActive = narrator === item.id;
+
+                return (
+                  <MagicChoiceCard
+                    key={item.id}
+                    image={narratorArtwork[item.id]}
+                    title={item.label}
+                    subtitle={getNarratorSubtitle(item.id)}
+                    active={isActive}
+                    disabled={loading}
+                    onPress={() => setNarrator(item.id)}
+                    tall
+                  />
+                );
+              })}
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonLoading]}
+            onPress={handleGenerate}
+            disabled={loading}
+            activeOpacity={0.88}
+          >
+            <LinearGradient
+              colors={["#FFE16A", "#FFC13D", "#F5A623"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.generateGradient}
+            >
+              <Text style={styles.generateSparkle}>✦</Text>
+              <View style={styles.generateTextBox}>
+                <Text style={styles.buttonText}>
+                  {loading
+                    ? loadingText || t.createStory.generating
+                    : t.createStory.generate}
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                {!loading ? (
+                  <Text style={styles.generateHint}>
+                    {language === "fr"
+                      ? "Magico s’occupe du reste ✨"
+                      : language === "en"
+                        ? "Magico takes care of the rest ✨"
+                        : "Magico se encarga del resto ✨"}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.generateMagic}>✨</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>
-  {t.createStory.narratorTitle}
-</Text>
-
-<View style={styles.narratorGrid}>
-  {narrators.map((item) => {
-    const isActive = narrator === item.id;
-
-    return (
-      <TouchableOpacity
-        key={item.id}
-        style={[
-          styles.narratorButton,
-          isActive && styles.narratorActive,
-        ]}
-        onPress={() => setNarrator(item.id)}
-        disabled={loading}
-      >
-        <Text
-          style={[
-            styles.narratorLabel,
-            isActive && styles.narratorLabelActive,
-          ]}
-        >
-          {item.label}
-        </Text>
-
-        <Text
-          style={[
-            styles.narratorSubtitle,
-            isActive && styles.narratorSubtitleActive,
-          ]}
-        >
-          {getNarratorSubtitle(item.id)}
-        </Text>
-      </TouchableOpacity>
-    );
-  })}
-</View>
-
-        <TouchableOpacity
-          style={[styles.button, loading && { opacity: 0.7 }]}
-          onPress={handleGenerate}
-          disabled={loading}
-        >
-          <Text style={styles.buttonText}>
-            {loading
-  ? loadingText || t.createStory.generating
-  : t.createStory.generate}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.push("/")}
-          disabled={loading}
-        >
-          <Text style={styles.backText}>
-  {t.createStory.backHome}
-</Text>
-        </TouchableOpacity>
-            </ScrollView>
-    </SafeAreaView>
-  </LinearGradient>
-);
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.push("/")}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.backText}>{t.createStory.backHome}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
-  flex: 1,
-},
+    flex: 1,
+  },
 
-safeArea: {
-  flex: 1,
-},
+  safeArea: {
+    flex: 1,
+  },
 
-scrollContent: {
-  paddingHorizontal: 24,
-  paddingTop: 20,
-  paddingBottom: 30,
-},
-  title: {
-    fontSize: 34,
-    fontWeight: "900",
-    color: "white",
-    marginBottom: 10,
+  scrollContent: {
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    width: "100%",
+    maxWidth: 820,
+    alignSelf: "center",
   },
-  subtitle: {
-    color: "#DDD",
-    fontSize: 16,
-    marginBottom: 22,
-  },
-  carnetsCard: {
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 18,
-  },
-  activePackEyebrow: {
-    color: "#CBD5E1",
-    fontSize: 12,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+
+  hero: {
+    minHeight: 176,
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
+    overflow: "visible",
   },
-  activePackButton: {
-    minHeight: 68,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,183,3,0.16)",
-    borderWidth: 1,
-    borderColor: "#FFB703",
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+
+  heroText: {
+    flex: 1,
+    paddingLeft: 2,
+    zIndex: 2,
+  },
+
+  heroStars: {
+    color: "#FFD45C",
+    fontSize: 13,
+    letterSpacing: 4,
+    marginBottom: 5,
+  },
+
+  title: {
+    fontSize: 31,
+    lineHeight: 36,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  subtitle: {
+    color: "#DDD9F8",
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+    maxWidth: 245,
+  },
+
+  magico: {
+    width: 142,
+    height: 142,
+    marginRight: -10,
+  },
+
+  purchasedPackBanner: {
+    borderWidth: 1.2,
+    borderColor: "rgba(255,212,92,0.72)",
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 12,
+    alignItems: "center",
+    shadowColor: "#6D28D9",
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+
+  purchasedPackStars: {
+    color: "#FFD45C",
+    fontSize: 13,
+    letterSpacing: 3,
+    marginBottom: 3,
+  },
+
+  purchasedPackTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  purchasedPackSubtitle: {
+    color: "#EEEAFE",
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 4,
+  },
+
+  carnetsCard: {
+    borderWidth: 1.2,
+    borderColor: "rgba(183,158,255,0.50)",
+    borderRadius: 24,
+    padding: 15,
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+
+  packHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
+
+  activePackEyebrow: {
+    color: "#E9E3FF",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginBottom: 9,
+  },
+
+  packSparkle: {
+    color: "#FFD45C",
+    fontSize: 16,
+  },
+
+  activePackButton: {
+    minHeight: 72,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,193,61,0.13)",
+    borderWidth: 1.2,
+    borderColor: "#FFD45C",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  activePackIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+
+  activePackIconText: {
+    fontSize: 25,
+  },
+
   activePackTextBox: {
     flex: 1,
   },
+
   activePackTitle: {
-    color: "white",
-    fontSize: 17,
+    color: "#FFFFFF",
+    fontSize: 16,
     fontWeight: "900",
   },
+
   activePackSubtitle: {
-    color: "#E2E8F0",
+    color: "#E7E3F8",
     fontSize: 12,
     fontWeight: "700",
     marginTop: 4,
   },
+
   activePackArrow: {
-    color: "#FFB703",
+    color: "#FFD45C",
     fontSize: 28,
     fontWeight: "900",
-    marginLeft: 12,
-    marginTop: -6,
+    marginLeft: 8,
+    marginTop: -5,
   },
+
   changePackHint: {
-    color: "#CBD5E1",
+    color: "#CFC8E9",
     fontSize: 11,
     textAlign: "center",
     marginTop: 7,
   },
+
   packMiniRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-    marginTop: 14,
+    gap: 8,
+    marginTop: 12,
   },
-  packMiniText: {
+
+  packMiniPill: {
     flex: 1,
-    color: "white",
-    fontSize: 12,
-    fontWeight: "800",
-    textAlign: "center",
+    minHeight: 34,
+    borderRadius: 11,
     backgroundColor: "rgba(255,255,255,0.08)",
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  carnetLine: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
   },
-  carnetLabel: {
-    color: "white",
-    fontSize: 15,
+
+  packMiniText: {
+    color: "#FFFFFF",
+    fontSize: 11,
     fontWeight: "800",
-  },
-  carnetCount: {
-    minWidth: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#FFB703",
-    color: "#111827",
     textAlign: "center",
-    fontSize: 16,
-    fontWeight: "900",
-    paddingTop: 7,
   },
-  carnetSeparator: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    marginVertical: 12,
-  },
+
   buyCarnetButton: {
-    marginTop: 15,
-    minHeight: 44,
+    marginTop: 12,
+    minHeight: 43,
     borderRadius: 14,
-    backgroundColor: "rgba(255,183,3,0.18)",
+    backgroundColor: "rgba(255,193,61,0.13)",
     borderWidth: 1,
-    borderColor: "#FFB703",
+    borderColor: "rgba(255,212,92,0.58)",
     alignItems: "center",
     justifyContent: "center",
   },
+
   buyCarnetButtonText: {
-    color: "#FFB703",
+    color: "#FFD45C",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  sectionCard: {
+    backgroundColor: "rgba(255,255,255,0.075)",
+    borderWidth: 1,
+    borderColor: "rgba(176,159,235,0.23)",
+    borderRadius: 22,
+    padding: 15,
+    marginBottom: 12,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+
+  sectionNumber: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#FFC13D",
+    color: "#241A3E",
+    textAlign: "center",
+    paddingTop: 5,
+    fontSize: 14,
+    fontWeight: "900",
+    marginRight: 10,
+    overflow: "hidden",
+  },
+
+  sectionHeaderText: {
+    flex: 1,
+  },
+
+  sectionTitle: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 16,
+  },
+
+  sectionHint: {
+    color: "#CFCBE8",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+
+  input: {
+    backgroundColor: "#FAF9FF",
+    color: "#211B39",
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 126,
+    fontSize: 15,
+    lineHeight: 21,
+    textAlignVertical: "top",
+    borderWidth: 2,
+    borderColor: "rgba(255,212,92,0.72)",
+  },
+
+  photoHelpText: {
+    color: "#CFCBE8",
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 11,
+  },
+
+  photoButton: {
+    minHeight: 52,
+    backgroundColor: "rgba(91,64,174,0.58)",
+    borderWidth: 1,
+    borderColor: "rgba(190,170,255,0.50)",
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+
+  photoButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+
+  photoButtonText: {
+    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "900",
   },
 
-  input: {
-    backgroundColor: "white",
+  photoPreviewCard: {
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 18,
-    padding: 18,
-    minHeight: 125,
-    fontSize: 16,
-    marginBottom: 18,
+    padding: 10,
+    marginTop: 12,
+    alignItems: "center",
   },
-  sectionTitle: {
-    color: "white",
-    fontWeight: "900",
+
+  photoPreview: {
+    width: 154,
+    height: 154,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "rgba(255,212,92,0.55)",
+  },
+
+  photoPreviewInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+
+  photoPreviewCheck: {
+    color: "#FFD45C",
     fontSize: 16,
+    fontWeight: "900",
+    marginRight: 6,
+  },
+
+  photoPreviewText: {
+    color: "#E7E3F8",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  removePhotoButton: {
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  removePhotoButtonText: {
+    color: "#FFB4C1",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  storyTypeHint: {
+    color: "#D9D2FF",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
     marginBottom: 10,
   },
+
+  magicGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  magicChoiceOuter: {
+    width: "48%",
+    height: 142,
+    borderRadius: 19,
+    shadowColor: "#000000",
+    shadowOpacity: 0.28,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 6,
+  },
+
+  magicChoiceOuterTall: {
+    height: 170,
+  },
+
+  magicChoiceDisabled: {
+    opacity: 0.55,
+  },
+
+  magicChoiceTouchable: {
+    flex: 1,
+    borderRadius: 19,
+    overflow: "hidden",
+    borderWidth: 1.4,
+    borderColor: "rgba(198,181,255,0.38)",
+    backgroundColor: "rgba(58,42,122,0.82)",
+  },
+
+  magicChoiceTouchableActive: {
+    borderWidth: 2.4,
+    borderColor: "#FFD45C",
+    shadowColor: "#FFD45C",
+    shadowOpacity: 0.65,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 9,
+  },
+
+  magicChoiceImage: {
+    flex: 1,
+  },
+
+  magicChoiceImageRadius: {
+    borderRadius: 16,
+  },
+
+  magicChoiceShade: {
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 10,
+  },
+
+  magicChoiceSelectedBadge: {
+    position: "absolute",
+    top: 7,
+    right: 7,
+    width: 25,
+    height: 25,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFD45C",
+    borderWidth: 1,
+    borderColor: "#FFF2B7",
+  },
+
+  magicChoiceSelectedStar: {
+    color: "#4B3210",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  magicChoiceTextBox: {
+    backgroundColor: "rgba(25,15,68,0.68)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+
+  magicChoiceTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900",
+    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.55)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+
+  magicChoiceTitleActive: {
+    color: "#FFF5C7",
+  },
+
+  magicChoiceSubtitle: {
+    color: "#E8E3FA",
+    fontSize: 9.5,
+    lineHeight: 13,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 3,
+  },
+
+  magicChoiceSubtitleActive: {
+    color: "#FFF0B0",
+  },
+
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 20,
   },
+
   optionButton: {
     width: "48%",
-    backgroundColor: "rgba(255,255,255,0.14)",
+    minHeight: 51,
+    backgroundColor: "rgba(81,63,150,0.48)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    paddingVertical: 12,
-    borderRadius: 14,
+    borderColor: "rgba(188,174,242,0.30)",
+    paddingHorizontal: 8,
+    paddingVertical: 11,
+    borderRadius: 15,
     alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
+
   optionActive: {
-    backgroundColor: "#FFB703",
-    borderColor: "#FFB703",
+    backgroundColor: "#FFC13D",
+    borderColor: "#FFE08A",
   },
+
   optionText: {
-    color: "white",
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "900",
+    textAlign: "center",
   },
+
   optionTextActive: {
-    color: "#111",
+    color: "#241A3E",
   },
+
   optionDisabled: {
-    opacity: 0.45,
+    opacity: 0.42,
   },
+
+  selectedStar: {
+    position: "absolute",
+    right: 7,
+    top: 4,
+    color: "#7A5010",
+    fontSize: 10,
+  },
+
+  narratorGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  narratorButton: {
+    width: "48%",
+    minHeight: 82,
+    backgroundColor: "rgba(81,63,150,0.48)",
+    borderWidth: 1,
+    borderColor: "rgba(188,174,242,0.30)",
+    borderRadius: 15,
+    padding: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+
+  narratorActive: {
+    backgroundColor: "#FFC13D",
+    borderColor: "#FFE08A",
+  },
+
+  narratorLabel: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  narratorLabelActive: {
+    color: "#241A3E",
+  },
+
+  narratorSubtitle: {
+    color: "#CFCBE8",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 4,
+  },
+
+  narratorSubtitleActive: {
+    color: "#59481E",
+  },
+
+  narratorStar: {
+    position: "absolute",
+    right: 8,
+    top: 5,
+    color: "#7A5010",
+    fontSize: 11,
+  },
+
   button: {
-    backgroundColor: "#FFB703",
-    padding: 16,
-    borderRadius: 18,
+    borderRadius: 20,
+    overflow: "hidden",
+    marginTop: 5,
+    shadowColor: "#FFC13D",
+    shadowOpacity: 0.20,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+
+  buttonLoading: {
+    opacity: 0.72,
+  },
+
+  generateGradient: {
+    minHeight: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+
+  generateSparkle: {
+    color: "#7A5010",
+    fontSize: 18,
+    marginRight: 10,
+  },
+
+  generateTextBox: {
+    flex: 1,
     alignItems: "center",
   },
+
   buttonText: {
-    color: "#111",
+    color: "#231B3F",
     fontSize: 17,
     fontWeight: "900",
     textAlign: "center",
   },
-  backButton: {
-    marginTop: 18,
-    alignItems: "center",
-    marginBottom: 30,
-  },
-  backText: {
-    color: "white",
+
+  generateHint: {
+    color: "#5D451A",
+    fontSize: 11,
     fontWeight: "800",
+    marginTop: 3,
   },
-  narratorGrid: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 8,
-  marginBottom: 20,
-},
 
-narratorButton: {
-  width: "48%",
-  minHeight: 78,
-  backgroundColor: "rgba(255,255,255,0.14)",
-  borderWidth: 1,
-  borderColor: "rgba(255,255,255,0.25)",
-  borderRadius: 14,
-  padding: 12,
-  alignItems: "center",
-  justifyContent: "center",
-},
+  generateMagic: {
+    fontSize: 22,
+    marginLeft: 10,
+  },
 
-narratorActive: {
-  backgroundColor: "#FFB703",
-  borderColor: "#FFB703",
-},
+  backButton: {
+    minHeight: 49,
+    backgroundColor: "rgba(46,37,112,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(255,212,92,0.48)",
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 13,
+    marginBottom: 20,
+  },
 
-narratorLabel: {
-  color: "white",
-  fontSize: 16,
-  fontWeight: "900",
-  textAlign: "center",
-},
-
-narratorLabelActive: {
-  color: "#111",
-},
-
-narratorSubtitle: {
-  color: "#CBD5E1",
-  fontSize: 11,
-  fontWeight: "700",
-  textAlign: "center",
-  marginTop: 4,
-},
-
-narratorSubtitleActive: {
-  color: "#333",
-},
-
-photoButton: {
-  backgroundColor: "rgba(255,255,255,0.14)",
-  borderWidth: 1,
-  borderColor: "rgba(255,255,255,0.25)",
-  paddingVertical: 14,
-  borderRadius: 16,
-  alignItems: "center",
-  marginBottom: 10,
-},
-
-photoButtonText: {
-  color: "white",
-  fontSize: 15,
-  fontWeight: "900",
-},
-
-removePhotoButton: {
-  alignItems: "center",
-  marginBottom: 18,
-},
-
-removePhotoButtonText: {
-  color: "#FCA5A5",
-  fontSize: 13,
-  fontWeight: "800",
-},
-
-photoPreviewCard: {
-  backgroundColor: "rgba(255,255,255,0.10)",
-  borderRadius: 16,
-  padding: 10,
-  marginBottom: 18,
-  alignItems: "center",
-},
-
-photoPreview: {
-  width: 150,
-  height: 150,
-  borderRadius: 16,
-  marginBottom: 8,
-},
-
-photoPreviewText: {
-  color: "#E2E8F0",
-  fontSize: 13,
-  fontWeight: "800",
-},
-
-photoHelpText: {
-  color: "#CBD5E1",
-  fontSize: 13,
-  lineHeight: 19,
-  marginBottom: 10,
-},
+  backText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900",
+  },
 });
