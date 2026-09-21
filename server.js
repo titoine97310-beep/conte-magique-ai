@@ -1,3 +1,4 @@
+import { continuousScene } from "./backend/continuous-video.js";
 import {
   AppStoreServerAPIClient,
   Environment,
@@ -5,7 +6,6 @@ import {
 } from "@apple/app-store-server-library";
 import RunwayML, {
   TaskFailedError,
-  toFile as runwayToFile,
 } from "@runwayml/sdk";
 import cors from "cors";
 import crypto from "crypto";
@@ -334,148 +334,6 @@ Prononce les mots naturellement.
   );
 }
 
-async function createNarratedSceneVideo({
-  videoUrl,
-  sceneText,
-  emotion,
-  narrator,
-  mode,
-  language = "fr",
-  sceneIndex,
-  tempDir,
-}) {
-  if (!ffmpegPath) {
-    throw new Error("FFmpeg introuvable.");
-  }
-
-  const sourceVideoPath =
-    path.join(
-      tempDir,
-      `source-${sceneIndex + 1}.mp4`
-    );
-
-  const narrationPath =
-    path.join(
-      tempDir,
-      `narration-${sceneIndex + 1}.mp3`
-    );
-
-  const outputPath =
-    path.join(
-      tempDir,
-      `narrated-${sceneIndex + 1}.mp4`
-    );
-
-  await downloadFile(
-    videoUrl,
-    sourceVideoPath
-  );
-
-  const narrationBuffer =
-  await createNarrationMp3({
-    text: sceneText,
-    mode,
-    emotion,
-    narrator,
-    language,
-  });
-
-  await fs.promises.writeFile(
-    narrationPath,
-    narrationBuffer
-  );
-
-  await new Promise((resolve, reject) => {
-    const ffmpeg = spawn(
-  ffmpegPath,
-  [
-    "-y",
-
-    // Vidéo Runway : jouée une seule fois.
-    "-i",
-    sourceVideoPath,
-
-    // Narration de la scène.
-    "-i",
-    narrationPath,
-
-    // Une fois la vidéo terminée,
-    // conserve sa dernière image.
-    "-filter_complex",
-    "[0:v]tpad=stop_mode=clone:stop_duration=600[v]",
-
-    "-map",
-    "[v]",
-
-    "-map",
-    "1:a:0",
-
-    "-c:v",
-    "libx264",
-
-    "-preset",
-    "veryfast",
-
-    "-crf",
-    "20",
-
-    "-c:a",
-    "aac",
-
-    "-b:a",
-    "160k",
-
-    "-pix_fmt",
-    "yuv420p",
-
-    // La scène s'arrête à la fin de la narration.
-    "-shortest",
-
-    "-movflags",
-    "+faststart",
-
-    outputPath,
-  ],
-  {
-    windowsHide: true,
-  }
-);
-
-    let stderr = "";
-
-    ffmpeg.stderr.on(
-      "data",
-      (data) => {
-        stderr += data.toString();
-      }
-    );
-
-    ffmpeg.on(
-      "close",
-      (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(
-            new Error(
-              `FFmpeg narration scène ${
-                sceneIndex + 1
-              } échouée.\n${stderr}`
-            )
-          );
-        }
-      }
-    );
-
-    ffmpeg.on(
-      "error",
-      reject
-    );
-  });
-
-  return outputPath;
-}
-
 const runway = new RunwayML({
   apiKey: process.env.RUNWAY_API_KEY,
 });
@@ -702,13 +560,15 @@ async function reserveVideoCredit(
   uid,
   sceneCount,
   imagesHash,
-  videoModel
+  videoModel,
+  requestKey = null,
+  narrationHash = null
 ) {
   const userRef =
     adminDb.collection("users").doc(uid);
 
   const generationRef =
-    adminDb.collection("videoGenerations").doc();
+    requestKey ? adminDb.collection("videoGenerations").doc(requestKey) : adminDb.collection("videoGenerations").doc();
 
   // 4 scènes = crédit Court
   // 6 scènes = crédit Moyen
@@ -730,6 +590,14 @@ async function reserveVideoCredit(
 
   await adminDb.runTransaction(
     async (transaction) => {
+      const existing = await transaction.get(generationRef);
+      if (existing.exists) {
+        const data = existing.data();
+        if (data.uid !== uid || data.imagesHash !== imagesHash || data.narrationHash !== narrationHash || data.model !== videoModel) {
+          throw new Error("Cette demande vidéo ne correspond pas à la génération d’origine.");
+        }
+        return;
+      }
       const userSnapshot =
         await transaction.get(userRef);
 
@@ -782,7 +650,8 @@ async function reserveVideoCredit(
         imagesHash,
 
         model: videoModel,
-        secondsPerScene: 5,
+        animationVersion: 2,
+        narrationHash,
 
         createdAt:
           FieldValue.serverTimestamp(),
@@ -1048,7 +917,7 @@ async function getPartialVideoGeneration(
     throw error;
   }
 
-  if (generation.status !== "partial") {
+  if (generation.status !== "partial" && !(generation.status === "reserved" && generation.animationVersion === 2)) {
     const error = new Error(
       "Cette génération vidéo ne peut pas être reprise."
     );
@@ -1175,6 +1044,7 @@ function createAppleClient(environment) {
 }
 
 app.get("/", (req, res) => {
+  res.set("X-ConteMagique-Animation", "continuous-v2");
   res.send("Backend ConteMagiqueIA OK");
 });
 // =========================
@@ -3017,7 +2887,11 @@ app.post(
 app.post("/video", async (req, res) => {
   let generationRef = null;
   let uid = null;
-  let runwaySucceeded = false;
+  let leaseOwned = false;
+  let heartbeat = null;
+  let workDir = null;
+  let mergedVideo = null;
+  const leaseOwner = crypto.randomUUID();
   let videoUrls = [];
 
   try {
@@ -3037,8 +2911,8 @@ app.post("/video", async (req, res) => {
     const {
   images,
   prompt,
-  generationId = null,
 } = req.body;
+let generationId = req.body?.generationId || null;
 
 const videoModel =
   req.body?.videoModel === "gen4.5"
@@ -3058,11 +2932,42 @@ if (images.length !== 4 && images.length !== 6) {
   });
 }
 
+const narrationScenes = Array.isArray(req.body?.scenes) ? req.body.scenes : [];
+const narrator = req.body?.narrator || "narratrice";
+const mode = req.body?.mode || "story";
+const language = ["fr", "en", "es"].includes(req.body?.language) ? req.body.language : "fr";
+if (narrationScenes.length !== images.length || narrationScenes.some(scene =>
+  typeof scene?.text !== "string" || !scene.text.trim() || scene.text.length > 6000) ||
+  images.some(image => typeof image !== "string" || !image.trim())) {
+  return res.status(400).json({ error: "Chaque scène doit contenir une image et un texte valide (6 000 caractères maximum)." });
+}
+const narrationHash = crypto.createHash("sha256")
+  .update(JSON.stringify({ narrationScenes, narrator, mode, language, prompt: prompt || "" })).digest("hex");
+
 const sceneCount = images.length;
 const imagesHash = crypto
   .createHash("sha256")
   .update(JSON.stringify(images))
   .digest("hex");
+
+const requestId = req.body?.requestId;
+if (requestId != null && (typeof requestId !== "string" || !/^[a-zA-Z0-9-]{8,100}$/.test(requestId))) {
+  return res.status(400).json({ error: "Identifiant de demande invalide." });
+}
+const requestKey = requestId ? crypto.createHash("sha256").update(uid + ":" + requestId).digest("hex") : null;
+if (!generationId && requestKey) {
+  const previous = await adminDb.collection("videoGenerations").doc(requestKey).get();
+  if (previous.exists) {
+    const data = previous.data();
+    if (data.uid !== uid || data.imagesHash !== imagesHash || data.narrationHash !== narrationHash || data.model !== videoModel) {
+      return res.status(409).json({ error: "Cette demande vidéo ne correspond pas à la génération d’origine." });
+    }
+    if (data.status === "completed" && data.finalVideoUrl) {
+      return res.json({ success: true, finalVideoUrl: data.finalVideoUrl, videoUrls: data.videoUrls, sceneCount, generationId: previous.id });
+    }
+    generationId = previous.id;
+  }
+}
 
 let startSceneIndex = 0;
 
@@ -3108,7 +3013,7 @@ if (reconciliation.action === "refunded") {
       });
     }
 
-  generationRef = partial.generationRef;
+
 
   videoUrls = partial.videoUrls;
 
@@ -3145,6 +3050,10 @@ if (reconciliation.action === "refunded") {
   throw error;
 }
 
+  if (partial.generation.narrationHash && partial.generation.narrationHash !== narrationHash) {
+    return res.status(409).json({ error: "Le texte ou la voix ne correspond pas à la génération d’origine." });
+  }
+  generationRef = partial.generationRef;
   console.log(
     `🔄 Reprise vidéo à la scène ${startSceneIndex + 1}/${sceneCount}`
   );
@@ -3159,7 +3068,9 @@ else {
     uid,
     sceneCount,
     imagesHash,
-    videoModel
+    videoModel,
+    requestKey,
+    narrationHash
   );
 
   console.log(
@@ -3168,249 +3079,61 @@ else {
   );
 }
 
-    console.log(
-  `🎬 Génération de ${sceneCount} scènes vidéo Runway...`
-);
-
-
-for (
-  let index = startSceneIndex;
-  index < images.length;
-  index++
-) {
-  const imageUrl = images[index];
-
-  console.log(
-  `🖼️ Image reçue scène ${index + 1} :`,
-  {
-    type: typeof imageUrl,
-    length:
-      typeof imageUrl === "string"
-        ? imageUrl.length
-        : null,
-    start:
-      typeof imageUrl === "string"
-        ? imageUrl.slice(0, 100)
-        : imageUrl,
+// One worker at a time per generation; persist progress before each paid task.
+await adminDb.runTransaction(async transaction => {
+  const snap = await transaction.get(generationRef);
+  const data = snap.data();
+  if (data?.uid !== uid || !["reserved", "partial"].includes(data.status)) throw new Error("Génération indisponible.");
+  if (data.leaseUntil > Date.now()) throw new Error("Cette génération est déjà en cours. Patientez avant de reprendre.");
+  transaction.update(generationRef, { leaseOwner, leaseUntil: Date.now() + 20 * 60 * 1000,
+    status: "partial", narrationHash, animationVersion: 2 });
+});
+leaseOwned = true;
+heartbeat = setInterval(() => {
+  generationRef.update({ leaseUntil: Date.now() + 20 * 60 * 1000,
+    lastProgressAt: FieldValue.serverTimestamp() }).catch(error => console.error("Video heartbeat:", error.message));
+}, 60000);
+heartbeat.unref();
+workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "contemagiqueia-continuous-"));
+const bucket = getStorage().bucket();
+const narratedVideoPaths = [];
+for (let index = 0; index < images.length; index++) {
+  const sceneRef = generationRef.collection("continuousScenes").doc(String(index));
+  const snapshot = await sceneRef.get();
+  const state = snapshot.exists ? snapshot.data() : {};
+  const prefix = `videos/${uid}/${generationRef.id}/continuous/${index}`;
+  const sceneDir = path.join(workDir, String(index));
+  await fs.promises.mkdir(sceneDir, { recursive: true });
+  const files = {
+    exists: async name => (await bucket.file(`${prefix}/${name}`).exists())[0],
+    get: async (name, destination) => bucket.file(`${prefix}/${name}`).download({ destination }),
+    put: async (name, source) => bucket.upload(source, { destination: `${prefix}/${name}`,
+      resumable: false, metadata: { cacheControl: "private,max-age=3600" } }),
+  };
+  let narratedPath = path.join(sceneDir, "narrated.mp4");
+  let sceneUrl = state.finalVideoUrl;
+  if (sceneUrl && await files.exists("narrated.mp4")) {
+    await files.get("narrated.mp4", narratedPath);
+  } else {
+    const scene = narrationScenes[index];
+    narratedPath = await continuousScene({ state, files, ffmpeg: ffmpegPath, dir: sceneDir,
+      image: images[index], text: scene.text, model: videoModel, runway, download: downloadFile,
+      legacyVideoUrl: videoUrls[index],
+      createAudio: () => createNarrationMp3({ text: scene.text, emotion: scene.emotion || "warm", narrator, mode, language }),
+      saveState: value => sceneRef.set(value),
+    });
+    const token = crypto.randomUUID();
+    await bucket.upload(narratedPath, { destination: `${prefix}/narrated.mp4`, resumable: false,
+      metadata: { contentType: "video/mp4", cacheControl: "private,max-age=3600",
+        metadata: { firebaseStorageDownloadTokens: token } } });
+    sceneUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(prefix + "/narrated.mp4")}?alt=media&token=${token}`;
+    await sceneRef.set({ ...state, finalVideoUrl: sceneUrl });
   }
-);
-
-  if (typeof imageUrl !== "string" || !imageUrl.trim()) {
-    throw new Error(
-      `Image invalide pour la scène ${index + 1}.`
-    );
-  }
-
-  const sceneActionPrompt =
-  typeof prompt === "string"
-    ? prompt.trim()
-    : "";
-
-const consistencyPrompt = `
-Animate the exact source image.
-
-Preserve character identity exactly:
-same faces, skin tones, hairstyles, ages, body proportions, clothing, shoes, colors and accessories.
-
-Do not add, remove, duplicate, merge, replace or transform characters.
-Do not redesign characters or change their appearance.
-Keep important objects unchanged.
-
-Use only subtle natural movements:
-blinking, breathing, small head movements, gentle hand movements and slight environmental motion.
-
-Keep the original framing and composition.
-Locked camera.
-No zoom, pan, dolly or camera rotation.
-Keep all main characters fully visible.
-Do not crop heads, bodies or important objects.
-
-Preserve the original illustration style, lighting, colors and atmosphere.
-Smooth, stable, child-friendly animation.
-`;
-
-const rawPromptText =
-  sceneActionPrompt
-    ? `${consistencyPrompt}\n\nScene action:\n${sceneActionPrompt}`
-    : consistencyPrompt;
-
-const safePromptText =
-  rawPromptText.length > 1000
-    ? rawPromptText.slice(0, 1000)
-    : rawPromptText;
-
-console.log(
-  "🧩 Prompt brut Runway :",
-  rawPromptText.length
-);
-
-console.log(
-  "✂️ Prompt envoyé Runway :",
-  safePromptText.length
-);
-
-console.log(
-  "📝 Contenu prompt Runway :",
-  safePromptText
-);
-
-console.log(
-  `📝 Longueur prompt Runway : ${safePromptText.length}/1000`
-);
-
-let runwayPromptImage = imageUrl;
-
-if (
-  typeof imageUrl === "string" &&
-  imageUrl.startsWith("data:image/")
-) {
-  const match = imageUrl.match(
-    /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/
-  );
-
-  if (!match) {
-    throw new Error(
-      `Image base64 invalide pour la scène ${index + 1}.`
-    );
-  }
-
-  const mimeType = match[1];
-  const base64Data = match[2];
-
-  const extension =
-    mimeType === "image/png"
-      ? "png"
-      : mimeType === "image/webp"
-      ? "webp"
-      : "jpg";
-
-  const imageBuffer = Buffer.from(
-    base64Data,
-    "base64"
-  );
-
-  const runwayFile = await runwayToFile(
-  imageBuffer,
-  `scene-${index + 1}.${extension}`
-);
-
-  const upload =
-    await runway.uploads.createEphemeral(
-      runwayFile
-    );
-
-  runwayPromptImage = upload.uri;
-
-  console.log(
-    `📤 Image scène ${index + 1} envoyée à Runway :`,
-    runwayPromptImage
-  );
+  narratedVideoPaths.push(narratedPath);
+  videoUrls[index] = sceneUrl;
+  await saveVideoSceneProgress(uid, generationRef, videoUrls);
+  console.log(`🎬 Scène animée et narrée ${index + 1}/${images.length} terminée.`);
 }
-
-  const task = await runway.imageToVideo
-    .create({
-      model: videoModel,
-      promptImage: runwayPromptImage,
-      promptText: safePromptText,
-ratio: "720:1280",
-duration: 5,
-    })
-    .waitForTaskOutput();
-
-  const sceneVideoUrl = task?.output?.[0];
-
-  if (!sceneVideoUrl) {
-    throw new Error(
-      `Runway n'a retourné aucune vidéo pour la scène ${index + 1}.`
-    );
-  }
-
-  videoUrls.push(sceneVideoUrl);
-
-  await saveVideoSceneProgress(
-  uid,
-  generationRef,
-  videoUrls
-);
-
-  console.log(
-    `✅ Scène ${index + 1}/${sceneCount} générée.`
-  );
-}
-
-runwaySucceeded = true;
-
-
-console.log(
-  `✅ Dessin animé complet généré : ${sceneCount} scènes`,
-  generationRef.id
-);
-
-const narrationScenes =
-  Array.isArray(req.body?.scenes)
-    ? req.body.scenes
-    : [];
-
-const narrator =
-  req.body?.narrator || "narratrice";
-
-const mode =
-  req.body?.mode || "story";
-
-const language =
-  ["fr", "en", "es"].includes(req.body?.language)
-    ? req.body.language
-    : "fr";
-
-if (narrationScenes.length !== videoUrls.length) {
-  throw new Error(
-    "Le nombre de textes ne correspond pas au nombre de scènes vidéo."
-  );
-}
-
-const narrationTempDir =
-  await fs.promises.mkdtemp(
-    path.join(
-      os.tmpdir(),
-      "contemagiqueia-narration-"
-    )
-  );
-
-let mergedVideo = null;
-
-try {
-  const narratedVideoPaths = [];
-
-  for (
-    let index = 0;
-    index < videoUrls.length;
-    index++
-  ) {
-    const sceneData =
-      narrationScenes[index] || {};
-
-    const narratedPath =
-      await createNarratedSceneVideo({
-        videoUrl: videoUrls[index],
-        sceneText: sceneData.text || "",
-        emotion:
-          sceneData.emotion || "warm",
-        narrator,
-        mode,
-        language,
-        sceneIndex: index,
-        tempDir: narrationTempDir,
-      });
-
-    narratedVideoPaths.push(
-      narratedPath
-    );
-
-    console.log(
-      `🔊 Narration scène ${index + 1}/${videoUrls.length} créée.`
-    );
-  }
-
   mergedVideo =
     await mergeLocalVideoClips(
       narratedVideoPaths,
@@ -3421,8 +3144,6 @@ try {
     "🎬 Vidéo finale avec narration assemblée."
   );
 
-  const bucket =
-    getStorage().bucket();
 
   const finalVideoStoragePath =
     `videos/${uid}/${generationRef.id}/final.mp4`;
@@ -3484,26 +3205,6 @@ console.log(
     generationId:
       generationRef.id,
   });
-} finally {
-  await fs.promises.rm(
-    narrationTempDir,
-    {
-      recursive: true,
-      force: true,
-    }
-  );
-
-  if (mergedVideo?.tempDir) {
-    await fs.promises.rm(
-      mergedVideo.tempDir,
-      {
-        recursive: true,
-        force: true,
-      }
-    );
-  }
-}
-
 } catch (error) {
   console.error(
     "❌ Erreur génération vidéo Runway :",
@@ -3513,31 +3214,10 @@ console.log(
   if (
     uid &&
     generationRef &&
-    !runwaySucceeded
+    leaseOwned
   ) {
     try {
-      if (videoUrls.length > 0) {
-        await savePartialVideoGeneration(
-          uid,
-          generationRef,
-          videoUrls,
-          videoUrls.length
-        );
-
-        console.log(
-          `⚠️ Génération partielle sauvegardée : ${videoUrls.length} scène(s) terminée(s).`
-        );
-      } else {
-        await refundVideoCredit(
-          uid,
-          generationRef
-        );
-
-        console.log(
-          "💰 Crédit vidéo remboursé :",
-          generationRef.id
-        );
-      }
+      await generationRef.update({ status: "partial", lastErrorAt: FieldValue.serverTimestamp() });
     } catch (creditError) {
       console.error(
         "❌ Erreur gestion crédit vidéo après échec :",
@@ -3572,7 +3252,19 @@ console.log(
       "Erreur génération vidéo",
     details:
       error?.message,
+    generationId: generationRef?.id || null,
   });
+} finally {
+  if (heartbeat) clearInterval(heartbeat);
+  if (leaseOwned) {
+    await adminDb.runTransaction(async transaction => {
+      const snap = await transaction.get(generationRef);
+      if (snap.data()?.leaseOwner === leaseOwner) transaction.update(generationRef, { leaseUntil: 0, leaseOwner: null });
+    }).catch(error => console.error("Video lease cleanup:", error.message));
+  }
+  for (const dir of [workDir, mergedVideo?.tempDir].filter(Boolean)) {
+    await fs.promises.rm(dir, { recursive: true, force: true }).catch(error => console.error("Video cleanup:", error.message));
+  }
 }
 });
 
