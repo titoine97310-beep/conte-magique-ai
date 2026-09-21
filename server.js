@@ -1044,7 +1044,7 @@ function createAppleClient(environment) {
 }
 
 app.get("/", (req, res) => {
-  res.set("X-ConteMagique-Animation", "continuous-v2");
+  res.set("X-ConteMagique-Animation", "continuous-v2.1");
   res.send("Backend ConteMagiqueIA OK");
 });
 // =========================
@@ -2891,6 +2891,7 @@ app.post("/video", async (req, res) => {
   let heartbeat = null;
   let workDir = null;
   let mergedVideo = null;
+  let creditRefunded = false;
   const leaseOwner = crypto.randomUUID();
   let videoUrls = [];
 
@@ -3217,7 +3218,15 @@ console.log(
     leaseOwned
   ) {
     try {
-      await generationRef.update({ status: "partial", lastErrorAt: FieldValue.serverTimestamp() });
+      if (error?.code === "RUNWAY_TASK_FAILED") {
+        // A terminal provider failure must not strand a purchased app credit,
+        // including on older clients that cannot send a resume identifier.
+        await refundVideoCredit(uid, generationRef);
+        creditRefunded = true;
+        await generationRef.update({ failureCode: error.failureCode || "UNKNOWN", failedTaskId: error.taskId || null });
+      } else {
+        await generationRef.update({ status: "partial", lastErrorAt: FieldValue.serverTimestamp() });
+      }
     } catch (creditError) {
       console.error(
         "❌ Erreur gestion crédit vidéo après échec :",
@@ -3249,9 +3258,10 @@ console.log(
 
   return res.status(500).json({
     error:
-      "Erreur génération vidéo",
+      creditRefunded ? "La création a échoué chez le fournisseur vidéo. Votre crédit dessin animé a été restitué. Vous pouvez réessayer." : "Erreur génération vidéo",
     details:
-      error?.message,
+      creditRefunded ? "La création a échoué chez le fournisseur vidéo. Votre crédit dessin animé a été restitué. Vous pouvez réessayer." : error?.message,
+    code: creditRefunded ? "VIDEO_GENERATION_REFUNDED" : error?.code,
     generationId: generationRef?.id || null,
   });
 } finally {

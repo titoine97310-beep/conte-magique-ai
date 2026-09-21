@@ -113,8 +113,13 @@ export async function continuousScene({ state, saveState, files, createAudio, ru
         if (task.status === 'SUCCEEDED') break;
         if (['FAILED', 'CANCELED', 'CANCELLED'].includes(task.status)) {
           clip.failed = true;
+          clip.failureCode = task.failureCode || task.status;
           await saveState(state);
-          throw new Error(`La tâche Runway ${clip.taskId} est ${task.status}.`);
+          const error = new Error('Le service vidéo n’a pas pu terminer cette scène.');
+          error.code = 'RUNWAY_TASK_FAILED';
+          error.taskId = clip.taskId;
+          error.failureCode = clip.failureCode;
+          throw error;
         }
         await sleep(5000);
       }

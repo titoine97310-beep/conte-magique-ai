@@ -92,3 +92,16 @@ test('narration trop longue : aucun appel vidéo payant', async t => {
   await assert.rejects(continuousScene(f.options), /120 secondes/);
   assert.equal(f.requests.length, 0);
 });
+
+test('un échec définitif Runway expose un code de remboursement et conserve le diagnostic', async t => {
+  const f = await fixture(t, 3);
+  f.options.runway.tasks.retrieve = async () => ({ status: 'FAILED', failureCode: 'INTERNAL.BAD_OUTPUT.CODE01' });
+  await assert.rejects(continuousScene(f.options), error => {
+    assert.equal(error.code, 'RUNWAY_TASK_FAILED');
+    assert.equal(error.failureCode, 'INTERNAL.BAD_OUTPUT.CODE01');
+    assert.equal(error.taskId, '1');
+    return true;
+  });
+  assert.equal(f.state.clips[0].failed, true);
+  assert.equal(f.requests.length, 1);
+});
