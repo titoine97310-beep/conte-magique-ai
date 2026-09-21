@@ -1,4 +1,5 @@
 import { continuousScene } from "./backend/continuous-video.js";
+import { findLegacyResume } from "./backend/video-resume.js";
 import {
   AppStoreServerAPIClient,
   Environment,
@@ -1044,7 +1045,7 @@ function createAppleClient(environment) {
 }
 
 app.get("/", (req, res) => {
-  res.set("X-ConteMagique-Animation", "continuous-v2.1");
+  res.set("X-ConteMagique-Animation", "continuous-v2.2");
   res.send("Backend ConteMagiqueIA OK");
 });
 // =========================
@@ -2956,6 +2957,10 @@ if (requestId != null && (typeof requestId !== "string" || !/^[a-zA-Z0-9-]{8,100
   return res.status(400).json({ error: "Identifiant de demande invalide." });
 }
 const requestKey = requestId ? crypto.createHash("sha256").update(uid + ":" + requestId).digest("hex") : null;
+if (!generationId && !requestId) {
+  const previous = await adminDb.collection("videoGenerations").where("uid", "==", uid).get();
+  generationId = findLegacyResume(previous.docs, { uid, imagesHash, narrationHash, model: videoModel });
+}
 if (!generationId && requestKey) {
   const previous = await adminDb.collection("videoGenerations").doc(requestKey).get();
   if (previous.exists) {

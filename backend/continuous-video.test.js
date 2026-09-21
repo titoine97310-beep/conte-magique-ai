@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import ffmpeg from 'ffmpeg-static';
+import RunwayML from '@runwayml/sdk';
 import { clipDuration, motionPrompt, runFfmpeg, mediaDuration, continuousScene } from './continuous-video.js';
 
 test('durées valides et contexte conservé dans le prompt', () => {
@@ -33,7 +34,10 @@ async function fixture(t, seconds = 12) {
     },
     createAudio: async () => { audioCalls++; return fs.readFile(audio); },
     runway: {
-      uploads: { createEphemeral: async () => ({ uri: 'runway://frame' }) },
+      uploads: { createEphemeral: async params => {
+        assert.ok(params.file instanceof File, 'Le SDK attend { file }, pas directement un File');
+        return { uri: 'runway://frame' };
+      } },
       imageToVideo: { create: async request => {
         requests.push(request);
         const id = String(requests.length);
@@ -104,4 +108,23 @@ test('un échec définitif Runway expose un code de remboursement et conserve le
   });
   assert.equal(f.state.clips[0].failed, true);
   assert.equal(f.requests.length, 1);
+});
+
+test('une continuation traverse le vrai SDK upload (HTTP simulé), sans undefined', async t => {
+  const f = await fixture(t);
+  const calls = [];
+  const client = new RunwayML({ apiKey: 'test-only', maxRetries: 0, fetch: async (url, options) => {
+    calls.push(String(url));
+    if (String(url).endsWith('/v1/uploads')) {
+      assert.equal(JSON.parse(options.body).filename, 'frame.png');
+      return new Response(JSON.stringify({ uploadUrl: 'https://storage.example.invalid/upload', fields: {}, runwayUri: 'runway://frame' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    assert.equal(String(url), 'https://storage.example.invalid/upload');
+    assert.ok(options.body.get('file').size > 0);
+    return new Response(null, { status: 204 });
+  } });
+  f.options.runway.uploads = client.uploads;
+  await continuousScene(f.options);
+  assert.equal(calls.length, 2);
+  assert.equal(f.requests[1].promptImage, 'runway://frame');
 });

@@ -94,8 +94,8 @@ export async function continuousScene({ state, saveState, files, createAudio, ru
           const match = promptImage.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/s);
           if (!match) throw new Error('Image base64 invalide.');
           const extension = match[1].split('/')[1];
-          const upload = await runway.uploads.createEphemeral(await toFile(
-            Buffer.from(match[2], 'base64'), `frame.${extension}`, { type: match[1] }));
+          const file = await toFile(Buffer.from(match[2], 'base64'), `frame.${extension}`, { type: match[1] });
+          const upload = await runway.uploads.createEphemeral({ file });
           promptImage = upload.uri;
         }
         clip = { submitting: true, duration: clipDuration(seconds - covered) };
