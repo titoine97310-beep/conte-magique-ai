@@ -1,5 +1,5 @@
-import { Audio } from "expo-av";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
@@ -608,10 +608,80 @@ sound.setOnPlaybackStatusUpdate((status) => {
 }
 
   function videoRequestStorageKey() {
-    // Retain the request across a lost response or app restart; account and content scoped.
-    return "continuous-video:" + JSON.stringify({ uid: auth.currentUser?.uid,
-      scenes: scenes.map((scene: any) => ({ text: scene?.text || "", image: scene?.imageUrl || "", emotion: scene?.ambience || "warm" })),
-      narrator: story?.narrator || "narratrice", language, mode: bedtimeMode ? "bedtime" : "story" });
+    // La clé dépend du compte et du contenu de l'histoire.
+    // Une même histoire retrouve donc sa génération en attente après
+    // une coupure réseau ou un redémarrage de l'application.
+    return (
+      "continuous-video:" +
+      JSON.stringify({
+        uid: auth.currentUser?.uid || null,
+        scenes: scenes.map((scene: any) => ({
+          text: scene?.text || "",
+          image: scene?.imageUrl || "",
+          emotion: scene?.ambience || "warm",
+        })),
+        narrator: story?.narrator || "narratrice",
+        language,
+        mode: bedtimeMode ? "bedtime" : "story",
+      })
+    );
+  }
+
+  type PendingVideoGeneration = {
+    requestId: string;
+    generationId: string | null;
+  };
+
+  async function loadPendingVideoGeneration(
+    storageKey: string
+  ): Promise<PendingVideoGeneration | null> {
+    const savedValue = await AsyncStorage.getItem(storageKey);
+
+    if (!savedValue) {
+      return null;
+    }
+
+    // Compatibilité avec l'ancienne version qui enregistrait
+    // directement requestId comme simple chaîne.
+    try {
+      const parsed = JSON.parse(savedValue);
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        typeof parsed.requestId === "string"
+      ) {
+        return {
+          requestId: parsed.requestId,
+          generationId:
+            typeof parsed.generationId === "string" &&
+            parsed.generationId.trim()
+              ? parsed.generationId
+              : null,
+        };
+      }
+    } catch {
+      // L'ancienne valeur n'était pas du JSON.
+    }
+
+    if (typeof savedValue === "string" && savedValue.trim()) {
+      return {
+        requestId: savedValue,
+        generationId: null,
+      };
+    }
+
+    return null;
+  }
+
+  async function savePendingVideoGeneration(
+    storageKey: string,
+    pending: PendingVideoGeneration
+  ) {
+    await AsyncStorage.setItem(
+      storageKey,
+      JSON.stringify(pending)
+    );
   }
 
   async function openVideoModal() {
@@ -839,207 +909,304 @@ function closeVideoModal() {
 }
 
   async function createAnimatedVideo() {
-  if (videoGenerating) return;
+    if (videoGenerating) return;
 
-  const user = auth.currentUser;
+    const user = auth.currentUser;
 
-  if (!user) {
-    Alert.alert(
-  t.player.loginRequired,
-  t.player.loginRequiredMessage
-);
-    return;
-  }
-
-  try {
-    setVideoGenerating(true);
-
-    const token = await user.getIdToken();
-
-    const images = await Promise.all(
-  scenes.map(
-    async (
-      scene: {
-        imageUrl?: string | null;
-      },
-      index: number
-    ) => {
-      const imageUrl =
-        scene.imageUrl?.trim();
-
-      if (!imageUrl) {
-        return null;
-      }
-
-      // URL distante ou image déjà en base64 :
-      // on la garde telle quelle.
-      if (
-        imageUrl.startsWith("https://") ||
-        imageUrl.startsWith("data:image/")
-      ) {
-        return imageUrl;
-      }
-
-      // Image sauvegardée localement sur Android/iOS :
-      // on l'envoie au backend sous forme de Data URI.
-      if (imageUrl.startsWith("file://")) {
-        const base64 =
-          await FileSystem.readAsStringAsync(
-            imageUrl,
-            {
-              encoding:
-                FileSystem.EncodingType.Base64,
-            }
-          );
-
-        const extension =
-          imageUrl
-            .split("?")[0]
-            .split(".")
-            .pop()
-            ?.toLowerCase();
-
-        const mimeType =
-          extension === "jpg" ||
-          extension === "jpeg"
-            ? "image/jpeg"
-            : extension === "webp"
-            ? "image/webp"
-            : "image/png";
-
-        console.log(
-          `🖼️ Scène ${index + 1} convertie en base64`
-        );
-
-        return `data:${mimeType};base64,${base64}`;
-      }
-
-      throw new Error(
-        `Format d'image non pris en charge pour la scène ${index + 1}.`
+    if (!user) {
+      Alert.alert(
+        t.player.loginRequired,
+        t.player.loginRequiredMessage
       );
-    }
-  )
-);
-
-    if (
-      images.some(
-        (image: string | null | undefined) => !image
-      )
-    ) {
-      throw new Error(
-        "Une ou plusieurs illustrations sont manquantes."
-      );
+      return;
     }
 
     const requestStorageKey = videoRequestStorageKey();
-    let requestId = await AsyncStorage.getItem(requestStorageKey);
-    if (!requestId) {
-      requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-      await AsyncStorage.setItem(requestStorageKey, requestId);
-    }
-    const response = await fetch(VIDEO_URL, {
-      method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+    try {
+      setVideoGenerating(true);
 
-      body: JSON.stringify({
-        requestId,
-        images,
+      const token = await user.getIdToken();
 
-        scenes: scenes.map((scene: any) => ({
-          text: scene?.text || "",
-          emotion: scene?.ambience || "warm",
-        })),
-
-        narrator:
-          story?.narrator || "narratrice",
-
-        mode:
-          bedtimeMode ? "bedtime" : "story",
-        
-        language,
-
-        videoModel: "gen4_turbo",
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      if (data?.code === "NO_VIDEO_CREDIT" || data?.code === "VIDEO_GENERATION_REFUNDED") {
-        await AsyncStorage.removeItem(requestStorageKey);
-      }
-      throw new Error(
-        data?.details || data?.error ||
-          "Impossible de créer le dessin animé."
-      );
-    }
-
-    await AsyncStorage.removeItem(requestStorageKey);
-
-    console.log(
-      "🎬 Dessin animé généré :",
-      data
-    );
-
-    if (data?.finalVideoUrl) {
-  setFinalVideoUrl(data.finalVideoUrl);
-}
-
-if (data?.finalVideoUrl) {
-  const updatedStory = {
-    ...story,
-    finalVideoUrl: data.finalVideoUrl,
-  };
-
-  setCurrentStory(updatedStory);
-}
-
-    setVideoModalVisible(false);
-
-    Alert.alert(
-  t.player.videoCreatedTitle,
-  `${data?.sceneCount || scenes.length} ${t.player.videoCreatedMessage}`,
-  [
-    {
-      text: t.player.later,
-      style: "cancel",
-    },
-    {
-      text: t.player.watchVideo,
-      onPress: () => {
-        if (data?.finalVideoUrl) {
-          router.push({
-            pathname: "/video-player",
-            params: {
-              url: data.finalVideoUrl,
+      const images = await Promise.all(
+        scenes.map(
+          async (
+            scene: {
+              imageUrl?: string | null;
             },
-          });
+            index: number
+          ) => {
+            const imageUrl = scene.imageUrl?.trim();
+
+            if (!imageUrl) {
+              return null;
+            }
+
+            // URL distante ou image déjà en base64 :
+            // on la garde telle quelle.
+            if (
+              imageUrl.startsWith("https://") ||
+              imageUrl.startsWith("data:image/")
+            ) {
+              return imageUrl;
+            }
+
+            // Image sauvegardée localement sur Android/iOS :
+            // on l'envoie au backend sous forme de Data URI.
+            if (imageUrl.startsWith("file://")) {
+              const base64 =
+                await FileSystem.readAsStringAsync(
+                  imageUrl,
+                  {
+                    encoding:
+                      FileSystem.EncodingType.Base64,
+                  }
+                );
+
+              const extension =
+                imageUrl
+                  .split("?")[0]
+                  .split(".")
+                  .pop()
+                  ?.toLowerCase();
+
+              const mimeType =
+                extension === "jpg" ||
+                extension === "jpeg"
+                  ? "image/jpeg"
+                  : extension === "webp"
+                    ? "image/webp"
+                    : "image/png";
+
+              console.log(
+                `🖼️ Scène ${index + 1} convertie en base64`
+              );
+
+              return `data:${mimeType};base64,${base64}`;
+            }
+
+            throw new Error(
+              `Format d'image non pris en charge pour la scène ${index + 1}.`
+            );
+          }
+        )
+      );
+
+      if (
+        images.some(
+          (image: string | null | undefined) => !image
+        )
+      ) {
+        throw new Error(
+          "Une ou plusieurs illustrations sont manquantes."
+        );
+      }
+
+      // On conserve requestId ET generationId.
+      // requestId protège déjà contre une nouvelle génération payante
+      // si la réponse HTTP est perdue. generationId permet en plus au
+      // backend de reprendre explicitement une génération partielle.
+      let pending =
+        await loadPendingVideoGeneration(
+          requestStorageKey
+        );
+
+      if (!pending) {
+        pending = {
+          requestId:
+            `${Date.now()}-` +
+            `${Math.random().toString(36).slice(2)}-` +
+            `${Math.random().toString(36).slice(2)}`,
+          generationId: null,
+        };
+
+        await savePendingVideoGeneration(
+          requestStorageKey,
+          pending
+        );
+      }
+
+      console.log(
+        "🎬 Demande vidéo :",
+        {
+          requestId: pending.requestId,
+          generationId: pending.generationId,
         }
-      },
-    },
-  ]
-);
+      );
 
-  } catch (error) {
-    console.error(
-      "Erreur création dessin animé :",
-      error
-    );
+      const response = await fetch(VIDEO_URL, {
+        method: "POST",
 
-    Alert.alert(
-  t.player.videoCreationImpossible,
-  error instanceof Error
-    ? error.message
-    : t.player.videoCreationError
-);
-  } finally {
-    setVideoGenerating(false);
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: JSON.stringify({
+          requestId: pending.requestId,
+          generationId:
+            pending.generationId || undefined,
+
+          images,
+
+          scenes: scenes.map((scene: any) => ({
+            text: scene?.text || "",
+            emotion:
+              scene?.ambience || "warm",
+          })),
+
+          narrator:
+            story?.narrator || "narratrice",
+
+          mode:
+            bedtimeMode
+              ? "bedtime"
+              : "story",
+
+          language,
+
+          videoModel: "gen4_turbo",
+        }),
+      });
+
+      // Le backend renvoie normalement du JSON.
+      // On protège quand même l'application contre une réponse vide
+      // ou une page d'erreur non JSON.
+      const responseText = await response.text();
+
+      let data: any = {};
+
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          data = {
+            error: responseText,
+          };
+        }
+      }
+
+      // Dès que le serveur nous communique un generationId,
+      // on le mémorise AVANT de traiter succès/erreur.
+      // Ainsi un timeout Runway ou une erreur temporaire pourra
+      // reprendre exactement la même génération.
+      if (
+        typeof data?.generationId === "string" &&
+        data.generationId.trim()
+      ) {
+        pending = {
+          ...pending,
+          generationId: data.generationId,
+        };
+
+        await savePendingVideoGeneration(
+          requestStorageKey,
+          pending
+        );
+
+        console.log(
+          "💾 generationId vidéo mémorisé :",
+          data.generationId
+        );
+      }
+
+      if (!response.ok) {
+        // Ces cas terminent définitivement la tentative :
+        // aucun crédit disponible ou génération annulée/remboursée.
+        // On supprime donc l'identifiant local pour permettre une
+        // nouvelle demande propre ultérieurement.
+        if (
+          data?.code === "NO_VIDEO_CREDIT" ||
+          data?.code ===
+            "VIDEO_GENERATION_REFUNDED"
+        ) {
+          await AsyncStorage.removeItem(
+            requestStorageKey
+          );
+        }
+
+        // Pour les erreurs temporaires Runway, les timeouts,
+        // une réponse perdue ou une génération encore en cours,
+        // on NE supprime PAS les identifiants locaux.
+        // Un nouvel appui reprendra la même génération.
+        throw new Error(
+          data?.details ||
+            data?.error ||
+            data?.message ||
+            "Impossible de créer le dessin animé."
+        );
+      }
+
+      if (!data?.finalVideoUrl) {
+        // Un HTTP 2xx sans vidéo finale ne doit surtout pas être
+        // considéré comme terminé : on garde requestId/generationId.
+        throw new Error(
+          "La génération vidéo n'est pas encore terminée. Réessaie dans quelques instants pour reprendre la même génération."
+        );
+      }
+
+      console.log(
+        "🎬 Dessin animé généré :",
+        data
+      );
+
+      setFinalVideoUrl(
+        data.finalVideoUrl
+      );
+
+      const updatedStory = {
+        ...story,
+        finalVideoUrl:
+          data.finalVideoUrl,
+      };
+
+      setCurrentStory(updatedStory);
+
+      // On efface la reprise uniquement lorsque la vidéo finale
+      // a réellement été reçue.
+      await AsyncStorage.removeItem(
+        requestStorageKey
+      );
+
+      setVideoModalVisible(false);
+
+      Alert.alert(
+        t.player.videoCreatedTitle,
+        `${data?.sceneCount || scenes.length} ${t.player.videoCreatedMessage}`,
+        [
+          {
+            text: t.player.later,
+            style: "cancel",
+          },
+          {
+            text: t.player.watchVideo,
+            onPress: () => {
+              router.push({
+                pathname: "/video-player",
+                params: {
+                  url: data.finalVideoUrl,
+                },
+              });
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error(
+        "Erreur création dessin animé :",
+        error
+      );
+
+      Alert.alert(
+        t.player.videoCreationImpossible,
+        error instanceof Error
+          ? error.message
+          : t.player.videoCreationError
+      );
+    } finally {
+      setVideoGenerating(false);
+    }
   }
-}
 
 async function stopVoice() {
     iaRunRef.current += 1;
