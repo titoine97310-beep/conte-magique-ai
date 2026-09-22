@@ -1,7 +1,7 @@
+import { toFile } from '@runwayml/sdk';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
-import { toFile } from '@runwayml/sdk';
 
 export function clipDuration(remaining) {
   if (!Number.isFinite(remaining) || remaining <= 0) throw new Error('Durée vidéo invalide.');
@@ -9,8 +9,66 @@ export function clipDuration(remaining) {
 }
 
 export function motionPrompt(text = '', continuation = false) {
-  const style = `${continuation ? 'Continue from this exact frame.' : 'Animate this exact illustration.'} Lively children cartoon, one continuous shot. Expressive gestures, natural head and body turns, small steps and weight shifts when appropriate to the scene. Characters react to each other and to the action with clear facial expressions. Keep movement throughout the shot. Preserve all character identities, outfits, proportions, objects and the illustration style. Locked camera, stable framing, characters remain within the frame. `;
-  return style + `Scene context: ${String(text).slice(0, 1000 - style.length - 15)}`;
+  const style = `
+${continuation
+  ? `Continue seamlessly from this exact frame.
+This is a continuation clip, not a new scene.
+Preserve the exact current appearance, pose, position and scale of every character.
+Continue only the motion already established in the previous shot.
+Do not introduce a new action, gesture, pose, expression, object or camera movement.
+Prioritize visual stability and character identity over additional movement.`
+  : `Animate this exact illustration with very high visual fidelity.
+Begin with gentle natural motion while preserving the exact original characters and composition.`}
+
+This is a gentle animated children's storybook shot.
+
+ABSOLUTE PRIORITY: preserve the original illustration.
+The characters must remain exactly the same people and creatures throughout the shot.
+
+STRICT CHARACTER CONSISTENCY:
+- preserve faces, facial features, skin tone, hair, hairstyle and age
+- preserve body proportions and anatomy
+- preserve clothing, colors, patterns and accessories
+- preserve all important objects
+- do not add, remove, duplicate, merge or replace characters
+- do not transform one character into another
+- do not invent new limbs, fingers, faces, clothing or objects
+- keep hands and faces stable and anatomically coherent
+- preserve the original illustration style and color palette
+
+MOTION:
+Use subtle, natural animation only.
+Prefer:
+- gentle breathing
+- natural blinking
+- very small eye movements
+- subtle facial expressions
+- slight head movement
+- gentle hair or clothing movement
+- small environmental motion such as leaves, light, particles or clouds
+
+Only perform a larger character action when it is clearly required by the scene context.
+Avoid unnecessary walking, large body turns, exaggerated gestures or rapid movement.
+
+CAMERA:
+Stable cinematic framing.
+Very subtle slow push-in or parallax is allowed when appropriate.
+No sudden camera movement.
+No cuts.
+No reframing that removes an important character.
+Keep all main characters visible and recognizable.
+
+CONTINUITY:
+This shot belongs to the same animated story.
+Maintain visual continuity from beginning to end.
+For continuation clips, the first frame must continue naturally from the supplied frame.
+Do not reset character positions or redesign the scene.
+
+Scene context:
+${String(text).slice(0, 1000)}
+`;
+
+  return style.trim();
 }
 
 export function runFfmpeg(binary, args) {
