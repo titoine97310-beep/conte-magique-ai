@@ -9,66 +9,19 @@ export function clipDuration(remaining) {
 }
 
 export function motionPrompt(text = '', continuation = false) {
-  const style = `
-${continuation
-  ? `Continue seamlessly from this exact frame.
-This is a continuation clip, not a new scene.
-Preserve the exact current appearance, pose, position and scale of every character.
-Continue only the motion already established in the previous shot.
-Do not introduce a new action, gesture, pose, expression, object or camera movement.
-Prioritize visual stability and character identity over additional movement.`
-  : `Animate this exact illustration with very high visual fidelity.
-Begin with gentle natural motion while preserving the exact original characters and composition.`}
+  const style = continuation
+    ? `Continue seamlessly from this exact frame. This is the same shot, not a new scene. Preserve exactly every character's face, hair, skin tone, age, body proportions, clothes, colors, accessories, objects, position and scale. Do not add, remove, duplicate, merge or transform characters or objects. Continue only the established motion. No new action, pose or camera movement. Keep faces, hands and anatomy stable. Use only subtle natural motion: breathing, blinking, tiny eye or head movements, gentle hair, clothing or environmental movement. Preserve the exact illustration style and composition. Stable framing, no cuts.`
+    : `Animate this exact illustration with very high visual fidelity. Preserve exactly every character's face, hair, skin tone, age, body proportions, clothes, colors, accessories and objects. Do not add, remove, duplicate, merge or transform characters or objects. Keep faces, hands and anatomy stable. Use gentle natural motion only: breathing, blinking, tiny eye or head movements, subtle expressions, gentle hair, clothing or environmental movement. Avoid unnecessary walking, large gestures and body turns. Preserve the exact illustration style, colors and composition. Stable cinematic framing, no cuts.`;
 
-This is a gentle animated children's storybook shot.
+  const available = Math.max(0, 980 - style.length);
+  const context = String(text)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, available);
 
-ABSOLUTE PRIORITY: preserve the original illustration.
-The characters must remain exactly the same people and creatures throughout the shot.
-
-STRICT CHARACTER CONSISTENCY:
-- preserve faces, facial features, skin tone, hair, hairstyle and age
-- preserve body proportions and anatomy
-- preserve clothing, colors, patterns and accessories
-- preserve all important objects
-- do not add, remove, duplicate, merge or replace characters
-- do not transform one character into another
-- do not invent new limbs, fingers, faces, clothing or objects
-- keep hands and faces stable and anatomically coherent
-- preserve the original illustration style and color palette
-
-MOTION:
-Use subtle, natural animation only.
-Prefer:
-- gentle breathing
-- natural blinking
-- very small eye movements
-- subtle facial expressions
-- slight head movement
-- gentle hair or clothing movement
-- small environmental motion such as leaves, light, particles or clouds
-
-Only perform a larger character action when it is clearly required by the scene context.
-Avoid unnecessary walking, large body turns, exaggerated gestures or rapid movement.
-
-CAMERA:
-Stable cinematic framing.
-Very subtle slow push-in or parallax is allowed when appropriate.
-No sudden camera movement.
-No cuts.
-No reframing that removes an important character.
-Keep all main characters visible and recognizable.
-
-CONTINUITY:
-This shot belongs to the same animated story.
-Maintain visual continuity from beginning to end.
-For continuation clips, the first frame must continue naturally from the supplied frame.
-Do not reset character positions or redesign the scene.
-
-Scene context:
-${String(text).slice(0, 1000)}
-`;
-
-  return style.trim();
+  return context
+    ? `${style} Scene: ${context}`.slice(0, 1000)
+    : style.slice(0, 1000);
 }
 
 export function runFfmpeg(binary, args) {
