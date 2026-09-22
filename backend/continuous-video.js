@@ -109,14 +109,62 @@ export async function continuousScene({ state, saveState, files, createAudio, ru
           const upload = await runway.uploads.createEphemeral({ file });
           promptImage = upload.uri;
         }
-        clip = { submitting: true, duration: clipDuration(seconds - covered) };
-        state.clips[index] = clip;
-        await saveState(state);
-        const task = await runway.imageToVideo.create({ model, ratio: '720:1280', duration: clip.duration,
-          promptImage, promptText: motionPrompt(text, index > 0) }, { maxRetries: 0 });
-        clip.taskId = task.id;
-        clip.submitting = false;
-        await saveState(state);
+        clip = {
+  submitting: true,
+  duration: clipDuration(seconds - covered),
+};
+
+state.clips[index] = clip;
+await saveState(state);
+
+let task;
+
+try {
+  task = await runway.imageToVideo.create(
+    {
+      model,
+      ratio: '720:1280',
+      duration: clip.duration,
+      promptImage,
+      promptText: motionPrompt(text, index > 0),
+    },
+    {
+      maxRetries: 0,
+    }
+  );
+} catch (error) {
+  /*
+   * Si Runway a répondu avec un HTTP 4xx,
+   * la requête a été explicitement refusée.
+   * Il n'existe donc pas de tâche vidéo ambiguë à reprendre.
+   *
+   * On marque le clip comme échec confirmé afin qu'il
+   * puisse être recréé proprement lors de la prochaine reprise.
+   */
+  const status = Number(error?.status);
+
+  if (Number.isFinite(status) && status >= 400 && status < 500) {
+    clip.submitting = false;
+    clip.failed = true;
+    clip.failureCode = `HTTP_${status}`;
+
+    await saveState(state);
+  }
+
+  /*
+   * Pour une erreur réseau ou une situation sans réponse HTTP
+   * certaine, on laisse submitting=true volontairement.
+   * Cela empêche de créer accidentellement une deuxième tâche
+   * Runway payante.
+   */
+  throw error;
+}
+
+clip.taskId = task.id;
+clip.submitting = false;
+clip.failed = false;
+
+await saveState(state);
       }
       let task;
       for (let attempt = 0; attempt < 180; attempt++) {
