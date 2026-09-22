@@ -2,7 +2,7 @@
   "expo": {
     "name": "ConteMagiqueIA",
     "slug": "contemagiqueia",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "contemagiqueia",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.contemagiqueia.app",
-      "buildNumber": "5",
+      "buildNumber": "8",
       "associatedDomains": [
         "applinks:contemagiqueia.fr"
       ],
@@ -22,7 +22,7 @@
       }
     },
     "android": {
-      "versionCode": 31,
+      "versionCode": 35,
       "adaptiveIcon": {
         "backgroundColor": "#111827",
         "foregroundImage": "./assets/images/adaptive-icon.png"

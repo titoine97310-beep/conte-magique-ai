@@ -1,4 +1,5 @@
 import { Audio } from "expo-av";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import { useKeepAwake } from "expo-keep-awake";
 import { LinearGradient } from "expo-linear-gradient";
@@ -606,6 +607,13 @@ sound.setOnPlaybackStatusUpdate((status) => {
   );
 }
 
+  function videoRequestStorageKey() {
+    // Retain the request across a lost response or app restart; account and content scoped.
+    return "continuous-video:" + JSON.stringify({ uid: auth.currentUser?.uid,
+      scenes: scenes.map((scene: any) => ({ text: scene?.text || "", image: scene?.imageUrl || "", emotion: scene?.ambience || "warm" })),
+      narrator: story?.narrator || "narratrice", language, mode: bedtimeMode ? "bedtime" : "story" });
+  }
+
   async function openVideoModal() {
   if (videoGenerating) return;
 
@@ -630,6 +638,11 @@ sound.setOnPlaybackStatusUpdate((status) => {
   }
 
   try {
+  const pendingVideo = await AsyncStorage.getItem(videoRequestStorageKey());
+  if (pendingVideo) {
+    setVideoModalVisible(true);
+    return;
+  }
   const remaining =
   await getVideoCreditsRemaining(
     scenes.length
@@ -918,6 +931,12 @@ function closeVideoModal() {
       );
     }
 
+    const requestStorageKey = videoRequestStorageKey();
+    let requestId = await AsyncStorage.getItem(requestStorageKey);
+    if (!requestId) {
+      requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+      await AsyncStorage.setItem(requestStorageKey, requestId);
+    }
     const response = await fetch(VIDEO_URL, {
       method: "POST",
 
@@ -927,6 +946,7 @@ function closeVideoModal() {
       },
 
       body: JSON.stringify({
+        requestId,
         images,
 
         scenes: scenes.map((scene: any) => ({
@@ -949,11 +969,16 @@ function closeVideoModal() {
     const data = await response.json();
 
     if (!response.ok) {
+      if (data?.code === "NO_VIDEO_CREDIT" || data?.code === "VIDEO_GENERATION_REFUNDED") {
+        await AsyncStorage.removeItem(requestStorageKey);
+      }
       throw new Error(
-        data?.error ||
+        data?.details || data?.error ||
           "Impossible de créer le dessin animé."
       );
     }
+
+    await AsyncStorage.removeItem(requestStorageKey);
 
     console.log(
       "🎬 Dessin animé généré :",
@@ -1088,6 +1113,7 @@ async function stopVoice() {
         <ScrollView
           style={styles.screenScroll}
           contentContainerStyle={styles.screenScrollContent}
+          nestedScrollEnabled
           showsVerticalScrollIndicator={false}
         >
         <View style={styles.header}>
@@ -1140,7 +1166,15 @@ async function stopVoice() {
             },
           ]}
         >
-          <ScrollView>
+          <ScrollView
+            key={index}
+            style={styles.narrationScroll}
+            contentContainerStyle={styles.narrationScrollContent}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+            persistentScrollbar
+            indicatorStyle="white"
+          >
             <Text style={styles.scene}>
               {t.player.scene} {index + 1} / {scenes.length}
             </Text>
@@ -1460,6 +1494,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.20,
     shadowRadius: 8,
     elevation: 4,
+  },
+  narrationScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  narrationScrollContent: {
+    paddingRight: 8,
+    paddingBottom: 12,
   },
   cardNight: {
     backgroundColor: "rgba(10,17,36,0.96)",

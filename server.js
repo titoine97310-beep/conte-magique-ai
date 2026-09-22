@@ -1,5 +1,3 @@
-import { continuousScene } from "./backend/continuous-video.js";
-import { findLegacyResume } from "./backend/video-resume.js";
 import {
   AppStoreServerAPIClient,
   Environment,
@@ -7,38 +5,44 @@ import {
 } from "@apple/app-store-server-library";
 import RunwayML, {
   TaskFailedError,
+  toFile as runwayToFile,
 } from "@runwayml/sdk";
+import { spawn } from "child_process";
 import cors from "cors";
 import crypto from "crypto";
 import dotenv from "dotenv";
 import express from "express";
-import fs from "fs";
-import { google } from "googleapis";
-import OpenAI, { toFile } from "openai";
-
-import { spawn } from "child_process";
 import ffmpegPath from "ffmpeg-static";
 import { cert, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import fs from "fs";
+import { google } from "googleapis";
+import OpenAI, { toFile } from "openai";
 import os from "os";
 import path from "path";
 
 dotenv.config();
 
-console.log("Clé OpenAI présente :", !!process.env.OPENAI_API_KEY);
+console.log(
+  "Clé OpenAI présente :",
+  !!process.env.OPENAI_API_KEY
+);
 
 const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
-  
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-async function downloadFile(url, outputPath) {
+async function downloadFile(
+  url,
+  outputPath
+) {
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -47,7 +51,8 @@ async function downloadFile(url, outputPath) {
     );
   }
 
-  const arrayBuffer = await response.arrayBuffer();
+  const arrayBuffer =
+    await response.arrayBuffer();
 
   await fs.promises.writeFile(
     outputPath,
@@ -55,47 +60,73 @@ async function downloadFile(url, outputPath) {
   );
 }
 
-async function mergeVideoClips(videoUrls, generationId) {
+async function mergeVideoClips(
+  videoUrls,
+  generationId
+) {
   if (!ffmpegPath) {
-    throw new Error("FFmpeg introuvable.");
+    throw new Error(
+      "FFmpeg introuvable."
+    );
   }
 
-  if (!Array.isArray(videoUrls) || videoUrls.length === 0) {
-    throw new Error("Aucune vidéo à assembler.");
+  if (
+    !Array.isArray(videoUrls) ||
+    videoUrls.length === 0
+  ) {
+    throw new Error(
+      "Aucune vidéo à assembler."
+    );
   }
 
-  const tempDir = await fs.promises.mkdtemp(
-    path.join(os.tmpdir(), "contemagiqueia-video-")
-  );
+  const tempDir =
+    await fs.promises.mkdtemp(
+      path.join(
+        os.tmpdir(),
+        "contemagiqueia-video-"
+      )
+    );
 
   try {
     const localFiles = [];
 
-    for (let i = 0; i < videoUrls.length; i++) {
-      const localPath = path.join(
-        tempDir,
-        `scene-${i + 1}.mp4`
-      );
+    for (
+      let i = 0;
+      i < videoUrls.length;
+      i++
+    ) {
+      const localPath =
+        path.join(
+          tempDir,
+          `scene-${i + 1}.mp4`
+        );
 
       await downloadFile(
         videoUrls[i],
         localPath
       );
 
-      localFiles.push(localPath);
+      localFiles.push(
+        localPath
+      );
     }
 
-    const concatFilePath = path.join(
-      tempDir,
-      "concat.txt"
-    );
+    const concatFilePath =
+      path.join(
+        tempDir,
+        "concat.txt"
+      );
 
-    const concatContent = localFiles
-      .map(
-        (filePath) =>
-          `file '${filePath.replace(/'/g, "'\\''")}'`
-      )
-      .join("\n");
+    const concatContent =
+      localFiles
+        .map(
+          (filePath) =>
+            `file '${filePath.replace(
+              /'/g,
+              "'\\''"
+            )}'`
+        )
+        .join("\n");
 
     await fs.promises.writeFile(
       concatFilePath,
@@ -103,70 +134,89 @@ async function mergeVideoClips(videoUrls, generationId) {
       "utf8"
     );
 
-    const outputPath = path.join(
-      tempDir,
-      `${generationId}-final.mp4`
-    );
-
-    await new Promise((resolve, reject) => {
-      const ffmpeg = spawn(
-        ffmpegPath,
-        [
-          "-y",
-          "-f",
-          "concat",
-          "-safe",
-          "0",
-          "-i",
-          concatFilePath,
-          "-c:v",
-          "libx264",
-
-          "-preset",
-          "veryfast",
-
-          "-crf",
-          "20",
-
-          "-c:a",
-          "aac",
-
-          "-b:a",
-          "160k",
-
-          "-pix_fmt",
-          "yuv420p",
-
-          "-movflags",
-          "+faststart",
-
-          outputPath,
-        ],
-        {
-          windowsHide: true,
-        }
+    const outputPath =
+      path.join(
+        tempDir,
+        `${generationId}-final.mp4`
       );
 
-      let stderr = "";
+    await new Promise(
+      (resolve, reject) => {
+        const ffmpeg =
+          spawn(
+            ffmpegPath,
+            [
+              "-y",
 
-      ffmpeg.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
+              "-f",
+              "concat",
 
-      ffmpeg.on("close", (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(
-            new Error(
-              `FFmpeg a échoué avec le code ${code}.\n${stderr}`
-            )
+              "-safe",
+              "0",
+
+              "-i",
+              concatFilePath,
+
+              "-c:v",
+              "libx264",
+
+              "-preset",
+              "veryfast",
+
+              "-crf",
+              "20",
+
+              "-c:a",
+              "aac",
+
+              "-b:a",
+              "160k",
+
+              "-pix_fmt",
+              "yuv420p",
+
+              "-movflags",
+              "+faststart",
+
+              outputPath,
+            ],
+            {
+              windowsHide:
+                true,
+            }
           );
-        }
-      });
 
-      ffmpeg.on("error", reject);
-    });
+        let stderr = "";
+
+        ffmpeg.stderr.on(
+          "data",
+          (data) => {
+            stderr +=
+              data.toString();
+          }
+        );
+
+        ffmpeg.on(
+          "close",
+          (code) => {
+            if (code === 0) {
+              resolve();
+            } else {
+              reject(
+                new Error(
+                  `FFmpeg a échoué avec le code ${code}.\n${stderr}`
+                )
+              );
+            }
+          }
+        );
+
+        ffmpeg.on(
+          "error",
+          reject
+        );
+      }
+    );
 
     return outputPath;
   } catch (error) {
@@ -182,10 +232,13 @@ async function mergeVideoClips(videoUrls, generationId) {
   }
 }
 
-function getNarratorProfile(narrator = "narratrice") {
+function getNarratorProfile(
+  narrator = "narratrice"
+) {
   const narratorProfiles = {
     narratrice: {
       voice: "nova",
+
       instructions: `
 Lis comme une conteuse chaleureuse pour enfants.
 Voix naturelle, douce, expressive.
@@ -195,6 +248,7 @@ Raconte comme une maman lisant une histoire.
 
     narrateur: {
       voice: "onyx",
+
       instructions: `
 Lis comme un papa racontant une histoire.
 Voix grave, rassurante, naturelle, expressive.
@@ -204,6 +258,7 @@ Prends ton temps et fais des pauses naturelles.
 
     magicien: {
       voice: "sage",
+
       instructions: `
 Lis comme un vieux magicien bienveillant.
 Voix mystérieuse mais chaleureuse, expressive, naturelle.
@@ -212,6 +267,7 @@ Voix mystérieuse mais chaleureuse, expressive, naturelle.
 
     fee: {
       voice: "shimmer",
+
       instructions: `
 Lis comme une fée joyeuse.
 Voix légère, lumineuse, pleine d'émerveillement, naturelle, expressive.
@@ -220,6 +276,7 @@ Voix légère, lumineuse, pleine d'émerveillement, naturelle, expressive.
 
     mamie: {
       voice: "ballad",
+
       instructions: `
 Lis comme une grand-mère racontant un conte à ses petits-enfants.
 Voix très douce, lente et affectueuse, expressive, naturelle.
@@ -228,6 +285,7 @@ Voix très douce, lente et affectueuse, expressive, naturelle.
 
     garcon: {
       voice: "echo",
+
       instructions: `
 Lis comme un jeune garçon racontant une aventure.
 Voix vive, enthousiaste et naturelle, expressive.
@@ -255,47 +313,64 @@ async function createNarrationMp3({
   }
 
   const profile =
-    getNarratorProfile(narrator);
+    getNarratorProfile(
+      narrator
+    );
 
-    const supportedLanguages = ["fr", "en", "es"];
+  const supportedLanguages = [
+    "fr",
+    "en",
+    "es",
+  ];
 
-const selectedLanguage =
-  supportedLanguages.includes(language)
-    ? language
-    : "fr";
+  const selectedLanguage =
+    supportedLanguages.includes(
+      language
+    )
+      ? language
+      : "fr";
 
-const languageInstructions = {
-  fr: `
+  const languageInstructions = {
+    fr: `
 Lis le texte en français.
 Utilise une prononciation française naturelle et claire.
 Ne traduis pas le texte.
 `,
 
-  en: `
+    en: `
 Read the text in English.
 Use natural, clear English pronunciation.
 Do not translate the text.
 `,
 
-  es: `
+    es: `
 Lee el texto en español.
 Utiliza una pronunciación española natural y clara.
 No traduzcas el texto.
 `,
-};
+  };
 
-  let emotionInstructions = "";
+  let emotionInstructions =
+    "";
 
-  if (emotion === "danger") {
+  if (
+    emotion === "danger"
+  ) {
     emotionInstructions =
       "Ajoute un suspense très léger, sans jamais devenir effrayant.";
-  } else if (emotion === "victory") {
+  } else if (
+    emotion === "victory"
+  ) {
     emotionInstructions =
       "Utilise un ton joyeux et chaleureux.";
-  } else if (emotion === "calm") {
+  } else if (
+    emotion === "calm"
+  ) {
     emotionInstructions =
       "Utilise un ton doux et paisible.";
-  } else if (emotion === "night") {
+  } else if (
+    emotion === "night"
+  ) {
     emotionInstructions =
       "Utilise un ton calme et rassurant.";
   }
@@ -323,11 +398,19 @@ Prononce les mots naturellement.
 
   const response =
     await openai.audio.speech.create({
-      model: "gpt-4o-mini-tts",
-      voice: profile.voice,
-      input: text,
+      model:
+        "gpt-4o-mini-tts",
+
+      voice:
+        profile.voice,
+
+      input:
+        text,
+
       instructions,
-      response_format: "mp3",
+
+      response_format:
+        "mp3",
     });
 
   return Buffer.from(
@@ -335,11 +418,176 @@ Prononce les mots naturellement.
   );
 }
 
-const runway = new RunwayML({
-  apiKey: process.env.RUNWAY_API_KEY,
-});
+async function createNarratedSceneVideo({
+  videoUrl,
+  sceneText,
+  emotion,
+  narrator,
+  mode,
+  language = "fr",
+  sceneIndex,
+  tempDir,
+}) {
+  if (!ffmpegPath) {
+    throw new Error(
+      "FFmpeg introuvable."
+    );
+  }
 
-const GOOGLE_PLAY_PACKAGE_NAME = "com.contemagiqueia.app";
+  const sourceVideoPath =
+    path.join(
+      tempDir,
+      `source-${sceneIndex + 1}.mp4`
+    );
+
+  const narrationPath =
+    path.join(
+      tempDir,
+      `narration-${sceneIndex + 1}.mp3`
+    );
+
+  const outputPath =
+    path.join(
+      tempDir,
+      `narrated-${sceneIndex + 1}.mp4`
+    );
+
+  await downloadFile(
+    videoUrl,
+    sourceVideoPath
+  );
+
+  const narrationBuffer =
+    await createNarrationMp3({
+      text:
+        sceneText,
+
+      mode,
+
+      emotion,
+
+      narrator,
+
+      language,
+    });
+
+  await fs.promises.writeFile(
+    narrationPath,
+    narrationBuffer
+  );
+
+  await new Promise(
+    (resolve, reject) => {
+      const ffmpeg =
+        spawn(
+          ffmpegPath,
+          [
+            "-y",
+
+            // Vidéo Runway :
+            // jouée une seule fois.
+            "-i",
+            sourceVideoPath,
+
+            // Narration.
+            "-i",
+            narrationPath,
+
+            // Une fois la vidéo
+            // terminée, conserve
+            // sa dernière image.
+            "-filter_complex",
+
+            "[0:v]tpad=stop_mode=clone:stop_duration=600[v]",
+
+            "-map",
+            "[v]",
+
+            "-map",
+            "1:a:0",
+
+            "-c:v",
+            "libx264",
+
+            "-preset",
+            "veryfast",
+
+            "-crf",
+            "20",
+
+            "-c:a",
+            "aac",
+
+            "-b:a",
+            "160k",
+
+            "-pix_fmt",
+            "yuv420p",
+
+            // La scène s'arrête
+            // à la fin de la
+            // narration.
+            "-shortest",
+
+            "-movflags",
+            "+faststart",
+
+            outputPath,
+          ],
+          {
+            windowsHide:
+              true,
+          }
+        );
+
+      let stderr = "";
+
+      ffmpeg.stderr.on(
+        "data",
+        (data) => {
+          stderr +=
+            data.toString();
+        }
+      );
+
+      ffmpeg.on(
+        "close",
+        (code) => {
+          if (
+            code === 0
+          ) {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                `FFmpeg narration scène ${
+                  sceneIndex + 1
+                } échouée.\n${stderr}`
+              )
+            );
+          }
+        }
+      );
+
+      ffmpeg.on(
+        "error",
+        reject
+      );
+    }
+  );
+
+  return outputPath;
+}
+
+const runway =
+  new RunwayML({
+    apiKey:
+      process.env
+        .RUNWAY_API_KEY,
+  });
+
+const GOOGLE_PLAY_PACKAGE_NAME =
+  "com.contemagiqueia.app";
 
 const GOOGLE_PLAY_PRODUCTS = {
   carnet_15_textes: {
@@ -350,7 +598,8 @@ const GOOGLE_PLAY_PRODUCTS = {
 
   carnet_15_histoires: {
     type: "story",
-    packType: "illustrated",
+    packType:
+      "illustrated",
     stories: 15,
   },
 
@@ -378,7 +627,8 @@ const APPLE_PRODUCTS = {
 
   carnet_15_histoires: {
     type: "story",
-    packType: "illustrated",
+    packType:
+      "illustrated",
     stories: 15,
   },
 
@@ -397,76 +647,160 @@ const APPLE_PRODUCTS = {
   },
 };
 
-const googlePlayAuth = new google.auth.GoogleAuth({
-  keyFile: "/etc/secrets/google-play-service-account.json",
-  scopes: ["https://www.googleapis.com/auth/androidpublisher"],
-});
+const googlePlayAuth =
+  new google.auth.GoogleAuth({
+    keyFile:
+      "/etc/secrets/google-play-service-account.json",
 
-const androidPublisher = google.androidpublisher({
-  version: "v3",
-  auth: googlePlayAuth,
-});
+    scopes: [
+      "https://www.googleapis.com/auth/androidpublisher",
+    ],
+  });
 
-const APPLE_ISSUER_ID = process.env.APPLE_ISSUER_ID;
-const APPLE_KEY_ID = process.env.APPLE_KEY_ID;
-const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID;
+const androidPublisher =
+  google.androidpublisher({
+    version: "v3",
+    auth: googlePlayAuth,
+  });
 
-const APPLE_KEY_PATH = APPLE_KEY_ID
-  ? `/etc/secrets/SubscriptionKey_${APPLE_KEY_ID}.p8`
-  : null;
+const APPLE_ISSUER_ID =
+  process.env
+    .APPLE_ISSUER_ID;
+
+const APPLE_KEY_ID =
+  process.env
+    .APPLE_KEY_ID;
+
+const APPLE_BUNDLE_ID =
+  process.env
+    .APPLE_BUNDLE_ID;
+
+const APPLE_KEY_PATH =
+  APPLE_KEY_ID
+    ? `/etc/secrets/SubscriptionKey_${APPLE_KEY_ID}.p8`
+    : null;
 
 function getApplePrivateKey() {
   if (!APPLE_ISSUER_ID) {
-    throw new Error("APPLE_ISSUER_ID manquant.");
+    throw new Error(
+      "APPLE_ISSUER_ID manquant."
+    );
   }
 
   if (!APPLE_KEY_ID) {
-    throw new Error("APPLE_KEY_ID manquant.");
+    throw new Error(
+      "APPLE_KEY_ID manquant."
+    );
   }
 
-  if (!APPLE_KEY_PATH || !fs.existsSync(APPLE_KEY_PATH)) {
+  if (
+    !APPLE_KEY_PATH ||
+    !fs.existsSync(
+      APPLE_KEY_PATH
+    )
+  ) {
     throw new Error(
       `Clé privée Apple introuvable : ${APPLE_KEY_PATH}`
     );
   }
 
-  return fs.readFileSync(APPLE_KEY_PATH, "utf8");
+  return fs.readFileSync(
+    APPLE_KEY_PATH,
+    "utf8"
+  );
 }
 
-const firebaseServiceAccount = JSON.parse(
-  fs.readFileSync(
-    "/etc/secrets/firebase-service-account.json",
-    "utf8"
+const FIREBASE_SERVICE_ACCOUNT_PATH =
+  fs.existsSync(
+    "/etc/secrets/firebase-service-account.json"
   )
+    ? "/etc/secrets/firebase-service-account.json"
+    : path.join(
+        process.cwd(),
+        "secrets",
+        "firebase-service-account.json"
+      );
+
+if (
+  !fs.existsSync(
+    FIREBASE_SERVICE_ACCOUNT_PATH
+  )
+) {
+  throw new Error(
+    `Clé Firebase introuvable : ${FIREBASE_SERVICE_ACCOUNT_PATH}`
+  );
+}
+
+console.log(
+  "🔥 Firebase Admin : clé de service trouvée."
 );
 
-const firebaseAdminApp = initializeApp({
-  credential: cert(firebaseServiceAccount),
-  projectId: "contemagiqueia",
-  storageBucket: "contemagiqueia.firebasestorage.app",
-});
+const firebaseServiceAccount =
+  JSON.parse(
+    fs.readFileSync(
+      FIREBASE_SERVICE_ACCOUNT_PATH,
+      "utf8"
+    )
+  );
 
-const firebaseAuth = getAuth(firebaseAdminApp);
-const adminDb = getFirestore(firebaseAdminApp);
-const adminStorage = getStorage(firebaseAdminApp);
+const firebaseAdminApp =
+  initializeApp({
+    credential: cert(
+      firebaseServiceAccount
+    ),
 
-async function requireFirebaseUser(req, res) {
+    projectId:
+      "contemagiqueia",
+
+    storageBucket:
+      "contemagiqueia.firebasestorage.app",
+  });
+
+const firebaseAuth =
+  getAuth(
+    firebaseAdminApp
+  );
+
+const adminDb =
+  getFirestore(
+    firebaseAdminApp
+  );
+
+const adminStorage =
+  getStorage(
+    firebaseAdminApp
+  );
+
+async function requireFirebaseUser(
+  req,
+  res
+) {
   const authorization =
-    req.headers.authorization || "";
+    req.headers.authorization ||
+    "";
 
-  if (!authorization.startsWith("Bearer ")) {
+  if (
+    !authorization.startsWith(
+      "Bearer "
+    )
+  ) {
     res.status(401).json({
-      error: "Authentification Firebase requise.",
+      error:
+        "Authentification Firebase requise.",
     });
 
     return null;
   }
 
   try {
-    const idToken = authorization.substring(7);
+    const idToken =
+      authorization.substring(7);
 
     const decodedToken =
-      await firebaseAuth.verifyIdToken(idToken);
+      await firebaseAuth
+        .verifyIdToken(
+          idToken
+        );
 
     return decodedToken;
   } catch (error) {
@@ -476,16 +810,23 @@ async function requireFirebaseUser(req, res) {
     );
 
     res.status(401).json({
-      error: "Session Firebase invalide.",
+      error:
+        "Session Firebase invalide.",
     });
 
     return null;
   }
 }
 
-async function requireAdminUser(req, res) {
+async function requireAdminUser(
+  req,
+  res
+) {
   const decodedToken =
-    await requireFirebaseUser(req, res);
+    await requireFirebaseUser(
+      req,
+      res
+    );
 
   if (!decodedToken) {
     return null;
@@ -497,20 +838,27 @@ async function requireAdminUser(req, res) {
       .doc(decodedToken.uid)
       .get();
 
-  if (!userSnapshot.exists) {
+  if (
+    !userSnapshot.exists
+  ) {
     res.status(403).json({
-      error: "Profil administrateur introuvable.",
+      error:
+        "Profil administrateur introuvable.",
     });
 
     return null;
   }
 
   const userData =
-    userSnapshot.data() || {};
+    userSnapshot.data() ||
+    {};
 
-  if (userData.role !== "admin") {
+  if (
+    userData.role !== "admin"
+  ) {
     res.status(403).json({
-      error: "Accès administrateur requis.",
+      error:
+        "Accès administrateur requis.",
     });
 
     return null;
@@ -525,32 +873,44 @@ async function sendExpoPushNotification({
   body,
   data = {},
 }) {
-  const response = await fetch(
-    "https://exp.host/--/api/v2/push/send",
-    {
-      method: "POST",
+  const response =
+    await fetch(
+      "https://exp.host/--/api/v2/push/send",
+      {
+        method: "POST",
 
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
+        headers: {
+          Accept:
+            "application/json",
 
-      body: JSON.stringify({
-        to,
-        sound: "default",
-        title,
-        body,
-        data,
-      }),
-    }
-  );
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            to,
+
+            sound:
+              "default",
+
+            title,
+
+            body,
+
+            data,
+          }),
+      }
+    );
 
   const result =
     await response.json();
 
   if (!response.ok) {
     throw new Error(
-      `Erreur Expo Push : ${JSON.stringify(result)}`
+      `Erreur Expo Push : ${JSON.stringify(
+        result
+      )}`
     );
   }
 
@@ -562,14 +922,33 @@ async function reserveVideoCredit(
   sceneCount,
   imagesHash,
   videoModel,
-  requestKey = null,
-  narrationHash = null
+  requestId,
+  narration
 ) {
   const userRef =
-    adminDb.collection("users").doc(uid);
+    adminDb
+      .collection("users")
+      .doc(uid);
 
+  // Si le client fournit un requestId,
+  // la même demande retrouvera toujours
+  // le même document Firestore.
+  //
+  // Cela empêche un double débit si
+  // la réponse HTTP est perdue et que
+  // l'application renvoie la requête.
   const generationRef =
-    requestKey ? adminDb.collection("videoGenerations").doc(requestKey) : adminDb.collection("videoGenerations").doc();
+    requestId
+      ? adminDb
+          .collection(
+            "videoGenerations"
+          )
+          .doc(requestId)
+      : adminDb
+          .collection(
+            "videoGenerations"
+          )
+          .doc();
 
   // 4 scènes = crédit Court
   // 6 scènes = crédit Moyen
@@ -581,85 +960,225 @@ async function reserveVideoCredit(
         : null;
 
   if (!videoType) {
-    const error = new Error(
-      "Nombre de scènes non compatible avec un crédit vidéo."
-    );
+    const error =
+      new Error(
+        "Nombre de scènes non compatible avec un crédit vidéo."
+      );
 
-    error.code = "INVALID_VIDEO_SCENE_COUNT";
+    error.code =
+      "INVALID_VIDEO_SCENE_COUNT";
+
     throw error;
   }
 
   await adminDb.runTransaction(
     async (transaction) => {
-      const existing = await transaction.get(generationRef);
-      if (existing.exists) {
-        const data = existing.data();
-        if (data.uid !== uid || data.imagesHash !== imagesHash || data.narrationHash !== narrationHash || data.model !== videoModel) {
-          throw new Error("Cette demande vidéo ne correspond pas à la génération d’origine.");
+      // IMPORTANT :
+      // on vérifie d'abord si cette
+      // génération existe déjà.
+      const existingSnapshot =
+        await transaction.get(
+          generationRef
+        );
+
+      if (
+        existingSnapshot.exists
+      ) {
+        const existing =
+          existingSnapshot.data() ||
+          {};
+
+        // Le requestId appartient déjà
+        // à un autre utilisateur.
+        if (
+          existing.uid !== uid
+        ) {
+          const error =
+            new Error(
+              "Cette demande ne correspond pas à cet utilisateur."
+            );
+
+          error.code =
+            "VIDEO_REQUEST_MISMATCH";
+
+          throw error;
         }
+
+        // Le même requestId ne peut pas
+        // être réutilisé pour une autre
+        // narration.
+        if (
+          existing.narration !==
+          narration
+        ) {
+          const error =
+            new Error(
+              "Cette demande ne correspond pas à la narration d'origine."
+            );
+
+          error.code =
+            "VIDEO_REQUEST_MISMATCH";
+
+          throw error;
+        }
+
+        // Même sécurité pour les images.
+        if (
+          existing.imagesHash !==
+          imagesHash
+        ) {
+          const error =
+            new Error(
+              "Cette demande ne correspond pas aux images d'origine."
+            );
+
+          error.code =
+            "VIDEO_REQUEST_MISMATCH";
+
+          throw error;
+        }
+
+        // Même nombre de scènes.
+        if (
+          existing.sceneCount !==
+          sceneCount
+        ) {
+          const error =
+            new Error(
+              "Cette demande ne correspond pas au nombre de scènes d'origine."
+            );
+
+          error.code =
+            "VIDEO_REQUEST_MISMATCH";
+
+          throw error;
+        }
+
+        // Même modèle vidéo.
+        if (
+          existing.model !==
+          videoModel
+        ) {
+          const error =
+            new Error(
+              "Cette demande ne correspond pas au modèle vidéo d'origine."
+            );
+
+          error.code =
+            "VIDEO_REQUEST_MISMATCH";
+
+          throw error;
+        }
+
+        // La demande est strictement
+        // identique.
+        //
+        // On ne débite surtout PAS
+        // un deuxième crédit.
         return;
       }
-      const userSnapshot =
-        await transaction.get(userRef);
 
-      if (!userSnapshot.exists) {
+      const userSnapshot =
+        await transaction.get(
+          userRef
+        );
+
+      if (
+        !userSnapshot.exists
+      ) {
         throw new Error(
           "Profil utilisateur introuvable."
         );
       }
 
       const userData =
-        userSnapshot.data() || {};
+        userSnapshot.data() ||
+        {};
 
       const remaining =
-        userData.videoCredits?.[videoType]
-          ?.remaining || 0;
+        userData
+          .videoCredits?.[
+            videoType
+          ]?.remaining ||
+        0;
 
-      if (remaining <= 0) {
-        const error = new Error(
-          videoType === "short"
-            ? "Aucun crédit dessin animé Court disponible."
-            : "Aucun crédit dessin animé Moyen disponible."
-        );
+      if (
+        remaining <= 0
+      ) {
+        const error =
+          new Error(
+            videoType ===
+              "short"
+              ? "Aucun crédit dessin animé Court disponible."
+              : "Aucun crédit dessin animé Moyen disponible."
+          );
 
-        error.code = "NO_VIDEO_CREDIT";
+        error.code =
+          "NO_VIDEO_CREDIT";
+
         throw error;
       }
 
-      transaction.update(userRef, {
-        [`videoCredits.${videoType}.remaining`]:
-          FieldValue.increment(-1),
+      transaction.update(
+        userRef,
+        {
+          [`videoCredits.${videoType}.remaining`]:
+            FieldValue.increment(
+              -1
+            ),
 
-        [`videoCredits.${videoType}.reserved`]:
-          FieldValue.increment(1),
-      });
+          [`videoCredits.${videoType}.reserved`]:
+            FieldValue.increment(
+              1
+            ),
+        }
+      );
 
-      transaction.set(generationRef, {
-        uid,
+      transaction.set(
+        generationRef,
+        {
+          uid,
 
-        type: "full_story_video",
-        videoType,
-        appCredits: 1,
+          type:
+            "full_story_video",
 
-        status: "reserved",
+          videoType,
 
-        sceneCount,
-        completedScenes: 0,
+          appCredits: 1,
 
-        // Permet de vérifier que la reprise
-        // concerne bien les mêmes images.
-        imagesHash,
+          status:
+            "reserved",
 
-        model: videoModel,
-        animationVersion: 2,
-        narrationHash,
+          sceneCount,
 
-        createdAt:
-          FieldValue.serverTimestamp(),
+          completedScenes:
+            0,
 
-        completedAt: null,
-        refundedAt: null,
-      });
+          imagesHash,
+
+          // Permet de garantir qu'un
+          // requestId ne sera jamais
+          // réutilisé avec une autre
+          // narration.
+          narration,
+
+          model:
+            videoModel,
+
+          secondsPerScene:
+            5,
+
+          createdAt:
+            FieldValue
+              .serverTimestamp(),
+
+          completedAt:
+            null,
+
+          refundedAt:
+            null,
+        }
+      );
     }
   );
 
@@ -671,59 +1190,85 @@ async function refundVideoCredit(
   generationRef
 ) {
   const userRef =
-    adminDb.collection("users").doc(uid);
+    adminDb
+      .collection("users")
+      .doc(uid);
 
   await adminDb.runTransaction(
     async (transaction) => {
       const generationSnapshot =
-        await transaction.get(generationRef);
+        await transaction.get(
+          generationRef
+        );
 
-      if (!generationSnapshot.exists) {
+      if (
+        !generationSnapshot.exists
+      ) {
         return;
       }
 
       const generation =
         generationSnapshot.data();
 
-      // Empêche tout double remboursement.
+      // Empêche tout double
+      // remboursement.
       if (
-  generation.status !== "reserved" &&
-  generation.status !== "partial"
-) {
-  return;
-}
+        generation.status !==
+          "reserved" &&
+        generation.status !==
+          "partial"
+      ) {
+        return;
+      }
 
-      if (generation.uid !== uid) {
+      if (
+        generation.uid !== uid
+      ) {
         throw new Error(
           "Utilisateur incorrect pour ce remboursement."
         );
       }
 
       const videoType =
-  generation.videoType;
+        generation.videoType;
 
-if (
-  videoType !== "short" &&
-  videoType !== "medium"
-) {
-  throw new Error(
-    "Type de crédit vidéo invalide pour le remboursement."
-  );
-}
+      if (
+        videoType !==
+          "short" &&
+        videoType !==
+          "medium"
+      ) {
+        throw new Error(
+          "Type de crédit vidéo invalide pour le remboursement."
+        );
+      }
 
-transaction.update(userRef, {
-  [`videoCredits.${videoType}.remaining`]:
-    FieldValue.increment(1),
+      transaction.update(
+        userRef,
+        {
+          [`videoCredits.${videoType}.remaining`]:
+            FieldValue.increment(
+              1
+            ),
 
-  [`videoCredits.${videoType}.reserved`]:
-    FieldValue.increment(-1),
-});
+          [`videoCredits.${videoType}.reserved`]:
+            FieldValue.increment(
+              -1
+            ),
+        }
+      );
 
-      transaction.update(generationRef, {
-        status: "refunded",
-        refundedAt:
-          FieldValue.serverTimestamp(),
-      });
+      transaction.update(
+        generationRef,
+        {
+          status:
+            "refunded",
+
+          refundedAt:
+            FieldValue
+              .serverTimestamp(),
+        }
+      );
     }
   );
 }
@@ -734,14 +1279,20 @@ async function completeVideoGeneration(
   videoUrls
 ) {
   const userRef =
-    adminDb.collection("users").doc(uid);
+    adminDb
+      .collection("users")
+      .doc(uid);
 
   await adminDb.runTransaction(
     async (transaction) => {
       const generationSnapshot =
-        await transaction.get(generationRef);
+        await transaction.get(
+          generationRef
+        );
 
-      if (!generationSnapshot.exists) {
+      if (
+        !generationSnapshot.exists
+      ) {
         throw new Error(
           "Génération vidéo introuvable."
         );
@@ -750,49 +1301,69 @@ async function completeVideoGeneration(
       const generation =
         generationSnapshot.data();
 
-      // Empêche une double validation.
+      // Empêche une double
+      // validation.
       if (
-  generation.status !== "reserved" &&
-  generation.status !== "partial"
-) {
-  return;
-}
+        generation.status !==
+          "reserved" &&
+        generation.status !==
+          "partial"
+      ) {
+        return;
+      }
 
-      if (generation.uid !== uid) {
+      if (
+        generation.uid !== uid
+      ) {
         throw new Error(
           "Utilisateur incorrect pour cette génération."
         );
       }
 
       const videoType =
-  generation.videoType;
+        generation.videoType;
 
-if (
-  videoType !== "short" &&
-  videoType !== "medium"
-) {
-  throw new Error(
-    "Type de crédit vidéo invalide pour la validation."
-  );
-}
+      if (
+        videoType !==
+          "short" &&
+        videoType !==
+          "medium"
+      ) {
+        throw new Error(
+          "Type de crédit vidéo invalide pour la validation."
+        );
+      }
 
-transaction.update(userRef, {
-  [`videoCredits.${videoType}.reserved`]:
-    FieldValue.increment(-1),
+      transaction.update(
+        userRef,
+        {
+          [`videoCredits.${videoType}.reserved`]:
+            FieldValue.increment(
+              -1
+            ),
+        }
+      );
 
-  [`videoCredits.${videoType}.used`]:
-    FieldValue.increment(1),
-});
+      transaction.update(
+        generationRef,
+        {
+          status:
+            "completed",
 
-      transaction.update(generationRef, {
-  status: "completed",
-  videoUrls,
-  completedScenes: Array.isArray(videoUrls)
-    ? videoUrls.length
-    : 0,
-  completedAt:
-    FieldValue.serverTimestamp(),
-});
+          videoUrls,
+
+          completedScenes:
+            Array.isArray(
+              videoUrls
+            )
+              ? videoUrls.length
+              : 0,
+
+          completedAt:
+            FieldValue
+              .serverTimestamp(),
+        }
+      );
     }
   );
 }
@@ -805,9 +1376,13 @@ async function saveVideoSceneProgress(
   await adminDb.runTransaction(
     async (transaction) => {
       const generationSnapshot =
-        await transaction.get(generationRef);
+        await transaction.get(
+          generationRef
+        );
 
-      if (!generationSnapshot.exists) {
+      if (
+        !generationSnapshot.exists
+      ) {
         throw new Error(
           "Génération vidéo introuvable."
         );
@@ -816,27 +1391,42 @@ async function saveVideoSceneProgress(
       const generation =
         generationSnapshot.data();
 
-      if (generation.uid !== uid) {
+      if (
+        generation.uid !== uid
+      ) {
         throw new Error(
           "Utilisateur incorrect pour cette génération."
         );
       }
 
       if (
-        generation.status !== "reserved" &&
-        generation.status !== "partial"
+        generation.status !==
+          "reserved" &&
+        generation.status !==
+          "partial"
       ) {
         return;
       }
 
-      transaction.update(generationRef, {
-        status: "partial",
-        videoUrls,
-        completedScenes: videoUrls.length,
-        nextSceneIndex: videoUrls.length,
-        lastProgressAt:
-          FieldValue.serverTimestamp(),
-      });
+      transaction.update(
+        generationRef,
+        {
+          status:
+            "partial",
+
+          videoUrls,
+
+          completedScenes:
+            videoUrls.length,
+
+          nextSceneIndex:
+            videoUrls.length,
+
+          lastProgressAt:
+            FieldValue
+              .serverTimestamp(),
+        }
+      );
     }
   );
 }
@@ -850,9 +1440,13 @@ async function savePartialVideoGeneration(
   await adminDb.runTransaction(
     async (transaction) => {
       const generationSnapshot =
-        await transaction.get(generationRef);
+        await transaction.get(
+          generationRef
+        );
 
-      if (!generationSnapshot.exists) {
+      if (
+        !generationSnapshot.exists
+      ) {
         throw new Error(
           "Génération vidéo introuvable."
         );
@@ -861,28 +1455,42 @@ async function savePartialVideoGeneration(
       const generation =
         generationSnapshot.data();
 
-      if (generation.uid !== uid) {
+      if (
+        generation.uid !== uid
+      ) {
         throw new Error(
           "Utilisateur incorrect pour cette génération."
         );
       }
 
-      if (generation.status !== "reserved") {
+      if (
+        generation.status !==
+          "reserved" &&
+        generation.status !==
+          "partial"
+      ) {
         return;
       }
 
-      transaction.update(generationRef, {
-        status: "partial",
+      transaction.update(
+        generationRef,
+        {
+          status:
+            "partial",
 
-        videoUrls,
+          videoUrls,
 
-        completedScenes: videoUrls.length,
+          completedScenes:
+            videoUrls.length,
 
-        nextSceneIndex: failedSceneIndex,
+          nextSceneIndex:
+            failedSceneIndex,
 
-        lastErrorAt:
-          FieldValue.serverTimestamp(),
-      });
+          lastErrorAt:
+            FieldValue
+              .serverTimestamp(),
+        }
+      );
     }
   );
 }
@@ -893,41 +1501,65 @@ async function getPartialVideoGeneration(
 ) {
   const generationRef =
     adminDb
-      .collection("videoGenerations")
-      .doc(generationId);
+      .collection(
+        "videoGenerations"
+      )
+      .doc(
+        generationId
+      );
 
   const generationSnapshot =
     await generationRef.get();
 
-  if (!generationSnapshot.exists) {
-    const error = new Error(
-      "Génération vidéo introuvable."
-    );
-    error.code = "VIDEO_GENERATION_NOT_FOUND";
+  if (
+    !generationSnapshot.exists
+  ) {
+    const error =
+      new Error(
+        "Génération vidéo introuvable."
+      );
+
+    error.code =
+      "VIDEO_GENERATION_NOT_FOUND";
+
     throw error;
   }
 
   const generation =
     generationSnapshot.data();
 
-  if (generation.uid !== uid) {
-    const error = new Error(
-      "Cette génération vidéo appartient à un autre utilisateur."
-    );
-    error.code = "VIDEO_GENERATION_FORBIDDEN";
+  if (
+    generation.uid !== uid
+  ) {
+    const error =
+      new Error(
+        "Cette génération vidéo appartient à un autre utilisateur."
+      );
+
+    error.code =
+      "VIDEO_GENERATION_FORBIDDEN";
+
     throw error;
   }
+    if (
+    generation.status !==
+    "partial"
+  ) {
+    const error =
+      new Error(
+        "Cette génération vidéo ne peut pas être reprise."
+      );
 
-  if (generation.status !== "partial" && !(generation.status === "reserved" && generation.animationVersion === 2)) {
-    const error = new Error(
-      "Cette génération vidéo ne peut pas être reprise."
-    );
-    error.code = "VIDEO_GENERATION_NOT_PARTIAL";
+    error.code =
+      "VIDEO_GENERATION_NOT_PARTIAL";
+
     throw error;
   }
 
   const videoUrls =
-    Array.isArray(generation.videoUrls)
+    Array.isArray(
+      generation.videoUrls
+    )
       ? generation.videoUrls
       : [];
 
@@ -935,36 +1567,51 @@ async function getPartialVideoGeneration(
     generationRef,
     generation,
     videoUrls,
+
     nextSceneIndex:
-      Number.isInteger(generation.nextSceneIndex)
+      Number.isInteger(
+        generation.nextSceneIndex
+      )
         ? generation.nextSceneIndex
         : videoUrls.length,
   };
 }
 
-function isVideoGenerationStale(generation) {
-  const createdAt = generation?.createdAt;
+function isVideoGenerationStale(
+  generation
+) {
+  const createdAt =
+    generation?.createdAt;
 
   if (!createdAt) {
     return false;
   }
 
   const createdAtMs =
-    typeof createdAt.toMillis === "function"
+    typeof createdAt.toMillis ===
+    "function"
       ? createdAt.toMillis()
-      : new Date(createdAt).getTime();
+      : new Date(
+          createdAt
+        ).getTime();
 
-  if (!Number.isFinite(createdAtMs)) {
+  if (
+    !Number.isFinite(
+      createdAtMs
+    )
+  ) {
     return false;
   }
 
-  // Une génération bloquée depuis plus de 30 minutes
+  // Une génération bloquée
+  // depuis plus de 30 minutes
   // est considérée comme ancienne.
   const STALE_AFTER_MS =
     30 * 60 * 1000;
 
   return (
-    Date.now() - createdAtMs >
+    Date.now() -
+      createdAtMs >
     STALE_AFTER_MS
   );
 }
@@ -976,64 +1623,90 @@ async function reconcileStaleVideoGeneration(
   const generationSnapshot =
     await generationRef.get();
 
-  if (!generationSnapshot.exists) {
+  if (
+    !generationSnapshot.exists
+  ) {
     return {
-      action: "not_found",
+      action:
+        "not_found",
     };
   }
 
   const generation =
     generationSnapshot.data();
 
-  if (generation.uid !== uid) {
+  if (
+    generation.uid !== uid
+  ) {
     throw new Error(
       "Utilisateur incorrect pour cette génération."
     );
   }
 
-  if (!isVideoGenerationStale(generation)) {
+  if (
+    !isVideoGenerationStale(
+      generation
+    )
+  ) {
     return {
-      action: "not_stale",
+      action:
+        "not_stale",
     };
   }
 
   const videoUrls =
-    Array.isArray(generation.videoUrls)
+    Array.isArray(
+      generation.videoUrls
+    )
       ? generation.videoUrls
       : [];
 
-  // Des scènes Runway existent déjà :
-  // on conserve la génération pour permettre sa reprise.
+  // Des scènes Runway existent
+  // déjà : on conserve la
+  // génération pour permettre
+  // sa reprise.
   if (
-    generation.status === "partial" ||
+    generation.status ===
+      "partial" ||
     videoUrls.length > 0
   ) {
     return {
-      action: "keep_for_resume",
-      completedScenes: videoUrls.length,
+      action:
+        "keep_for_resume",
+
+      completedScenes:
+        videoUrls.length,
     };
   }
 
   // Aucun travail Runway terminé :
   // le crédit peut être rendu.
-  if (generation.status === "reserved") {
+  if (
+    generation.status ===
+    "reserved"
+  ) {
     await refundVideoCredit(
       uid,
       generationRef
     );
 
     return {
-      action: "refunded",
+      action:
+        "refunded",
     };
   }
 
   return {
-    action: "nothing",
+    action:
+      "nothing",
   };
 }
 
-function createAppleClient(environment) {
-  const privateKey = getApplePrivateKey();
+function createAppleClient(
+  environment
+) {
+  const privateKey =
+    getApplePrivateKey();
 
   return new AppStoreServerAPIClient(
     privateKey,
@@ -1044,10 +1717,15 @@ function createAppleClient(environment) {
   );
 }
 
-app.get("/", (req, res) => {
-  res.set("X-ConteMagique-Animation", "continuous-v2.2");
-  res.send("Backend ConteMagiqueIA OK");
-});
+app.get(
+  "/",
+  (req, res) => {
+    res.send(
+      "Backend ConteMagiqueIA OK"
+    );
+  }
+);
+
 // =========================
 // 🔗 PARTAGE SÉCURISÉ
 // =========================
@@ -1055,12 +1733,18 @@ app.get("/", (req, res) => {
 function createShareToken() {
   return crypto
     .randomBytes(32)
-    .toString("base64url");
+    .toString(
+      "base64url"
+    );
 }
 
-function hashShareToken(token) {
+function hashShareToken(
+  token
+) {
   return crypto
-    .createHash("sha256")
+    .createHash(
+      "sha256"
+    )
     .update(token)
     .digest("hex");
 }
@@ -1071,6 +1755,7 @@ function hashShareToken(token) {
 
 app.post(
   "/share/create",
+
   async (req, res) => {
     try {
       const decodedToken =
@@ -1096,33 +1781,42 @@ app.post(
         type !== "story" &&
         type !== "video"
       ) {
-        return res.status(400).json({
-          error:
-            "Type de partage invalide.",
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Type de partage invalide.",
+          });
       }
 
       if (!contentId) {
-        return res.status(400).json({
-          error:
-            "Identifiant du contenu manquant.",
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Identifiant du contenu manquant.",
+          });
       }
 
-      let sharedContent = null;
+      let sharedContent =
+        null;
 
       // =========================
       // 🎬 PARTAGE VIDÉO
       // =========================
 
-      if (type === "video") {
+      if (
+        type === "video"
+      ) {
         const videoRef =
           adminDb
             .collection(
               "videoGenerations"
             )
             .doc(
-              String(contentId)
+              String(
+                contentId
+              )
             );
 
         const videoSnapshot =
@@ -1174,7 +1868,8 @@ app.post(
             video.finalVideoUrl,
 
           sceneCount:
-            video.sceneCount || 0,
+            video.sceneCount ||
+            0,
 
           videoType:
             video.videoType ||
@@ -1186,7 +1881,9 @@ app.post(
       // 📖 PARTAGE HISTOIRE
       // =========================
 
-      if (type === "story") {
+      if (
+        type === "story"
+      ) {
         if (
           !story ||
           typeof story !==
@@ -1201,8 +1898,12 @@ app.post(
         }
 
         if (
-          String(story.id) !==
-          String(contentId)
+          String(
+            story.id
+          ) !==
+          String(
+            contentId
+          )
         ) {
           return res
             .status(400)
@@ -1216,7 +1917,8 @@ app.post(
           !Array.isArray(
             story.scenes
           ) ||
-          story.scenes.length === 0
+          story.scenes
+            .length === 0
         ) {
           return res
             .status(400)
@@ -1227,7 +1929,8 @@ app.post(
         }
 
         if (
-          story.scenes.length > 20
+          story.scenes
+            .length > 20
         ) {
           return res
             .status(400)
@@ -1239,10 +1942,13 @@ app.post(
 
         sharedContent = {
           id:
-            String(story.id),
+            String(
+              story.id
+            ),
 
           prompt:
-            story.prompt || "",
+            story.prompt ||
+            "",
 
           title:
             story.title ||
@@ -1265,7 +1971,8 @@ app.post(
                   "",
 
                 imagePrompt:
-                  scene?.imagePrompt ||
+                  scene
+                    ?.imagePrompt ||
                   "",
 
                 imageUrl:
@@ -1297,25 +2004,33 @@ app.post(
           .collection(
             "shareLinks"
           )
-          .doc(tokenHash);
+          .doc(
+            tokenHash
+          );
 
       await shareRef.set({
-        ownerUid: uid,
+        ownerUid:
+          uid,
 
         type,
 
         contentId:
-          String(contentId),
+          String(
+            contentId
+          ),
 
         content:
           sharedContent,
 
-        active: true,
+        active:
+          true,
 
         createdAt:
-          FieldValue.serverTimestamp(),
+          FieldValue
+            .serverTimestamp(),
 
-        lastAccessedAt: null,
+        lastAccessedAt:
+          null,
       });
 
       const shareUrl =
@@ -1325,7 +2040,10 @@ app.post(
 
       return res.json({
         success: true,
-        token: shareToken,
+
+        token:
+          shareToken,
+
         shareUrl,
       });
     } catch (error) {
@@ -1339,6 +2057,7 @@ app.post(
         .json({
           error:
             "Impossible de créer le lien de partage.",
+
           message:
             error?.message,
         });
@@ -1352,11 +2071,13 @@ app.post(
 
 app.get(
   "/share/:token",
+
   async (req, res) => {
     try {
       const token =
         String(
-          req.params.token || ""
+          req.params.token ||
+            ""
         ).trim();
 
       if (!token) {
@@ -1369,14 +2090,18 @@ app.get(
       }
 
       const tokenHash =
-        hashShareToken(token);
+        hashShareToken(
+          token
+        );
 
       const shareRef =
         adminDb
           .collection(
             "shareLinks"
           )
-          .doc(tokenHash);
+          .doc(
+            tokenHash
+          );
 
       const shareSnapshot =
         await shareRef.get();
@@ -1396,7 +2121,8 @@ app.get(
         shareSnapshot.data();
 
       if (
-        share.active !== true
+        share.active !==
+        true
       ) {
         return res
           .status(410)
@@ -1408,11 +2134,13 @@ app.get(
 
       await shareRef.update({
         lastAccessedAt:
-          FieldValue.serverTimestamp(),
+          FieldValue
+            .serverTimestamp(),
       });
 
       return res.json({
-        success: true,
+        success:
+          true,
 
         type:
           share.type,
@@ -1424,7 +2152,7 @@ app.get(
           share.content,
       });
     } catch (error) {
-      console.error(
+            console.error(
         "❌ Erreur lecture partage :",
         error
       );
@@ -1434,185 +2162,305 @@ app.get(
         .json({
           error:
             "Impossible d'ouvrir ce contenu partagé.",
+
           message:
             error?.message,
         });
     }
   }
 );
+
 // =========================
-// ☁️ FIREBASE STORAGE - IMAGES HISTOIRES
+// ☁️ FIREBASE STORAGE
+// IMAGES HISTOIRES
 // =========================
-app.post("/story-image/upload", async (req, res) => {
-  try {
-    const decodedToken =
-      await requireFirebaseUser(req, res);
 
-    if (!decodedToken) {
-      return;
-    }
+app.post(
+  "/story-image/upload",
+  async (req, res) => {
+    try {
+      const decodedToken =
+        await requireFirebaseUser(
+          req,
+          res
+        );
 
-    const uid = decodedToken.uid;
+      if (!decodedToken) {
+        return;
+      }
 
-    const {
-      storyId,
-      sceneIndex,
-      imageBase64,
-      contentType = "image/png",
-    } = req.body;
+      const uid =
+        decodedToken.uid;
 
-    if (
-      !storyId ||
-      !Number.isInteger(sceneIndex) ||
-      !imageBase64
-    ) {
-      return res.status(400).json({
-        error:
-          "storyId, sceneIndex et imageBase64 sont obligatoires.",
+      const {
+        storyId,
+        sceneIndex,
+        imageBase64,
+        contentType =
+          "image/png",
+      } = req.body;
+
+      if (
+        !storyId ||
+        !Number.isInteger(
+          sceneIndex
+        ) ||
+        !imageBase64
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "storyId, sceneIndex et imageBase64 sont obligatoires.",
+          });
+      }
+
+      const allowedContentTypes =
+        [
+          "image/png",
+          "image/jpeg",
+          "image/webp",
+        ];
+
+      if (
+        !allowedContentTypes.includes(
+          contentType
+        )
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Type d'image non autorisé.",
+          });
+      }
+
+      const extension =
+        contentType ===
+        "image/jpeg"
+          ? "jpg"
+          : contentType ===
+              "image/webp"
+            ? "webp"
+            : "png";
+
+      const cleanBase64 =
+        imageBase64.includes(
+          ","
+        )
+          ? imageBase64.split(
+              ","
+            )[1]
+          : imageBase64;
+
+      const imageBuffer =
+        Buffer.from(
+          cleanBase64,
+          "base64"
+        );
+
+      if (
+        !imageBuffer.length
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Image Base64 invalide.",
+          });
+      }
+
+      const bucket =
+        adminStorage.bucket();
+
+      const storagePath =
+        `users/${uid}/stories/${storyId}/` +
+        `scene-${sceneIndex}.${extension}`;
+
+      const file =
+        bucket.file(
+          storagePath
+        );
+
+      await file.save(
+        imageBuffer,
+        {
+          metadata: {
+            contentType,
+
+            cacheControl:
+              "public,max-age=31536000",
+          },
+
+          resumable:
+            false,
+        }
+      );
+
+      const [
+        downloadUrl,
+      ] =
+        await file.getSignedUrl({
+          action:
+            "read",
+
+          expires:
+            "03-01-2500",
+        });
+
+      console.log(
+        `☁️ Illustration ${sceneIndex + 1} sauvegardée :`,
+        storagePath
+      );
+
+      return res.json({
+        success: true,
+
+        imageUrl:
+          downloadUrl,
+
+        storagePath,
       });
+    } catch (error) {
+      console.error(
+        "❌ Erreur upload image histoire :",
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Impossible de sauvegarder l'illustration.",
+
+          message:
+            error?.message,
+        });
     }
-
-    const allowedContentTypes = [
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-    ];
-
-    if (!allowedContentTypes.includes(contentType)) {
-      return res.status(400).json({
-        error: "Type d'image non autorisé.",
-      });
-    }
-
-    const extension =
-      contentType === "image/jpeg"
-        ? "jpg"
-        : contentType === "image/webp"
-          ? "webp"
-          : "png";
-
-    const cleanBase64 = imageBase64.includes(",")
-      ? imageBase64.split(",")[1]
-      : imageBase64;
-
-    const imageBuffer = Buffer.from(
-      cleanBase64,
-      "base64"
-    );
-
-    if (!imageBuffer.length) {
-      return res.status(400).json({
-        error: "Image Base64 invalide.",
-      });
-    }
-
-    const bucket = adminStorage.bucket();
-
-    const storagePath =
-      `users/${uid}/stories/${storyId}/` +
-      `scene-${sceneIndex}.${extension}`;
-
-    const file = bucket.file(storagePath);
-
-    await file.save(imageBuffer, {
-      metadata: {
-        contentType,
-        cacheControl: "public,max-age=31536000",
-      },
-      resumable: false,
-    });
-
-    const [downloadUrl] =
-      await file.getSignedUrl({
-        action: "read",
-        expires: "03-01-2500",
-      });
-
-    console.log(
-      `☁️ Illustration ${sceneIndex + 1} sauvegardée :`,
-      storagePath
-    );
-
-    return res.json({
-      success: true,
-      imageUrl: downloadUrl,
-      storagePath,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Erreur upload image histoire :",
-      error
-    );
-
-    return res.status(500).json({
-      error:
-        "Impossible de sauvegarder l'illustration.",
-      message: error?.message,
-    });
   }
-});
-function detectRequestedLanguage(prompt = "") {
-  const text = prompt.toLowerCase();
+);
+
+function detectRequestedLanguage(
+  prompt = ""
+) {
+  const text =
+    prompt.toLowerCase();
 
   const languages = [
     {
-      name: "espagnol",
-      patterns: ["en espagnol", "en español", "in spanish"],
+      name:
+        "espagnol",
+
+      patterns: [
+        "en espagnol",
+        "en español",
+        "in spanish",
+      ],
     },
+
     {
-      name: "anglais",
-      patterns: ["en anglais", "in english", "en inglés"],
+      name:
+        "anglais",
+
+      patterns: [
+        "en anglais",
+        "in english",
+        "en inglés",
+      ],
     },
+
     {
-      name: "français",
-      patterns: ["en français", "in french", "en francés"],
+      name:
+        "français",
+
+      patterns: [
+        "en français",
+        "in french",
+        "en francés",
+      ],
     },
+
     {
-      name: "portugais",
-      patterns: ["en portugais", "em português", "in portuguese"],
+      name:
+        "portugais",
+
+      patterns: [
+        "en portugais",
+        "em português",
+        "in portuguese",
+      ],
     },
+
     {
-      name: "italien",
-      patterns: ["en italien", "in italian", "in italiano"],
+      name:
+        "italien",
+
+      patterns: [
+        "en italien",
+        "in italian",
+        "in italiano",
+      ],
     },
+
     {
-      name: "allemand",
-      patterns: ["en allemand", "auf deutsch", "in german"],
+      name:
+        "allemand",
+
+      patterns: [
+        "en allemand",
+        "auf deutsch",
+        "in german",
+      ],
     },
+
     {
-      name: "créole guadeloupéen",
+      name:
+        "créole guadeloupéen",
+
       patterns: [
         "en créole guadeloupéen",
         "en creole guadeloupeen",
         "an kréyòl gwadloupéyen",
       ],
     },
+
     {
-      name: "créole martiniquais",
+      name:
+        "créole martiniquais",
+
       patterns: [
         "en créole martiniquais",
         "en creole martiniquais",
         "an kréyòl matnik",
       ],
     },
+
     {
-      name: "créole guyanais",
+      name:
+        "créole guyanais",
+
       patterns: [
         "en créole guyanais",
         "en creole guyanais",
         "an kréyòl gwiyannen",
       ],
     },
+
     {
-      name: "créole réunionnais",
+      name:
+        "créole réunionnais",
+
       patterns: [
         "en créole réunionnais",
         "en creole reunionnais",
         "an kréol réyoné",
       ],
     },
+
     {
-      name: "créole haïtien",
+      name:
+        "créole haïtien",
+
       patterns: [
         "en créole haïtien",
         "en creole haitien",
@@ -1621,8 +2469,18 @@ function detectRequestedLanguage(prompt = "") {
     },
   ];
 
-  for (const language of languages) {
-    if (language.patterns.some((pattern) => text.includes(pattern))) {
+  for (
+    const language of
+    languages
+  ) {
+    if (
+      language.patterns.some(
+        (pattern) =>
+          text.includes(
+            pattern
+          )
+      )
+    ) {
       return language.name;
     }
   }
@@ -1630,113 +2488,248 @@ function detectRequestedLanguage(prompt = "") {
   return null;
 }
 
-app.post("/story", async (req, res) => {
-  try {
-    const {
-  prompt,
-  type = "magic",
-  sceneCount = 4,
-  language = "fr",
-} = req.body;
+// =========================
+// 📚 TYPES D'HISTOIRE
+// =========================
 
-const allowedStoryTypes = [
-  "funny",
-  "adventure",
-  "magic",
-  "mystery",
-];
+function normalizeStoryTypes(
+  type
+) {
+  const allowedTypes =
+    [
+      "funny",
+      "adventure",
+      "magic",
+      "mystery",
+    ];
 
-const rawStoryTypes = Array.isArray(type)
-  ? type
-  : [type];
+  let receivedTypes = [];
 
-const storyTypes = [
-  ...new Set(
-    rawStoryTypes.filter((item) =>
-      allowedStoryTypes.includes(item)
-    )
-  ),
-].slice(0, 2);
+  if (
+    Array.isArray(type)
+  ) {
+    receivedTypes =
+      type;
+  } else if (
+    typeof type ===
+      "string"
+  ) {
+    receivedTypes =
+      type
+        .split(",")
+        .map(
+          (value) =>
+            value.trim()
+        );
+  }
 
-if (storyTypes.length === 0) {
-  storyTypes.push("magic");
+  const validTypes =
+    [
+      ...new Set(
+        receivedTypes.filter(
+          (value) =>
+            allowedTypes.includes(
+              value
+            )
+        )
+      ),
+    ];
+
+  if (
+    validTypes.length === 0
+  ) {
+    return [
+      "magic",
+    ];
+  }
+
+  // Maximum deux types
+  // d'histoire simultanément.
+  return validTypes.slice(
+    0,
+    2
+  );
 }
 
-const storyTypeDescription =
-  storyTypes.length === 1
-    ? storyTypes[0]
-    : `${storyTypes[0]} + ${storyTypes[1]}`;
+function storyTypeDescription(
+  type
+) {
+  const descriptions = {
+    funny:
+      "drôle, absurde, léger, avec des situations amusantes et des personnages rigolos",
 
-const mixedTypeInstructions =
-  storyTypes.length === 2
-    ? `
-FUSION DE DEUX TYPES OBLIGATOIRE :
-- Les deux types choisis sont : ${storyTypes[0]} et ${storyTypes[1]}.
-- Crée UNE SEULE intrigue cohérente qui mélange naturellement les deux univers.
-- Ne divise jamais l'histoire en une partie "${storyTypes[0]}" puis une partie "${storyTypes[1]}".
-- Les deux types doivent influencer l'intrigue du début à la fin.
-- Chaque scène doit rester reliée à la même quête, au même problème ou au même objectif principal.
-- Les événements d'une scène doivent avoir des conséquences logiques sur les scènes suivantes.
-- Le second type doit enrichir le premier sans rendre l'histoire confuse.
-- La résolution finale doit découler naturellement de ce qui a été construit dans les scènes précédentes.
-`
-    : `
-TYPE UNIQUE :
-- Construis toute l'histoire autour du type ${storyTypes[0]}.
+    adventure:
+      "aventure, exploration, défis et rythme dynamique",
+
+    magic:
+      "féerique, merveilleux, avec de la magie, de l'émerveillement et éventuellement des objets magiques",
+
+    mystery:
+      "mystère et suspense doux, avec des indices, un secret et une révélation adaptée aux enfants",
+  };
+
+  return (
+    descriptions[type] ||
+    descriptions.magic
+  );
+}
+
+function buildStoryTypeInstructions(
+  storyTypes
+) {
+  if (
+    storyTypes.length === 1
+  ) {
+    const selectedType =
+      storyTypes[0];
+
+    return `
+Type d'histoire sélectionné : ${selectedType}.
+
+Caractéristiques du type sélectionné :
+- ${selectedType} : ${storyTypeDescription(
+      selectedType
+    )}
+
+Construis toute l'histoire autour de ce type.
 `;
+  }
 
-    if (!prompt) {
-      return res.status(400).json({ error: "Prompt manquant" });
-    }
+  const [
+    firstType,
+    secondType,
+  ] = storyTypes;
 
-const supportedLanguages = ["fr", "en", "es"];
+  return `
+Deux types d'histoire ont été sélectionnés :
+- ${firstType} : ${storyTypeDescription(
+    firstType
+  )}
+- ${secondType} : ${storyTypeDescription(
+    secondType
+  )}
 
-const requestedLanguage = supportedLanguages.includes(language)
-  ? language
-  : "fr";
+Fusionne naturellement ces deux types dans UNE SEULE histoire cohérente.
 
-const selectedLanguage = requestedLanguage;
+IMPORTANT :
+- Ne crée pas deux histoires séparées.
+- Les deux types doivent réellement influencer l'intrigue.
+- Mélange leurs caractéristiques de manière naturelle.
+- Conserve les mêmes personnages et le même fil narratif du début à la fin.
+`;
+}
 
-const languageInstructions = {
-  fr: `
+app.post(
+  "/story",
+  async (req, res) => {
+    try {
+      const {
+        prompt,
+
+        type = "magic",
+
+        sceneCount = 4,
+
+        language = "fr",
+      } = req.body;
+
+      if (!prompt) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Prompt manquant",
+          });
+      }
+
+      const storyTypes =
+        normalizeStoryTypes(
+          type
+        );
+
+      const storyTypeInstructions =
+        buildStoryTypeInstructions(
+          storyTypes
+        );
+
+      const supportedLanguages =
+        [
+          "fr",
+          "en",
+          "es",
+        ];
+
+      const requestedLanguage =
+        supportedLanguages.includes(
+          language
+        )
+          ? language
+          : "fr";
+
+      const selectedLanguage =
+        requestedLanguage;
+
+      const languageInstructions =
+        {
+          fr: `
 LANGUE OBLIGATOIRE :
+
 - Écris toute l'histoire en français.
 - Le titre, les textes des scènes et les descriptions destinées à l'histoire doivent être en français.
 - Utilise un français naturel, chaleureux et adapté aux enfants.
 `,
 
-  en: `
+          en: `
 MANDATORY LANGUAGE:
+
 - Write the entire story in English.
 - The title, scene texts and story content must be in English.
 - Use natural, warm English suitable for children.
 `,
 
-  es: `
+          es: `
 IDIOMA OBLIGATORIO:
+
 - Escribe toda la historia en español.
 - El título, los textos de las escenas y el contenido de la historia deben estar en español.
 - Utiliza un español natural, cálido y apropiado para niños.
 `,
-};
+        };
 
-console.log("Langue choisie dans l'application :", selectedLanguage);
-console.log("Prompt reçu :", prompt);
+      console.log(
+        "Langue choisie dans l'application :",
+        selectedLanguage
+      );
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `
+      console.log(
+        "Type(s) d'histoire choisi(s) :",
+        storyTypes
+      );
+
+      console.log(
+        "Prompt reçu :",
+        prompt
+      );
+
+      const response =
+        await openai.chat.completions.create({
+          model:
+            "gpt-4o-mini",
+
+          messages: [
+            {
+              role:
+                "system",
+
+              content: `
 Tu es un conteur pour enfants talentueux, chaleureux et expressif.
 
 OBJECTIF :
+
 Créer une histoire agréable à écouter à voix haute, avec du rythme, des émotions et des pauses naturelles.
 
-Type(s) d’histoire choisi(s) : ${storyTypeDescription}
+${storyTypeInstructions}
 
-${mixedTypeInstructions}
 Nombre exact de scènes : ${sceneCount}
 
 ${languageInstructions[selectedLanguage]}
@@ -1755,29 +2748,32 @@ Réponds UNIQUEMENT en JSON strict :
 }
 
 Ambiences possibles :
+
 magic, forest, ocean, night, danger, calm, victory
 
 RÈGLES :
+
 - Crée exactement ${sceneCount} scènes.
 - Texte simple pour enfant de 4 à 8 ans.
-- L’histoire doit suivre précisément l’idée de l’utilisateur.
-- Chaque scène doit faire avancer l’histoire.
-- Fin heureuse ou cliffhanger doux selon le type d’histoire.
+- L'histoire doit suivre précisément l'idée de l'utilisateur.
+- Chaque scène doit faire avancer l'histoire.
+- Fin heureuse ou cliffhanger doux selon le ou les types d'histoire.
 - Pas de violence graphique.
-- Si l’utilisateur demande un personnage connu, transforme-le en personnage original inspiré du rôle général.
+- Si l'utilisateur demande un personnage connu, transforme-le en personnage original inspiré du rôle général.
 - Retourne toujours une clé "characters".
 - "characters" décrit uniquement les personnages principaux de CETTE histoire.
-- Ne jamais réutiliser des personnages d’une autre histoire.
+- Ne jamais réutiliser des personnages d'une autre histoire.
 - Les personnages doivent rester cohérents dans toutes les scènes : mêmes couleurs, même apparence, mêmes accessoires.
 - Les personnages secondaires et la famille doivent être cohérents avec le personnage principal.
 - Si un enfant est métis, noir, asiatique ou possède des traits culturels spécifiques, sa famille et son entourage proche doivent généralement partager une cohérence visuelle et familiale.
 - Évite que tous les personnages secondaires soient automatiquement blancs par défaut.
-- Les personnages doivent représenter naturellement différentes origines et apparences selon l’histoire.
+- Les personnages doivent représenter naturellement différentes origines et apparences selon l'histoire.
 - Respecte la cohérence familiale, culturelle et visuelle entre les personnages.
 - imagePrompt doit respecter les personnages décrits dans "characters".
 - imagePrompt doit être visuel, cohérent, précis et adapté au style choisi.
 
 NARRATION AUDIO :
+
 - Le texte doit être naturel à lire à voix haute.
 - Ajoute parfois des pauses avec "..." pour ralentir.
 - Utilise quelques interjections simples seulement si utile : oh..., ah..., wouah..., zut...
@@ -1785,11 +2781,22 @@ NARRATION AUDIO :
 - Utilise ? ! ... pour guider la voix.
 
 ÉMOTIONS :
+
 - Fais ressentir : surprise, joie, peur douce, curiosité.
-- Adapte le ton selon le type d’histoire.
+- Adapte le ton selon le ou les types d'histoire.
 - Ajoute des moments calmes et des moments dynamiques.
 
+CARACTÉRISTIQUES DES TYPES :
+
+- funny : drôle, absurde, léger, personnages rigolos.
+- adventure : action, exploration, défi, rythme dynamique.
+- magic : féerique, objets magiques, émerveillement.
+- mystery : suspense doux, secret, indice, révélation.
+
+Utilise uniquement le ou les types sélectionnés plus haut.
+
 AMBIANCES :
+
 - magic : découverte magique, fée, objet magique, portail
 - forest : forêt, animaux, nature, arbre, jungle
 - ocean : mer, bateau, pirate, plage, vague
@@ -1798,103 +2805,148 @@ AMBIANCES :
 - calm : moment tendre, repos, discussion, douceur
 - victory : réussite, fête, fin heureuse, célébration
 
-Caractéristiques des types (utilise uniquement le ou les types sélectionnés) :
-- funny : drôle, absurde, léger, personnages rigolos.
-- adventure : action, exploration, défi, rythme dynamique.
-- magic : féerique, objets magiques, émerveillement.
-- mystery : suspense doux, secret, indice, révélation.
-
 VARIÉTÉ :
+
 - Évite de réutiliser souvent les mêmes prénoms.
-- N’utilise presque jamais : Léo, Nina, Noé, Emma, Lila, Lucas.
+- N'utilise presque jamais : Léo, Nina, Noé, Emma, Lila, Lucas.
 - Crée des noms originaux, rares, poétiques ou amusants.
-- Utilise parfois des noms fantastiques, inventés, surnoms ou noms liés à l’univers.
-- Les personnages doivent sembler uniques d’une histoire à l’autre.
+- Utilise parfois des noms fantastiques, inventés, surnoms ou noms liés à l'univers.
+- Les personnages doivent sembler uniques d'une histoire à l'autre.
 
-LANGUE DE L’HISTOIRE :
+LANGUE DE L'HISTOIRE :
 
-- Détermine la langue finale à utiliser selon la demande de l’utilisateur.
-- Si l’utilisateur demande explicitement une langue, cette demande est prioritaire, même si le reste du texte est écrit dans une autre langue.
-- Exemple : si l’utilisateur écrit en français « raconte cette histoire en espagnol », écris toute l’histoire en espagnol.
-- Si aucune langue n’est demandée explicitement, écris l’histoire dans la langue principale utilisée par l’utilisateur.
-- L’utilisateur peut décrire son idée dans une langue et demander que l’histoire soit racontée dans une autre langue.
-- Traduis naturellement l’idée de l’utilisateur dans la langue demandée, sans modifier le sens.
+- Respecte obligatoirement la langue sélectionnée dans l'application.
+- L'utilisateur peut décrire son idée dans une langue et demander que l'histoire soit racontée dans une autre langue.
+- Traduis naturellement l'idée de l'utilisateur dans la langue demandée, sans modifier le sens.
 - Ne mélange pas plusieurs langues, sauf demande explicite.
 - Tous les textes destinés à être lus doivent être dans la langue finale : scènes, dialogues et narration.
 - La clé "characters" doit aussi être écrite dans la langue finale.
 - La clé "imagePrompt" peut rester en français ou en anglais pour optimiser la génération des images.
-- Pour les créoles, respecte précisément la variante demandée.
 
 Aucun texte avant ou après le JSON.
-          `,
-        },
-        {
-  role: "user",
-  content: requestedLanguage
-    ? `
+`,
+            },
+
+            {
+              role:
+                "user",
+
+              content: `
 LANGUE FINALE OBLIGATOIRE : ${requestedLanguage}.
 
-L’utilisateur a écrit sa demande dans une langue, mais il souhaite que toute
-l’histoire soit rédigée exclusivement en ${requestedLanguage}.
+L'utilisateur a écrit sa demande dans une langue, mais toute l'histoire doit respecter la langue sélectionnée ci-dessus.
 
 Traduis naturellement son idée dans cette langue sans modifier le sens.
-Ne réponds pas dans la langue utilisée pour écrire la demande.
 
-Demande de l’utilisateur :
-${prompt}
-`
-    : `
-Aucune langue finale n’a été explicitement demandée.
+Demande de l'utilisateur :
 
-Détecte la langue principale de la demande et rédige toute l’histoire dans
-cette même langue.
-
-Demande de l’utilisateur :
 ${prompt}
 `,
-},
-      ],
-    });
+            },
+          ],
+        });
 
-    let content = response.choices[0].message.content || "";
+      let content =
+        response
+          .choices[0]
+          .message
+          .content ||
+        "";
 
-    const start = content.indexOf("{");
-    const end = content.lastIndexOf("}");
+      const start =
+        content.indexOf(
+          "{"
+        );
 
-    if (start !== -1 && end !== -1) {
-      content = content.slice(start, end + 1);
+      const end =
+        content.lastIndexOf(
+          "}"
+        );
+
+      if (
+        start !== -1 &&
+        end !== -1
+      ) {
+        content =
+          content.slice(
+            start,
+            end + 1
+          );
+      }
+
+      const story =
+        JSON.parse(
+          content
+        );
+
+      return res.json(
+        story
+      );
+    } catch (e) {
+      console.error(
+        "Erreur /story :",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Erreur génération histoire",
+
+          message:
+            e?.message,
+        });
     }
-
-    const story = JSON.parse(content);
-
-    return res.json(story);
-  } catch (e) {
-    console.error("Erreur /story :", e);
-
-    return res.status(500).json({
-      error: "Erreur génération histoire",
-      message: e?.message,
-    });
   }
-});
+);
 
-function sanitizePrompt(prompt) {
+function sanitizePrompt(
+  prompt
+) {
   return prompt
-    .replace(/batman/gi, "super-héros original sombre avec cape noire")
-    .replace(/superman/gi, "super-héros original lumineux avec cape rouge")
-    .replace(/spider[- ]?man/gi, "héros agile en tenue rouge et bleue")
-    .replace(/iron man/gi, "héros en armure futuriste")
-    .replace(/hulk/gi, "géant vert puissant")
-    .replace(/disney|marvel|dc/gi, "univers imaginaire");
+    .replace(
+      /batman/gi,
+      "super-héros original sombre avec cape noire"
+    )
+    .replace(
+      /superman/gi,
+      "super-héros original lumineux avec cape rouge"
+    )
+    .replace(
+      /spider[- ]?man/gi,
+      "héros agile en tenue rouge et bleue"
+    )
+    .replace(
+      /iron man/gi,
+      "héros en armure futuriste"
+    )
+    .replace(
+      /hulk/gi,
+      "géant vert puissant"
+    )
+    .replace(
+      /disney|marvel|dc/gi,
+      "univers imaginaire"
+    );
 }
 
-function getImageStylePrompt(prompt) {
-  const lowerPrompt = prompt.toLowerCase();
+function getImageStylePrompt(
+  prompt
+) {
+  const lowerPrompt =
+    prompt.toLowerCase();
 
   if (
-    lowerPrompt.includes("realistic") ||
-    lowerPrompt.includes("réaliste") ||
-    lowerPrompt.includes("cinematic")
+    lowerPrompt.includes(
+      "realistic"
+    ) ||
+    lowerPrompt.includes(
+      "réaliste"
+    ) ||
+    lowerPrompt.includes(
+      "cinematic"
+    )
   ) {
     return `
 Photographie réaliste, style cinéma familial.
@@ -1902,11 +2954,15 @@ Lumière naturelle, profondeur de champ, détails précis.
 Textures réalistes, environnement crédible.
 Pas de style dessin, pas cartoon, pas illustration.
 Adapté aux enfants, doux, rassurant.
-Décris précisément l’apparence des personnages importants.
+Décris précisément l'apparence des personnages importants.
 `;
   }
 
-  if (lowerPrompt.includes("fantasy")) {
+  if (
+    lowerPrompt.includes(
+      "fantasy"
+    )
+  ) {
     return `
 Illustration fantasy magique.
 Lumières féeriques, couleurs riches, ambiance mystique.
@@ -1914,7 +2970,14 @@ Personnages expressifs, style premium, doux et familial.
 `;
   }
 
-  if (lowerPrompt.includes("comic") || lowerPrompt.includes("bd")) {
+  if (
+    lowerPrompt.includes(
+      "comic"
+    ) ||
+    lowerPrompt.includes(
+      "bd"
+    )
+  ) {
     return `
 Style bande dessinée moderne.
 Contours nets, couleurs dynamiques, composition lisible.
@@ -1929,23 +2992,41 @@ Style premium, cohérent entre les scènes.
 `;
 }
 
-app.post("/image", async (req, res) => {
-  try {
-    const { prompt, referenceImage } = req.body;
+app.post(
+  "/image",
+  async (req, res) => {
+    try {
+      const {
+        prompt,
+        referenceImage,
+      } = req.body;
 
-    if (!prompt?.trim()) {
-      return res.status(400).json({
-        error: "Prompt image manquant",
-      });
-    }
+      if (
+        !prompt?.trim()
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Prompt image manquant",
+          });
+      }
 
-    const safePrompt = sanitizePrompt(prompt);
-    const stylePrompt = getImageStylePrompt(safePrompt);
+      const safePrompt =
+        sanitizePrompt(
+          prompt
+        );
 
-    const finalPrompt = `
+      const stylePrompt =
+        getImageStylePrompt(
+          safePrompt
+        );
+
+      const finalPrompt = `
 ${stylePrompt}
 
 Consignes de sécurité :
+
 - personnages originaux uniquement
 - aucun logo
 - aucune marque
@@ -1953,57 +3034,85 @@ Consignes de sécurité :
 - scène adaptée aux enfants
 
 Scène à générer :
+
 ${safePrompt}
 `;
 
-    let result;
+      let result;
 
-    if (referenceImage) {
-      const match = referenceImage.match(
-        /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/
-      );
+      if (
+        referenceImage
+      ) {
+        const match =
+          referenceImage.match(
+            /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/
+          );
 
-      if (!match) {
-        return res.status(400).json({
-          error: "Format de photo de référence invalide",
-        });
-      }
-
-      const mimeType = match[1];
-      const base64Data = match[2];
-
-      const extension =
-        mimeType === "image/png"
-          ? "png"
-          : mimeType === "image/webp"
-          ? "webp"
-          : "jpg";
-
-      const imageBuffer = Buffer.from(base64Data, "base64");
-
-      const referenceFile = await toFile(
-        imageBuffer,
-        `reference.${extension}`,
-        {
-          type: mimeType === "image/jpg" ? "image/jpeg" : mimeType,
+        if (!match) {
+          return res
+            .status(400)
+            .json({
+              error:
+                "Format de photo de référence invalide",
+            });
         }
-      );
 
-      result = await openai.images.edit({
-        model: "gpt-image-2",
-        image: referenceFile,
-        prompt: `
+        const mimeType =
+          match[1];
+
+        const base64Data =
+          match[2];
+
+        const extension =
+          mimeType ===
+          "image/png"
+            ? "png"
+            : mimeType ===
+                "image/webp"
+              ? "webp"
+              : "jpg";
+                      const imageBuffer =
+          Buffer.from(
+            base64Data,
+            "base64"
+          );
+
+        const referenceFile =
+          await toFile(
+            imageBuffer,
+            `reference.${extension}`,
+            {
+              type:
+                mimeType ===
+                "image/jpg"
+                  ? "image/jpeg"
+                  : mimeType,
+            }
+          );
+
+        result =
+          await openai.images.edit({
+            model:
+              "gpt-image-2",
+
+            image:
+              referenceFile,
+
+            prompt: `
 Utilise la photo fournie comme référence visuelle principale et obligatoire.
 
 OBJECTIF PRIORITAIRE :
+
 Conserver les mêmes personnes et les mêmes éléments visuels importants dans toutes les illustrations de cette histoire.
 
 PERSONNES DE RÉFÉRENCE :
+
 Analyse attentivement la photo de référence avant de créer l'illustration.
 
 Les personnes visibles sur la photo constituent la distribution de référence de l'histoire.
 
 RÈGLES STRICTES :
+
 - n'invente aucun enfant, bébé, adulte ou personnage humain supplémentaire
 - n'ajoute jamais un frère, une sœur, un ami ou un autre enfant qui n'est pas demandé par la scène
 - ne duplique jamais une personne
@@ -2014,7 +3123,9 @@ RÈGLES STRICTES :
 - les personnages secondaires éventuellement nécessaires au décor doivent rester clairement en arrière-plan et ne jamais pouvoir être confondus avec les personnages principaux
 
 PRIORITÉ ABSOLUE :
+
 La fidélité et la continuité des personnages principaux sont plus importantes que l'ajout de détails décoratifs.
+
 En cas de doute, simplifie le décor plutôt que d'inventer une personne, un vêtement ou un accessoire.
 
 IDENTITÉ DES PERSONNES :
@@ -2051,8 +3162,11 @@ RÈGLES STRICTES SUR LES VISAGES :
 - la pose, l'expression et l'angle de vue peuvent changer, mais l'identité faciale doit rester stable
 
 VÊTEMENTS ET ACCESSOIRES :
+
 Les vêtements doivent rester cohérents avec la photo de référence et entre toutes les scènes.
+
 Conserve :
+
 - les mêmes couleurs principales
 - le même type de haut
 - le même type de bas
@@ -2063,6 +3177,7 @@ Conserve :
 - le sac à dos peut naturellement être posé ou hors champ lorsque le contexte le justifie, par exemple lorsque l'enfant est assis en classe
 
 RÈGLES STRICTES :
+
 - ne change jamais volontairement la couleur d'un vêtement
 - n'ajoute pas de chapeau, casquette, couronne, lunettes ou accessoire absent de la photo, sauf si la scène le demande explicitement
 - ne remplace pas un sac à dos par un autre
@@ -2073,13 +3188,16 @@ RÈGLES STRICTES :
 - privilégie la continuité visuelle plutôt que la créativité vestimentaire
 
 IMPORTANT :
+
 - ne change pas arbitrairement les couleurs des vêtements
 - n'ajoute pas de lettres, logos, symboles ou dessins différents d'une scène à l'autre
 - si un motif précis est difficile à reproduire, utilise un motif simple et cohérent plutôt que d'en inventer un nouveau à chaque scène
 - garde les sacs à dos et accessoires reconnaissables d'une scène à l'autre
 
 DOUDOU / OBJET IMPORTANT :
+
 Si un doudou ou un objet important est visible :
+
 - conserve sa forme
 - conserve ses couleurs
 - conserve ses proportions
@@ -2094,178 +3212,272 @@ Ne crée pas une nouvelle interprétation du visage à chaque illustration.
 Traite la photo de référence comme la fiche d'identité visuelle permanente des personnages principaux pour toute l'histoire.
 
 COHÉRENCE ENTRE LES SCÈNES :
+
 Cette illustration appartient à une série.
+
 Les personnages doivent donner l'impression d'être exactement les mêmes personnages que dans les autres scènes.
+
 La scène, l'action, la pose et le décor peuvent changer, mais l'identité visuelle des personnages ne doit pas changer.
 
 STYLE :
-Transforme les personnes photographiées en personnages illustrés.
-Ne produis pas une photographie réaliste.
-Garde une illustration douce, familiale, premium et adaptée aux enfants.
 
+Transforme les personnes photographiées en personnages illustrés.
+
+Ne produis pas une photographie réaliste.
+
+Garde une illustration douce, familiale, premium et adaptée aux enfants.
 
 ${finalPrompt}
 `,
-        size: "1024x1024",
-        quality: "medium",
+
+            size:
+              "1024x1024",
+
+            quality:
+              "medium",
+          });
+      } else {
+        result =
+          await openai.images.generate({
+            model:
+              "gpt-image-2",
+
+            prompt:
+              finalPrompt,
+
+            size:
+              "1024x1024",
+
+            quality:
+              "medium",
+          });
+      }
+
+      const base64 =
+        result.data?.[0]
+          ?.b64_json;
+
+      if (!base64) {
+        throw new Error(
+          "Aucune image retournée par OpenAI"
+        );
+      }
+
+      return res.json({
+        imageUrl:
+          `data:image/png;base64,${base64}`,
       });
-    } else {
-      result = await openai.images.generate({
-        model: "gpt-image-2",
-        prompt: finalPrompt,
-        size: "1024x1024",
-        quality: "medium",
-      });
+    } catch (e) {
+      console.error(
+        "Erreur /image complète :",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Erreur génération image",
+
+          message:
+            e?.message,
+
+          status:
+            e?.status,
+        });
     }
-
-    const base64 = result.data?.[0]?.b64_json;
-
-    if (!base64) {
-      throw new Error("Aucune image retournée par OpenAI");
-    }
-
-    return res.json({
-      imageUrl: `data:image/png;base64,${base64}`,
-    });
-  } catch (e) {
-    console.error("Erreur /image complète :", e);
-
-    return res.status(500).json({
-      error: "Erreur génération image",
-      message: e?.message,
-      status: e?.status,
-    });
   }
-});
+);
 
-app.post("/tts", async (req, res) => {
-  console.log("Requête TTS reçue :", req.body?.text?.slice(0, 80));
+// =========================
+// 🔊 TTS
+// =========================
 
-  try {
-    const {
-  text,
-  mode = "story",
-  emotion = "warm",
-  narrator = "narratrice",
-  language = "fr",
-} = req.body;
+app.post(
+  "/tts",
+  async (req, res) => {
+    console.log(
+      "Requête TTS reçue :",
+      req.body?.text?.slice(
+        0,
+        80
+      )
+    );
 
-const supportedLanguages = ["fr", "en", "es"];
+    try {
+      const {
+        text,
+        mode = "story",
+        emotion = "warm",
+        narrator =
+          "narratrice",
+        language = "fr",
+      } = req.body;
 
-const selectedLanguage =
-  supportedLanguages.includes(language)
-    ? language
-    : "fr";
+      const supportedLanguages =
+        [
+          "fr",
+          "en",
+          "es",
+        ];
 
-    const languageInstructions = {
-  fr: `
+      const selectedLanguage =
+        supportedLanguages.includes(
+          language
+        )
+          ? language
+          : "fr";
+
+      const languageInstructions =
+        {
+          fr: `
 Lis le texte en français.
 Utilise une prononciation française naturelle et claire.
 Ne traduis pas le texte dans une autre langue.
 `,
 
-  en: `
+          en: `
 Read the text in English.
 Use natural, clear English pronunciation.
 Do not translate the text into another language.
 `,
 
-  es: `
+          es: `
 Lee el texto en español.
 Utiliza una pronunciación española natural y clara.
 No traduzcas el texto a otro idioma.
 `,
-};
+        };
 
-    if (!text?.trim()) {
-      return res.status(400).json({
-        error: "Texte manquant",
-      });
-    }
+      if (!text?.trim()) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Texte manquant",
+          });
+      }
 
-    const narratorProfiles = {
-  narratrice: {
-    voice: "nova",
-    instructions: `
+      const narratorProfiles =
+        {
+          narratrice: {
+            voice:
+              "nova",
+
+            instructions: `
 Lis comme une conteuse chaleureuse pour enfants.
 Voix naturelle, douce, expressive.
 Raconte comme une maman lisant une histoire.
 `,
-  },
+          },
 
-  narrateur: {
-    voice: "onyx",
-    instructions: `
+          narrateur: {
+            voice:
+              "onyx",
+
+            instructions: `
 Lis comme un papa racontant une histoire.
 Voix grave, rassurante, naturelle, expressive.
 Prends ton temps et fais des pauses naturelles.
 `,
-  },
+          },
 
-  magicien: {
-    voice: "sage",
-    instructions: `
+          magicien: {
+            voice:
+              "sage",
+
+            instructions: `
 Lis comme un vieux magicien bienveillant.
-Voix mystérieuse mais chaleureuse, expressive, naturelle
+Voix mystérieuse mais chaleureuse, expressive, naturelle.
 `,
-  },
+          },
 
-  fee: {
-    voice: "shimmer",
-    instructions: `
+          fee: {
+            voice:
+              "shimmer",
+
+            instructions: `
 Lis comme une fée joyeuse.
 Voix légère, lumineuse, pleine d'émerveillement, naturelle, expressive.
 `,
-  },
+          },
 
-  mamie: {
-    voice: "ballad",
-    instructions: `
+          mamie: {
+            voice:
+              "ballad",
+
+            instructions: `
 Lis comme une grand-mère racontant un conte à ses petits-enfants.
 Voix très douce, lente et affectueuse, expressive, naturelle.
 `,
-  },
+          },
 
-  garcon: {
-    voice: "echo",
-    instructions: `
+          garcon: {
+            voice:
+              "echo",
+
+            instructions: `
 Lis comme un jeune garçon racontant une aventure.
 Voix vive, enthousiaste et naturelle, expressive.
 `,
-  },
-};
+          },
+        };
 
-    const profile =
-      narratorProfiles[narrator] || narratorProfiles.narratrice;
+      const profile =
+        narratorProfiles[
+          narrator
+        ] ||
+        narratorProfiles
+          .narratrice;
 
-    console.log("Narrateur reçu :", narrator);
-    console.log("Voix choisie :", profile.voice);
+      console.log(
+        "Narrateur reçu :",
+        narrator
+      );
 
-    let emotionInstructions = "";
+      console.log(
+        "Voix choisie :",
+        profile.voice
+      );
 
-    if (emotion === "danger") {
-      emotionInstructions =
-        "Ajoute un suspense très léger, sans jamais devenir effrayant.";
-    } else if (emotion === "victory") {
-      emotionInstructions =
-        "Utilise un ton joyeux et chaleureux.";
-    } else if (emotion === "calm") {
-      emotionInstructions =
-        "Utilise un ton doux et paisible.";
-    } else if (emotion === "night") {
-      emotionInstructions =
-        "Utilise un ton calme et rassurant.";
-    }
+      let emotionInstructions =
+        "";
 
-    const bedtimeInstructions =
-      mode === "bedtime"
-        ? `
+      if (
+        emotion ===
+        "danger"
+      ) {
+        emotionInstructions =
+          "Ajoute un suspense très léger, sans jamais devenir effrayant.";
+      } else if (
+        emotion ===
+        "victory"
+      ) {
+        emotionInstructions =
+          "Utilise un ton joyeux et chaleureux.";
+      } else if (
+        emotion ===
+        "calm"
+      ) {
+        emotionInstructions =
+          "Utilise un ton doux et paisible.";
+      } else if (
+        emotion ===
+        "night"
+      ) {
+        emotionInstructions =
+          "Utilise un ton calme et rassurant.";
+      }
+
+      const bedtimeInstructions =
+        mode === "bedtime"
+          ? `
 Cette lecture est destinée au coucher.
 Parle calmement et marque davantage les pauses.
 `
-        : "";
+          : "";
 
-    const instructions = `
+      const instructions = `
 ${profile.instructions}
 
 ${languageInstructions[selectedLanguage]}
@@ -2279,276 +3491,482 @@ Ne traduis jamais le contenu.
 Prononce les mots naturellement dans la langue sélectionnée.
 `;
 
-console.log("Langue TTS :", selectedLanguage);
-
-    const response = await openai.audio.speech.create({
-  model: "gpt-4o-mini-tts",
-  voice: profile.voice,
-  input: text,
-  instructions,
-  response_format: "mp3",
-});
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Content-Length", buffer.length.toString());
-
-    return res.send(buffer);
-  } catch (e) {
-    console.error("Erreur TTS complète :", e);
-
-    return res.status(500).json({
-      error: "Erreur génération TTS",
-      message: e?.message,
-      status: e?.status,
-    });
-  }
-});
-
-app.post("/google-play/verify-purchase", async (req, res) => {
-  console.log("🛒 Requête Google Play reçue");
-console.log("🛒 productId :", req.body?.productId);
-console.log("🛒 purchaseToken présent :", !!req.body?.purchaseToken);
-console.log("🔥 Authorization présente :", !!req.headers.authorization);
-
-  try {
-    const authorization = req.headers.authorization || "";
-
-    if (!authorization.startsWith("Bearer ")) {
-      return res.status(401).json({
-        error: "Authentification Firebase requise.",
-      });
-    }
-
-    const idToken = authorization.substring(7);
-
-    const decodedToken =
-      await firebaseAuth.verifyIdToken(idToken);
-
-    const uid = decodedToken.uid;
-
-    const { productId, purchaseToken } = req.body;
-
-    if (!productId || !purchaseToken) {
-      return res.status(400).json({
-        error: "productId et purchaseToken sont obligatoires.",
-      });
-    }
-
-    const productConfig =
-      GOOGLE_PLAY_PRODUCTS[productId];
-
-    if (!productConfig) {
-      return res.status(400).json({
-        error: "Produit Google Play inconnu.",
-      });
-    }
-
-    const purchaseResponse =
-      await androidPublisher.purchases.productsv2.getproductpurchasev2({
-        packageName: GOOGLE_PLAY_PACKAGE_NAME,
-        token: purchaseToken,
-      });
-
-    const purchase = purchaseResponse.data;
-
-    const purchaseState =
-      purchase.purchaseStateContext?.purchaseState;
-
-    if (purchaseState !== "PURCHASED") {
-      return res.status(400).json({
-        error: "L'achat n'est pas encore validé.",
-        purchaseState,
-      });
-    }
-
-    const purchasedItem =
-      purchase.productLineItem?.find(
-        (item) => item.productId === productId
+      console.log(
+        "Langue TTS :",
+        selectedLanguage
       );
 
-    if (!purchasedItem) {
-      return res.status(400).json({
-        error:
-          "Le produit acheté ne correspond pas au produit demandé.",
-      });
+      const response =
+        await openai.audio.speech.create({
+          model:
+            "gpt-4o-mini-tts",
+
+          voice:
+            profile.voice,
+
+          input:
+            text,
+
+          instructions,
+
+          response_format:
+            "mp3",
+        });
+
+      const buffer =
+        Buffer.from(
+          await response.arrayBuffer()
+        );
+
+      res.setHeader(
+        "Content-Type",
+        "audio/mpeg"
+      );
+
+      res.setHeader(
+        "Content-Length",
+        buffer.length.toString()
+      );
+
+      return res.send(
+        buffer
+      );
+    } catch (e) {
+      console.error(
+        "Erreur TTS complète :",
+        e
+      );
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Erreur génération TTS",
+
+          message:
+            e?.message,
+
+          status:
+            e?.status,
+        });
     }
+  }
+);
 
-    const consumptionState =
-      purchasedItem.productOfferDetails?.consumptionState;
+// =========================
+// 🛒 GOOGLE PLAY
+// =========================
 
-    const purchaseHash = crypto
-      .createHash("sha256")
-      .update(purchaseToken)
-      .digest("hex");
+app.post(
+  "/google-play/verify-purchase",
+  async (req, res) => {
+    console.log(
+      "🛒 Requête Google Play reçue"
+    );
 
-    const userRef =
-      adminDb.collection("users").doc(uid);
+    console.log(
+      "🛒 productId :",
+      req.body?.productId
+    );
 
-    const purchaseRef =
-      adminDb
-        .collection("googlePlayPurchases")
-        .doc(purchaseHash);
+    console.log(
+      "🛒 purchaseToken présent :",
+      !!req.body
+        ?.purchaseToken
+    );
 
-    let alreadyCredited = false;
+    console.log(
+      "🔥 Authorization présente :",
+      !!req.headers
+        .authorization
+    );
 
-    await adminDb.runTransaction(
-      async (transaction) => {
-        const purchaseSnapshot =
-          await transaction.get(purchaseRef);
+    try {
+      const authorization =
+        req.headers
+          .authorization ||
+        "";
 
-        if (purchaseSnapshot.exists) {
-          const existingPurchase =
-            purchaseSnapshot.data();
+      if (
+        !authorization.startsWith(
+          "Bearer "
+        )
+      ) {
+        return res
+          .status(401)
+          .json({
+            error:
+              "Authentification Firebase requise.",
+          });
+      }
+
+      const idToken =
+        authorization.substring(
+          7
+        );
+
+      const decodedToken =
+        await firebaseAuth
+          .verifyIdToken(
+            idToken
+          );
+
+      const uid =
+        decodedToken.uid;
+
+      const {
+        productId,
+        purchaseToken,
+      } = req.body;
+
+      if (
+        !productId ||
+        !purchaseToken
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "productId et purchaseToken sont obligatoires.",
+          });
+      }
+
+      const productConfig =
+        GOOGLE_PLAY_PRODUCTS[
+          productId
+        ];
+
+      if (!productConfig) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Produit Google Play inconnu.",
+          });
+      }
+
+      const purchaseResponse =
+        await androidPublisher
+          .purchases
+          .productsv2
+          .getproductpurchasev2({
+            packageName:
+              GOOGLE_PLAY_PACKAGE_NAME,
+
+            token:
+              purchaseToken,
+          });
+
+      const purchase =
+        purchaseResponse.data;
+
+      const purchaseState =
+        purchase
+          .purchaseStateContext
+          ?.purchaseState;
+
+      if (
+        purchaseState !==
+        "PURCHASED"
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "L'achat n'est pas encore validé.",
+
+            purchaseState,
+          });
+      }
+
+      const purchasedItem =
+        purchase
+          .productLineItem
+          ?.find(
+            (item) =>
+              item.productId ===
+              productId
+          );
+
+      if (!purchasedItem) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Le produit acheté ne correspond pas au produit demandé.",
+          });
+      }
+
+      const consumptionState =
+        purchasedItem
+          .productOfferDetails
+          ?.consumptionState;
+
+      const purchaseHash =
+        crypto
+          .createHash(
+            "sha256"
+          )
+          .update(
+            purchaseToken
+          )
+          .digest(
+            "hex"
+          );
+
+      const userRef =
+        adminDb
+          .collection(
+            "users"
+          )
+          .doc(uid);
+
+      const purchaseRef =
+        adminDb
+          .collection(
+            "googlePlayPurchases"
+          )
+          .doc(
+            purchaseHash
+          );
+
+      let alreadyCredited =
+        false;
+
+      await adminDb.runTransaction(
+        async (
+          transaction
+        ) => {
+          const purchaseSnapshot =
+            await transaction.get(
+              purchaseRef
+            );
 
           if (
-            existingPurchase.uid !== uid ||
-            existingPurchase.productId !== productId
+            purchaseSnapshot.exists
+          ) {
+            const existingPurchase =
+              purchaseSnapshot.data();
+
+            if (
+              existingPurchase.uid !==
+                uid ||
+              existingPurchase.productId !==
+                productId
+            ) {
+              throw new Error(
+                "Ce paiement a déjà été associé à un autre compte ou produit."
+              );
+            }
+
+            alreadyCredited =
+              true;
+
+            return;
+          }
+
+          const userSnapshot =
+            await transaction.get(
+              userRef
+            );
+
+          if (
+            !userSnapshot.exists
           ) {
             throw new Error(
-              "Ce paiement a déjà été associé à un autre compte ou produit."
+              "Profil utilisateur introuvable."
             );
           }
 
-          alreadyCredited = true;
-          return;
-        }
+          if (
+            productConfig.type ===
+            "video"
+          ) {
+            transaction.update(
+              userRef,
+              {
+                [`videoCredits.${productConfig.videoType}.remaining`]:
+                  FieldValue.increment(
+                    productConfig.credits
+                  ),
 
-        const userSnapshot =
-          await transaction.get(userRef);
+                [`videoCredits.${productConfig.videoType}.purchases`]:
+                  FieldValue.increment(
+                    1
+                  ),
+              }
+            );
+          } else {
+            transaction.update(
+              userRef,
+              {
+                [`packs.${productConfig.packType}.storiesRemaining`]:
+                  FieldValue.increment(
+                    productConfig.stories
+                  ),
 
-        if (!userSnapshot.exists) {
-          throw new Error(
-            "Profil utilisateur introuvable."
+                [`packs.${productConfig.packType}.purchases`]:
+                  FieldValue.increment(
+                    1
+                  ),
+              }
+            );
+          }
+
+          transaction.set(
+            purchaseRef,
+            {
+              uid,
+
+              productId,
+
+              type:
+                productConfig.type,
+
+              packType:
+                productConfig.packType ||
+                null,
+
+              stories:
+                productConfig.stories ||
+                0,
+
+              videoType:
+                productConfig.videoType ||
+                null,
+
+              scenes:
+                productConfig.scenes ||
+                0,
+
+              videoCredits:
+                productConfig.credits ||
+                0,
+
+              orderId:
+                purchase.orderId ||
+                null,
+
+              creditedAt:
+                new Date()
+                  .toISOString(),
+
+              consumed:
+                false,
+            }
           );
         }
+      );
 
-        if (productConfig.type === "video") {
-  transaction.update(userRef, {
-    [`videoCredits.${productConfig.videoType}.remaining`]:
-      FieldValue.increment(
-        productConfig.credits
-      ),
+      return res.json({
+        success:
+          true,
 
-    [`videoCredits.${productConfig.videoType}.purchases`]:
-      FieldValue.increment(1),
-  });
-} else {
-  transaction.update(userRef, {
-    [`packs.${productConfig.packType}.storiesRemaining`]:
-      FieldValue.increment(
-        productConfig.stories
-      ),
+        alreadyCredited,
 
-    [`packs.${productConfig.packType}.purchases`]:
-      FieldValue.increment(1),
-  });
-}
+        productId,
 
-        transaction.set(purchaseRef, {
-  uid,
-  productId,
+        type:
+          productConfig.type,
 
-  type: productConfig.type,
+        packType:
+          productConfig.packType ||
+          null,
 
-  packType:
-    productConfig.packType || null,
+        stories:
+          productConfig.stories ||
+          0,
 
-  stories:
-    productConfig.stories || 0,
+        videoType:
+                  productConfig.videoType ||
+          null,
 
-  videoType:
-    productConfig.videoType || null,
+        scenes:
+          productConfig.scenes ||
+          0,
 
-  scenes:
-    productConfig.scenes || 0,
+        videoCredits:
+          productConfig.credits ||
+          0,
+      });
+    } catch (error) {
+      console.error(
+        "Erreur vérification Google Play :",
+        error
+      );
 
-  videoCredits:
-    productConfig.credits || 0,
+      return res
+        .status(500)
+        .json({
+          error:
+            "Impossible de vérifier l'achat Google Play.",
 
-  orderId:
-    purchase.orderId || null,
-
-  creditedAt:
-    new Date().toISOString(),
-
-  consumed: false,
-});
+          message:
+            error?.message,
+        });
     }
-  );
-
-    return res.json({
-  success: true,
-  alreadyCredited,
-  productId,
-
-  type: productConfig.type,
-
-  packType:
-    productConfig.packType || null,
-
-  stories:
-    productConfig.stories || 0,
-
-  videoType:
-    productConfig.videoType || null,
-
-  scenes:
-    productConfig.scenes || 0,
-
-  videoCredits:
-    productConfig.credits || 0,
-});
-  } catch (error) {
-    console.error(
-      "Erreur vérification Google Play :",
-      error
-    );
-
-    return res.status(500).json({
-      error:
-        "Impossible de vérifier l'achat Google Play.",
-      message: error?.message,
-    });
   }
-});
+);
 
-const APPLE_APP_ID = 6805620727;
+// =========================
+// 🍎 APPLE
+// =========================
 
-const APPLE_ROOT_CA_URLS = [
-  "https://www.apple.com/appleca/AppleIncRootCertificate.cer",
-  "https://www.apple.com/certificateauthority/AppleRootCA-G2.cer",
-  "https://www.apple.com/certificateauthority/AppleRootCA-G3.cer",
-];
+const APPLE_APP_ID =
+  6805620727;
 
-let appleRootCertificatesCache = null;
+const APPLE_ROOT_CA_URLS =
+  [
+    "https://www.apple.com/appleca/AppleIncRootCertificate.cer",
+
+    "https://www.apple.com/certificateauthority/AppleRootCA-G2.cer",
+
+    "https://www.apple.com/certificateauthority/AppleRootCA-G3.cer",
+  ];
+
+let appleRootCertificatesCache =
+  null;
 
 async function getAppleRootCertificates() {
-  if (appleRootCertificatesCache) {
+  if (
+    appleRootCertificatesCache
+  ) {
     return appleRootCertificatesCache;
   }
 
-  const certificates = await Promise.all(
-    APPLE_ROOT_CA_URLS.map(async (url) => {
-      const response = await fetch(url);
+  const certificates =
+    await Promise.all(
+      APPLE_ROOT_CA_URLS.map(
+        async (url) => {
+          const response =
+            await fetch(
+              url
+            );
 
-      if (!response.ok) {
-        throw new Error(
-          `Impossible de télécharger un certificat Apple (${response.status}).`
-        );
-      }
+          if (
+            !response.ok
+          ) {
+            throw new Error(
+              `Impossible de télécharger un certificat Apple (${response.status}).`
+            );
+          }
 
-      return Buffer.from(await response.arrayBuffer());
-    })
-  );
+          return Buffer.from(
+            await response.arrayBuffer()
+          );
+        }
+      )
+    );
 
-  appleRootCertificatesCache = certificates;
+  appleRootCertificatesCache =
+    certificates;
 
   return certificates;
 }
 
-async function createAppleVerifier(environment) {
+async function createAppleVerifier(
+  environment
+) {
   const rootCertificates =
     await getAppleRootCertificates();
 
@@ -2557,54 +3975,73 @@ async function createAppleVerifier(environment) {
     true,
     environment,
     APPLE_BUNDLE_ID,
-    environment === Environment.PRODUCTION
+
+    environment ===
+      Environment.PRODUCTION
       ? APPLE_APP_ID
       : undefined
   );
 }
 
-async function verifyAppleTransaction(transactionId) {
+async function verifyAppleTransaction(
+  transactionId
+) {
   const environments = [
     Environment.PRODUCTION,
     Environment.SANDBOX,
   ];
 
-  let lastError = null;
+  let lastError =
+    null;
 
-  for (const environment of environments) {
+  for (
+    const environment of
+    environments
+  ) {
     try {
       const client =
-        createAppleClient(environment);
-
-      const response =
-        await client.getTransactionInfo(
-          transactionId
+        createAppleClient(
+          environment
         );
 
-      if (!response?.signedTransactionInfo) {
+      const response =
+        await client
+          .getTransactionInfo(
+            transactionId
+          );
+
+      if (
+        !response
+          ?.signedTransactionInfo
+      ) {
         throw new Error(
           "Apple n'a retourné aucune transaction signée."
         );
       }
 
       const verifier =
-        await createAppleVerifier(environment);
+        await createAppleVerifier(
+          environment
+        );
 
       const transaction =
-        await verifier.verifyAndDecodeTransaction(
-          response.signedTransactionInfo
-        );
+        await verifier
+          .verifyAndDecodeTransaction(
+            response.signedTransactionInfo
+          );
 
       return {
         transaction,
         environment,
       };
     } catch (error) {
-      lastError = error;
+      lastError =
+        error;
 
       console.log(
         `Échec vérification Apple ${environment} :`,
-        error?.message || error
+        error?.message ||
+          error
       );
     }
   }
@@ -2619,101 +4056,141 @@ async function verifyAppleTransaction(transactionId) {
 
 app.post(
   "/apple/verify-purchase",
+
   async (req, res) => {
-    console.log("🍎 Requête Apple reçue");
+    console.log(
+      "🍎 Requête Apple reçue"
+    );
+
     console.log(
       "🍎 productId :",
       req.body?.productId
     );
+
     console.log(
       "🍎 transactionId présent :",
-      !!req.body?.transactionId
+      !!req.body
+        ?.transactionId
     );
 
     try {
       const authorization =
-        req.headers.authorization || "";
+        req.headers
+          .authorization ||
+        "";
 
       if (
-        !authorization.startsWith("Bearer ")
+        !authorization.startsWith(
+          "Bearer "
+        )
       ) {
-        return res.status(401).json({
-          error:
-            "Authentification Firebase requise.",
-        });
+        return res
+          .status(401)
+          .json({
+            error:
+              "Authentification Firebase requise.",
+          });
       }
 
       const idToken =
-        authorization.substring(7);
-
-      const decodedToken =
-        await firebaseAuth.verifyIdToken(
-          idToken
+        authorization.substring(
+          7
         );
 
-      const uid = decodedToken.uid;
+      const decodedToken =
+        await firebaseAuth
+          .verifyIdToken(
+            idToken
+          );
+
+      const uid =
+        decodedToken.uid;
 
       const {
         productId,
         transactionId,
       } = req.body;
 
-      if (!productId || !transactionId) {
-        return res.status(400).json({
-          error:
-            "productId et transactionId sont obligatoires.",
-        });
+      if (
+        !productId ||
+        !transactionId
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "productId et transactionId sont obligatoires.",
+          });
       }
 
       const productConfig =
-        APPLE_PRODUCTS[productId];
+        APPLE_PRODUCTS[
+          productId
+        ];
 
       if (!productConfig) {
-        return res.status(400).json({
-          error:
-            "Produit Apple inconnu.",
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Produit Apple inconnu.",
+          });
       }
 
       const {
         transaction,
         environment,
-      } = await verifyAppleTransaction(
-        String(transactionId)
-      );
+      } =
+        await verifyAppleTransaction(
+          String(
+            transactionId
+          )
+        );
 
       if (
         transaction.bundleId !==
         APPLE_BUNDLE_ID
       ) {
-        return res.status(400).json({
-          error:
-            "La transaction ne correspond pas à ConteMagiqueIA.",
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "La transaction ne correspond pas à ConteMagiqueIA.",
+          });
       }
 
       if (
         transaction.productId !==
         productId
       ) {
-        return res.status(400).json({
-          error:
-            "Le produit acheté ne correspond pas au produit demandé.",
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Le produit acheté ne correspond pas au produit demandé.",
+          });
       }
 
-      if (!transaction.transactionId) {
-        return res.status(400).json({
-          error:
-            "Identifiant de transaction Apple manquant.",
-        });
+      if (
+        !transaction.transactionId
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Identifiant de transaction Apple manquant.",
+          });
       }
 
-      if (transaction.revocationDate) {
-        return res.status(400).json({
-          error:
-            "Cette transaction Apple a été révoquée ou remboursée.",
-        });
+      if (
+        transaction.revocationDate
+      ) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Cette transaction Apple a été révoquée ou remboursée.",
+          });
       }
 
       const verifiedTransactionId =
@@ -2721,25 +4198,41 @@ app.post(
           transaction.transactionId
         );
 
-      const purchaseHash = crypto
-        .createHash("sha256")
-        .update(verifiedTransactionId)
-        .digest("hex");
+      const purchaseHash =
+        crypto
+          .createHash(
+            "sha256"
+          )
+          .update(
+            verifiedTransactionId
+          )
+          .digest(
+            "hex"
+          );
 
       const userRef =
         adminDb
-          .collection("users")
+          .collection(
+            "users"
+          )
           .doc(uid);
 
       const purchaseRef =
         adminDb
-          .collection("applePurchases")
-          .doc(purchaseHash);
+          .collection(
+            "applePurchases"
+          )
+          .doc(
+            purchaseHash
+          );
 
-      let alreadyCredited = false;
+      let alreadyCredited =
+        false;
 
       await adminDb.runTransaction(
-        async (firestoreTransaction) => {
+        async (
+          firestoreTransaction
+        ) => {
           const purchaseSnapshot =
             await firestoreTransaction.get(
               purchaseRef
@@ -2752,7 +4245,8 @@ app.post(
               purchaseSnapshot.data();
 
             if (
-              existingPurchase.uid !== uid ||
+              existingPurchase.uid !==
+                uid ||
               existingPurchase.productId !==
                 productId
             ) {
@@ -2761,7 +4255,9 @@ app.post(
               );
             }
 
-            alreadyCredited = true;
+            alreadyCredited =
+              true;
+
             return;
           }
 
@@ -2770,529 +4266,1721 @@ app.post(
               userRef
             );
 
-          if (!userSnapshot.exists) {
+          if (
+            !userSnapshot.exists
+          ) {
             throw new Error(
               "Profil utilisateur introuvable."
             );
           }
 
-          if (productConfig.type === "video") {
-  firestoreTransaction.update(
-    userRef,
-    {
-      [`videoCredits.${productConfig.videoType}.remaining`]:
-        FieldValue.increment(
-          productConfig.credits
-        ),
+          if (
+            productConfig.type ===
+            "video"
+          ) {
+            firestoreTransaction.update(
+              userRef,
+              {
+                [`videoCredits.${productConfig.videoType}.remaining`]:
+                  FieldValue.increment(
+                    productConfig.credits
+                  ),
 
-      [`videoCredits.${productConfig.videoType}.purchases`]:
-        FieldValue.increment(1),
-    }
-  );
-} else {
-  firestoreTransaction.update(
-    userRef,
-    {
-      [`packs.${productConfig.packType}.storiesRemaining`]:
-        FieldValue.increment(
-          productConfig.stories
-        ),
+                [`videoCredits.${productConfig.videoType}.purchases`]:
+                  FieldValue.increment(
+                    1
+                  ),
+              }
+            );
+          } else {
+            firestoreTransaction.update(
+              userRef,
+              {
+                [`packs.${productConfig.packType}.storiesRemaining`]:
+                  FieldValue.increment(
+                    productConfig.stories
+                  ),
 
-      [`packs.${productConfig.packType}.purchases`]:
-        FieldValue.increment(1),
-    }
-  );
-}
+                [`packs.${productConfig.packType}.purchases`]:
+                  FieldValue.increment(
+                    1
+                  ),
+              }
+            );
+          }
 
           firestoreTransaction.set(
-  purchaseRef,
-  {
-    uid,
-    productId,
+            purchaseRef,
+            {
+              uid,
 
-    type: productConfig.type,
+              productId,
 
-    packType:
-      productConfig.packType || null,
+              type:
+                productConfig.type,
 
-    stories:
-      productConfig.stories || 0,
+              packType:
+                productConfig.packType ||
+                null,
 
-    videoType:
-      productConfig.videoType || null,
+              stories:
+                productConfig.stories ||
+                0,
 
-    scenes:
-      productConfig.scenes || 0,
+              videoType:
+                productConfig.videoType ||
+                null,
 
-    videoCredits:
-      productConfig.credits || 0,
+              scenes:
+                productConfig.scenes ||
+                0,
 
-    transactionId:
-      verifiedTransactionId,
+              videoCredits:
+                productConfig.credits ||
+                0,
 
-    environment:
-      environment || null,
+              transactionId:
+                verifiedTransactionId,
 
-    creditedAt:
-      new Date().toISOString(),
+              environment:
+                environment ||
+                null,
 
-    consumed: false,
-  }
-);
+              creditedAt:
+                new Date()
+                  .toISOString(),
+
+              consumed:
+                false,
+            }
+          );
         }
       );
 
       return res.json({
-  success: true,
-  alreadyCredited,
-  productId,
+        success:
+          true,
 
-  type: productConfig.type,
+        alreadyCredited,
 
-  packType:
-    productConfig.packType || null,
+        productId,
 
-  stories:
-    productConfig.stories || 0,
+        type:
+          productConfig.type,
 
-  videoType:
-    productConfig.videoType || null,
+        packType:
+          productConfig.packType ||
+          null,
 
-  scenes:
-    productConfig.scenes || 0,
+        stories:
+          productConfig.stories ||
+          0,
 
-  videoCredits:
-    productConfig.credits || 0,
+        videoType:
+          productConfig.videoType ||
+          null,
 
-  transactionId:
-    verifiedTransactionId,
-});
+        scenes:
+          productConfig.scenes ||
+          0,
+
+        videoCredits:
+          productConfig.credits ||
+          0,
+
+        transactionId:
+          verifiedTransactionId,
+      });
     } catch (error) {
       console.error(
         "Erreur vérification Apple :",
         error
       );
 
-      return res.status(500).json({
-        error:
-          "Impossible de vérifier l'achat Apple.",
-        message: error?.message,
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "Impossible de vérifier l'achat Apple.",
+
+          message:
+            error?.message,
+        });
     }
   }
 );
 
 // =========================
-// 🎬 RUNWAY - IMAGE TO VIDEO
+// 🎬 RUNWAY
+// OUTILS DE SÉCURISATION
 // =========================
-app.post("/video", async (req, res) => {
-  let generationRef = null;
-  let uid = null;
-  let leaseOwned = false;
-  let heartbeat = null;
-  let workDir = null;
-  let mergedVideo = null;
-  let creditRefunded = false;
-  const leaseOwner = crypto.randomUUID();
-  let videoUrls = [];
 
-  try {
-        const decodedToken =
-      await requireFirebaseUser(req, res);
+function createVideoImagesHash(
+  images
+) {
+  return crypto
+    .createHash(
+      "sha256"
+    )
+    .update(
+      JSON.stringify(
+        images
+      )
+    )
+    .digest(
+      "hex"
+    );
+}
 
-    if (!decodedToken) {
-      return;
+function buildRunwayMotionPrompt(
+  scenePrompt = ""
+) {
+  const basePrompt = `
+Animate the exact source illustration with very high visual fidelity.
+
+Preserve every main character exactly as shown in the source image.
+
+IDENTITY LOCK:
+- same face
+- same facial structure
+- same skin tone
+- same hairstyle
+- same hair color
+- same apparent age
+- same body proportions
+- same clothing
+- same clothing colors
+- same shoes
+- same accessories
+- same important objects
+
+STRICT CONTINUITY:
+- do not add characters
+- do not remove characters
+- do not duplicate characters
+- do not merge characters
+- do not replace characters
+- do not redesign faces
+- do not change clothes
+- do not change colors
+- do not invent accessories
+- do not transform one character into another
+
+MOVEMENT:
+Use only subtle and natural animation:
+- blinking
+- breathing
+- very small head movements
+- gentle hand or arm movements when appropriate
+- slight hair movement
+- slight environmental movement
+
+CAMERA:
+- locked camera
+- no zoom
+- no pan
+- no dolly
+- no camera rotation
+- preserve the original framing
+- keep all main characters visible
+- do not crop heads or bodies
+
+STYLE:
+Preserve the exact illustration style, lighting, colors, atmosphere and visual identity of the source image.
+
+The result must look like the original illustration gently coming to life, not like a newly redesigned scene.
+
+Smooth, stable, child-friendly animation.
+`;
+
+  const cleanScenePrompt =
+    String(
+      scenePrompt || ""
+    )
+      .replace(
+        /\s+/g,
+        " "
+      )
+      .trim();
+
+  if (
+    !cleanScenePrompt
+  ) {
+    return basePrompt
+      .trim()
+      .slice(
+        0,
+        1000
+      );
+  }
+
+  const sceneContext = `
+Scene context:
+${cleanScenePrompt}
+`;
+
+  return `${basePrompt}
+${sceneContext}`
+    .trim()
+    .slice(
+      0,
+      1000
+    );
+}
+
+function getRunwayTaskOutputUrl(
+  task
+) {
+  const output =
+    task?.output;
+
+  if (
+    Array.isArray(output) &&
+    output.length > 0
+  ) {
+    const firstOutput =
+      output[0];
+
+    if (
+      typeof firstOutput ===
+      "string"
+    ) {
+      return firstOutput;
     }
 
-    uid = decodedToken.uid;
+    if (
+      typeof firstOutput?.url ===
+      "string"
+    ) {
+      return firstOutput.url;
+    }
+  }
 
-    console.log(
-      "🎬 Demande vidéo autorisée pour :",
-      uid
+  if (
+    typeof output ===
+    "string"
+  ) {
+    return output;
+  }
+
+  if (
+    typeof task?.outputUrl ===
+    "string"
+  ) {
+    return task.outputUrl;
+  }
+
+  return null;
+}
+
+async function saveRunwayTaskState({
+  uid,
+  generationRef,
+  sceneIndex,
+  taskId = null,
+  status,
+  sourceImage,
+  videoUrl = null,
+  errorMessage = null,
+}) {
+  if (
+    !generationRef
+  ) {
+    return;
+  }
+
+  const generationSnapshot =
+    await generationRef.get();
+
+  if (
+    !generationSnapshot.exists
+  ) {
+    throw new Error(
+      "Génération vidéo introuvable."
     );
-    const {
+  }
+
+  const generation =
+    generationSnapshot.data();
+
+  if (
+    generation.uid !== uid
+  ) {
+    throw new Error(
+      "Utilisateur incorrect pour cette tâche Runway."
+    );
+  }
+
+  const update = {
+    [`runwayTasks.${sceneIndex}.status`]:
+      status,
+
+    [`runwayTasks.${sceneIndex}.sourceImage`]:
+      sourceImage ||
+      null,
+
+    [`runwayTasks.${sceneIndex}.updatedAt`]:
+      FieldValue.serverTimestamp(),
+
+    lastProgressAt:
+      FieldValue.serverTimestamp(),
+  };
+
+  if (taskId) {
+    update[
+      `runwayTasks.${sceneIndex}.taskId`
+    ] = taskId;
+  }
+
+  if (videoUrl) {
+    update[
+      `runwayTasks.${sceneIndex}.videoUrl`
+    ] = videoUrl;
+  }
+
+  if (errorMessage) {
+    update[
+      `runwayTasks.${sceneIndex}.errorMessage`
+    ] =
+      String(
+        errorMessage
+      ).slice(
+        0,
+        1000
+      );
+  }
+
+  await generationRef.update(
+    update
+  );
+}
+
+async function getRunwaySceneTask(
+  generationRef,
+  sceneIndex
+) {
+  const snapshot =
+    await generationRef.get();
+
+  if (
+    !snapshot.exists
+  ) {
+    return null;
+  }
+
+  const generation =
+    snapshot.data();
+
+  return (
+    generation
+      ?.runwayTasks?.[
+        sceneIndex
+      ] ||
+    null
+  );
+}
+
+async function waitForRunwayTask(
+  taskId
+) {
+  const maxAttempts =
+    180;
+
+  for (
+    let attempt = 0;
+    attempt <
+    maxAttempts;
+    attempt++
+  ) {
+    const task =
+      await runway.tasks.retrieve(
+        taskId
+      );
+
+    const status =
+      String(
+        task?.status ||
+          ""
+      ).toUpperCase();
+
+    if (
+      status ===
+      "SUCCEEDED"
+    ) {
+      return task;
+    }
+
+    if (
+      status ===
+        "FAILED" ||
+      status ===
+        "CANCELED" ||
+      status ===
+        "CANCELLED"
+    ) {
+      const error =
+        new Error(
+          `La tâche Runway ${taskId} a échoué avec le statut ${status}.`
+        );
+
+      error.code =
+        "RUNWAY_TASK_FAILED";
+
+      error.runwayTask =
+        task;
+
+      throw error;
+    }
+
+    await new Promise(
+      (resolve) =>
+        setTimeout(
+          resolve,
+          5000
+        )
+    );
+  }
+
+  const error =
+    new Error(
+      "La génération Runway prend trop de temps. Elle pourra être reprise sans recréer volontairement les scènes déjà enregistrées."
+    );
+
+  error.code =
+    "RUNWAY_TASK_TIMEOUT";
+
+  throw error;
+}
+
+async function createOrResumeRunwayScene({
+  uid,
+  generationRef,
+  sceneIndex,
+  imageUrl,
+  scenePrompt,
+  videoModel,
+}) {
+  const existingTask =
+    await getRunwaySceneTask(
+      generationRef,
+      sceneIndex
+    );
+
+  if (
+    existingTask?.videoUrl
+  ) {
+    console.log(
+      `♻️ Scène ${sceneIndex + 1} déjà terminée, réutilisation.`
+    );
+
+    return existingTask
+      .videoUrl;
+  }
+
+  let taskId =
+    existingTask?.taskId ||
+    null;
+
+  if (!taskId) {
+    // Important :
+    // on marque la scène AVANT
+    // d'envoyer la demande Runway.
+    //
+    // Si une erreur réseau ambiguë
+    // survient pendant la création,
+    // on évite de relancer
+    // automatiquement une deuxième
+    // génération payante.
+    if (
+      existingTask?.status ===
+      "submitting"
+    ) {
+      const error =
+        new Error(
+          `La scène ${sceneIndex + 1} possède une demande Runway dont le résultat de soumission est incertain. Une nouvelle tâche n'est pas lancée automatiquement afin d'éviter une double facturation.`
+        );
+
+      error.code =
+        "RUNWAY_SUBMISSION_UNCERTAIN";
+
+      throw error;
+    }
+
+    await saveRunwayTaskState({
+      uid,
+      generationRef,
+      sceneIndex,
+      status:
+        "submitting",
+      sourceImage:
+        imageUrl,
+    });
+
+    let task;
+
+    try {
+      task =
+        await runway.imageToVideo.create(
+          {
+            model:
+              videoModel,
+
+            promptImage:
+              imageUrl,
+
+            promptText:
+              buildRunwayMotionPrompt(
+                scenePrompt
+              ),
+
+            ratio:
+              "1280:720",
+
+            duration:
+              5,
+          },
+          {
+            maxRetries:
+              0,
+          }
+        );
+    } catch (error) {
+      console.error(
+        `❌ Erreur soumission Runway scène ${sceneIndex + 1} :`,
+        error
+      );
+
+      // On ne remet PAS automatiquement
+      // la scène à "failed".
+      //
+      // En cas d'erreur réseau, Runway
+      // peut avoir accepté la tâche sans
+      // que notre serveur ait reçu son ID.
+      // La relancer immédiatement pourrait
+      // donc coûter deux générations.
+      throw error;
+    }
+
+    taskId =
+      task?.id ||
+      task?.taskId ||
+      null;
+
+    if (!taskId) {
+      const error =
+        new Error(
+          "Runway n'a retourné aucun identifiant de tâche."
+        );
+
+      error.code =
+        "RUNWAY_TASK_ID_MISSING";
+
+      throw error;
+    }
+
+    await saveRunwayTaskState({
+      uid,
+      generationRef,
+      sceneIndex,
+      taskId,
+      status:
+        "processing",
+      sourceImage:
+        imageUrl,
+    });
+  } else {
+    console.log(
+      `♻️ Reprise de la tâche Runway ${taskId} pour la scène ${sceneIndex + 1}.`
+    );
+  }
+
+  try {
+    const completedTask =
+      await waitForRunwayTask(
+        taskId
+      );
+
+    const videoUrl =
+      getRunwayTaskOutputUrl(
+        completedTask
+      );
+
+    if (!videoUrl) {
+      throw new Error(
+        `Aucune URL vidéo retournée par Runway pour la scène ${sceneIndex + 1}.`
+      );
+    }
+
+    await saveRunwayTaskState({
+      uid,
+      generationRef,
+      sceneIndex,
+      taskId,
+      status:
+        "completed",
+      sourceImage:
+        imageUrl,
+      videoUrl,
+    });
+
+    return videoUrl;
+  } catch (error) {
+    if (
+      error?.code ===
+      "RUNWAY_TASK_FAILED"
+    ) {
+      await saveRunwayTaskState({
+        uid,
+        generationRef,
+        sceneIndex,
+        taskId,
+        status:
+          "failed",
+        sourceImage:
+          imageUrl,
+        errorMessage:
+          error?.message,
+      });
+    }
+
+    throw error;
+  }
+}
+
+// =========================
+// 🎬 RUNWAY - IMAGE TO VIDEO
+// =========================
+
+app.post(
+  "/video",
+  async (req, res) => {
+    let generationRef =
+      null;
+
+    let uid =
+      null;
+
+    let runwaySucceeded =
+      false;
+
+    let videoUrls =
+      [];
+
+    try {
+      const decodedToken =
+        await requireFirebaseUser(
+          req,
+          res
+        );
+
+      if (!decodedToken) {
+        return;
+      }
+
+      uid =
+        decodedToken.uid;
+
+      console.log(
+        "🎬 Demande vidéo autorisée pour :",
+        uid
+      );
+
+      const {
   images,
   prompt,
+  generationId = null,
+  requestId = null,
+  scenes = [],
+  narrator = "narratrice",
+  mode = "story",
+  language = "fr",
 } = req.body;
-let generationId = req.body?.generationId || null;
 
 const videoModel =
   req.body?.videoModel === "gen4.5"
     ? "gen4.5"
     : "gen4_turbo";
 
-if (!Array.isArray(images) || images.length === 0) {
-  return res.status(400).json({
-    error: "Aucune image de scène reçue.",
-  });
-}
-
-if (images.length !== 4 && images.length !== 6) {
-  return res.status(400).json({
-    error:
-      "Le dessin animé doit contenir exactement 4 ou 6 scènes.",
-  });
-}
-
-const narrationScenes = Array.isArray(req.body?.scenes) ? req.body.scenes : [];
-const narrator = req.body?.narrator || "narratrice";
-const mode = req.body?.mode || "story";
-const language = ["fr", "en", "es"].includes(req.body?.language) ? req.body.language : "fr";
-if (narrationScenes.length !== images.length || narrationScenes.some(scene =>
-  typeof scene?.text !== "string" || !scene.text.trim() || scene.text.length > 6000) ||
-  images.some(image => typeof image !== "string" || !image.trim())) {
-  return res.status(400).json({ error: "Chaque scène doit contenir une image et un texte valide (6 000 caractères maximum)." });
-}
-const narrationHash = crypto.createHash("sha256")
-  .update(JSON.stringify({ narrationScenes, narrator, mode, language, prompt: prompt || "" })).digest("hex");
-
-const sceneCount = images.length;
-const imagesHash = crypto
-  .createHash("sha256")
-  .update(JSON.stringify(images))
-  .digest("hex");
-
-const requestId = req.body?.requestId;
-if (requestId != null && (typeof requestId !== "string" || !/^[a-zA-Z0-9-]{8,100}$/.test(requestId))) {
-  return res.status(400).json({ error: "Identifiant de demande invalide." });
-}
-const requestKey = requestId ? crypto.createHash("sha256").update(uid + ":" + requestId).digest("hex") : null;
-if (!generationId && !requestId) {
-  const previous = await adminDb.collection("videoGenerations").where("uid", "==", uid).get();
-  generationId = findLegacyResume(previous.docs, { uid, imagesHash, narrationHash, model: videoModel });
-}
-if (!generationId && requestKey) {
-  const previous = await adminDb.collection("videoGenerations").doc(requestKey).get();
-  if (previous.exists) {
-    const data = previous.data();
-    if (data.uid !== uid || data.imagesHash !== imagesHash || data.narrationHash !== narrationHash || data.model !== videoModel) {
-      return res.status(409).json({ error: "Cette demande vidéo ne correspond pas à la génération d’origine." });
-    }
-    if (data.status === "completed" && data.finalVideoUrl) {
-      return res.json({ success: true, finalVideoUrl: data.finalVideoUrl, videoUrls: data.videoUrls, sceneCount, generationId: previous.id });
-    }
-    generationId = previous.id;
-  }
-}
-
-let startSceneIndex = 0;
-
-// ========================================
-// 🔄 REPRISE D'UNE GÉNÉRATION PARTIELLE
-// ========================================
-if (generationId) {
-  const generationRefToCheck =
-  adminDb
-    .collection("videoGenerations")
-    .doc(generationId);
-
-const reconciliation =
-  await reconcileStaleVideoGeneration(
-    uid,
-    generationRefToCheck
-  );
-
-if (reconciliation.action === "refunded") {
-  return res.status(409).json({
-    error:
-      "Cette ancienne génération a été annulée et le crédit vidéo a été remboursé.",
-    code:
-      "VIDEO_GENERATION_REFUNDED",
-  });
-}
-  const partial =
-    await getPartialVideoGeneration(
-      uid,
-      generationId
-    );
-
-    // Sécurité : une génération reprise doit utiliser
-    // le même modèle Runway que la génération d'origine.
-    if (
-      partial.generation.model &&
-      partial.generation.model !== videoModel
-    ) {
-      return res.status(409).json({
-        error:
-          "Le modèle vidéo ne correspond pas à la génération d'origine.",
-        code: "VIDEO_MODEL_MISMATCH",
-      });
-    }
-
-
-
-  videoUrls = partial.videoUrls;
-
-  startSceneIndex =
-    partial.nextSceneIndex;
-
-  // Sécurité : l'histoire reprise doit avoir
-  // le même nombre de scènes.
-  if (
-    partial.generation.sceneCount !==
-    sceneCount
-  ) {
-    const error = new Error(
-      "Le nombre de scènes ne correspond pas à la génération d'origine."
-    );
-
-    error.code =
-      "VIDEO_SCENE_COUNT_MISMATCH";
-
-    throw error;
-  }
-
-  if (
-  partial.generation.imagesHash !==
-  imagesHash
+if (
+  !Array.isArray(images) ||
+  images.length === 0
 ) {
-  const error = new Error(
-    "Les images ne correspondent pas à la génération vidéo d'origine."
-  );
-
-  error.code =
-    "VIDEO_IMAGES_MISMATCH";
-
-  throw error;
+  return res
+    .status(400)
+    .json({
+      error:
+        "Aucune image de scène reçue.",
+    });
 }
 
-  if (partial.generation.narrationHash && partial.generation.narrationHash !== narrationHash) {
-    return res.status(409).json({ error: "Le texte ou la voix ne correspond pas à la génération d’origine." });
-  }
-  generationRef = partial.generationRef;
-  console.log(
-    `🔄 Reprise vidéo à la scène ${startSceneIndex + 1}/${sceneCount}`
-  );
+if (
+  images.length !== 4 &&
+  images.length !== 6
+) {
+  return res
+    .status(400)
+    .json({
+      error:
+        "Le dessin animé doit contenir exactement 4 ou 6 scènes.",
+    });
 }
 
-// ========================================
-// 🆕 NOUVELLE GÉNÉRATION
-// ========================================
-else {
-  generationRef =
+if (
+  !requestId ||
+  typeof requestId !== "string"
+) {
+  return res
+    .status(400)
+    .json({
+      error:
+        "Identifiant de requête vidéo manquant.",
+      code:
+        "VIDEO_REQUEST_ID_REQUIRED",
+    });
+}
+
+const sceneCount =
+  images.length;
+
+console.log(
+  "🆔 VIDEO requestId reçu :",
+  requestId
+);
+
+console.log(
+  "🎬 Nombre de scènes :",
+  sceneCount
+);
+
+console.log(
+  "🤖 Modèle vidéo :",
+  videoModel
+);
+
+const imagesHash =
+  createVideoImagesHash(
+    images
+  );
+
+// Empreinte stable de la narration.
+//
+// Elle permet d'empêcher qu'un même requestId
+// soit réutilisé accidentellement avec une
+// histoire différente.
+const narration =
+  JSON.stringify({
+    prompt:
+      typeof prompt === "string"
+        ? prompt
+        : "",
+
+    scenes:
+      Array.isArray(scenes)
+        ? scenes.map(
+            (scene) => ({
+              text:
+                typeof scene?.text ===
+                "string"
+                  ? scene.text
+                  : "",
+
+              emotion:
+                typeof scene?.emotion ===
+                "string"
+                  ? scene.emotion
+                  : "warm",
+            })
+          )
+        : [],
+
+    narrator:
+      typeof narrator === "string"
+        ? narrator
+        : "narratrice",
+
+    mode:
+      typeof mode === "string"
+        ? mode
+        : "story",
+
+    language:
+      typeof language === "string"
+        ? language
+        : "fr",
+  });
+
+let startSceneIndex =
+  0;
+
+      // ========================================
+      // 🔄 REPRISE D'UNE GÉNÉRATION PARTIELLE
+      // ========================================
+
+      if (generationId) {
+        const generationRefToCheck =
+          adminDb
+            .collection(
+              "videoGenerations"
+            )
+            .doc(
+              generationId
+            );
+
+        const reconciliation =
+          await reconcileStaleVideoGeneration(
+            uid,
+            generationRefToCheck
+          );
+
+        if (
+          reconciliation.action ===
+          "refunded"
+        ) {
+          return res
+            .status(409)
+            .json({
+              error:
+                "Cette ancienne génération a été annulée et le crédit vidéo a été remboursé.",
+
+              code:
+                "VIDEO_GENERATION_REFUNDED",
+            });
+        }
+
+        const partial =
+          await getPartialVideoGeneration(
+            uid,
+            generationId
+          );
+
+        // Sécurité :
+        // une génération reprise
+        // doit utiliser le même
+        // modèle Runway.
+        if (
+          partial.generation
+            .model &&
+          partial.generation
+            .model !==
+            videoModel
+        ) {
+          return res
+            .status(409)
+            .json({
+              error:
+                "Le modèle vidéo ne correspond pas à la génération d'origine.",
+
+              code:
+                "VIDEO_MODEL_MISMATCH",
+            });
+        }
+
+        generationRef =
+          partial.generationRef;
+
+        videoUrls =
+          partial.videoUrls;
+
+        startSceneIndex =
+          partial.nextSceneIndex;
+
+        // Sécurité :
+        // l'histoire reprise doit
+        // avoir le même nombre
+        // de scènes.
+        if (
+          partial.generation
+            .sceneCount !==
+          sceneCount
+        ) {
+          const error =
+            new Error(
+              "Le nombre de scènes ne correspond pas à la génération d'origine."
+            );
+
+          error.code =
+            "VIDEO_SCENE_COUNT_MISMATCH";
+
+          throw error;
+        }
+
+        if (
+          partial.generation
+            .imagesHash &&
+          partial.generation
+            .imagesHash !==
+            imagesHash
+        ) {
+          const error =
+            new Error(
+              "Les images ne correspondent pas à la génération vidéo d'origine."
+            );
+
+          error.code =
+            "VIDEO_IMAGES_MISMATCH";
+
+          throw error;
+        }
+
+        console.log(
+          `♻️ Reprise génération ${generationId} à partir de la scène ${startSceneIndex + 1}.`
+        );
+              }
+
+      // ========================================
+      // 🆕 NOUVELLE GÉNÉRATION
+      // ========================================
+      else {
+        generationRef =
   await reserveVideoCredit(
     uid,
     sceneCount,
     imagesHash,
     videoModel,
-    requestKey,
-    narrationHash
+    requestId,
+    narration
   );
 
-  console.log(
-    "💳 Crédit vidéo réservé :",
-    generationRef.id
-  );
-}
+        console.log(
+          "💳 Crédit vidéo réservé :",
+          generationRef.id
+        );
+      }
 
-// One worker at a time per generation; persist progress before each paid task.
-await adminDb.runTransaction(async transaction => {
-  const snap = await transaction.get(generationRef);
-  const data = snap.data();
-  if (data?.uid !== uid || !["reserved", "partial"].includes(data.status)) throw new Error("Génération indisponible.");
-  if (data.leaseUntil > Date.now()) throw new Error("Cette génération est déjà en cours. Patientez avant de reprendre.");
-  transaction.update(generationRef, { leaseOwner, leaseUntil: Date.now() + 20 * 60 * 1000,
-    status: "partial", narrationHash, animationVersion: 2 });
-});
-leaseOwned = true;
-heartbeat = setInterval(() => {
-  generationRef.update({ leaseUntil: Date.now() + 20 * 60 * 1000,
-    lastProgressAt: FieldValue.serverTimestamp() }).catch(error => console.error("Video heartbeat:", error.message));
-}, 60000);
-heartbeat.unref();
-workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "contemagiqueia-continuous-"));
-const bucket = getStorage().bucket();
-const narratedVideoPaths = [];
-for (let index = 0; index < images.length; index++) {
-  const sceneRef = generationRef.collection("continuousScenes").doc(String(index));
-  const snapshot = await sceneRef.get();
-  const state = snapshot.exists ? snapshot.data() : {};
-  const prefix = `videos/${uid}/${generationRef.id}/continuous/${index}`;
-  const sceneDir = path.join(workDir, String(index));
-  await fs.promises.mkdir(sceneDir, { recursive: true });
-  const files = {
-    exists: async name => (await bucket.file(`${prefix}/${name}`).exists())[0],
-    get: async (name, destination) => bucket.file(`${prefix}/${name}`).download({ destination }),
-    put: async (name, source) => bucket.upload(source, { destination: `${prefix}/${name}`,
-      resumable: false, metadata: { cacheControl: "private,max-age=3600" } }),
-  };
-  let narratedPath = path.join(sceneDir, "narrated.mp4");
-  let sceneUrl = state.finalVideoUrl;
-  if (sceneUrl && await files.exists("narrated.mp4")) {
-    await files.get("narrated.mp4", narratedPath);
-  } else {
-    const scene = narrationScenes[index];
-    narratedPath = await continuousScene({ state, files, ffmpeg: ffmpegPath, dir: sceneDir,
-      image: images[index], text: scene.text, model: videoModel, runway, download: downloadFile,
-      legacyVideoUrl: videoUrls[index],
-      createAudio: () => createNarrationMp3({ text: scene.text, emotion: scene.emotion || "warm", narrator, mode, language }),
-      saveState: value => sceneRef.set(value),
-    });
-    const token = crypto.randomUUID();
-    await bucket.upload(narratedPath, { destination: `${prefix}/narrated.mp4`, resumable: false,
-      metadata: { contentType: "video/mp4", cacheControl: "private,max-age=3600",
-        metadata: { firebaseStorageDownloadTokens: token } } });
-    sceneUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(prefix + "/narrated.mp4")}?alt=media&token=${token}`;
-    await sceneRef.set({ ...state, finalVideoUrl: sceneUrl });
-  }
-  narratedVideoPaths.push(narratedPath);
-  videoUrls[index] = sceneUrl;
-  await saveVideoSceneProgress(uid, generationRef, videoUrls);
-  console.log(`🎬 Scène animée et narrée ${index + 1}/${images.length} terminée.`);
-}
-  mergedVideo =
-    await mergeLocalVideoClips(
-      narratedVideoPaths,
-      generationRef.id
-    );
+      console.log(
+        `🎬 Génération de ${sceneCount} scènes vidéo Runway...`
+      );
 
-  console.log(
-    "🎬 Vidéo finale avec narration assemblée."
-  );
+      const narrationScenes =
+        Array.isArray(
+          req.body?.scenes
+        )
+          ? req.body.scenes
+          : [];
 
+      // ========================================
+      // 🎬 GÉNÉRATION / REPRISE DES SCÈNES
+      // ========================================
 
-  const finalVideoStoragePath =
-    `videos/${uid}/${generationRef.id}/final.mp4`;
+      for (
+        let index =
+          startSceneIndex;
+        index <
+        images.length;
+        index++
+      ) {
+        const imageUrl =
+          images[index];
 
-  const finalVideoFile =
-    bucket.file(
-      finalVideoStoragePath
-    );
+        console.log(
+          `🖼️ Image reçue scène ${index + 1} :`,
+          {
+            type:
+              typeof imageUrl,
 
-  const downloadToken =
-    crypto.randomUUID();
+            length:
+              typeof imageUrl ===
+              "string"
+                ? imageUrl.length
+                : null,
 
-  await finalVideoFile.save(
-    mergedVideo.buffer,
-    {
-      resumable: false,
+            start:
+              typeof imageUrl ===
+              "string"
+                ? imageUrl.slice(
+                    0,
+                    100
+                  )
+                : imageUrl,
+          }
+        );
 
-      metadata: {
-        contentType: "video/mp4",
-        cacheControl:
-          "private,max-age=3600",
+        if (
+          typeof imageUrl !==
+            "string" ||
+          !imageUrl.trim()
+        ) {
+          throw new Error(
+            `Image invalide pour la scène ${index + 1}.`
+          );
+        }
 
-        metadata: {
-          firebaseStorageDownloadTokens:
-            downloadToken,
-        },
-      },
+        // La génération passe en état
+        // "partial" AVANT la soumission
+        // Runway.
+        //
+        // Ainsi, si Render ou le téléphone
+        // se coupe pendant une tâche Runway,
+        // la génération reste récupérable
+        // et le crédit n'est pas remboursé
+        // alors qu'une tâche payante peut
+        // encore être en cours.
+        await generationRef.update({
+          status:
+            "partial",
+
+          nextSceneIndex:
+            index,
+
+          lastProgressAt:
+            FieldValue
+              .serverTimestamp(),
+        });
+
+        let runwayPromptImage =
+          imageUrl;
+
+        // ========================================
+        // 📤 IMAGE BASE64 -> RUNWAY
+        // ========================================
+
+        if (
+          imageUrl.startsWith(
+            "data:image/"
+          )
+        ) {
+          const match =
+            imageUrl.match(
+              /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/
+            );
+
+          if (!match) {
+            throw new Error(
+              `Image base64 invalide pour la scène ${index + 1}.`
+            );
+          }
+
+          const mimeType =
+            match[1];
+
+          const base64Data =
+            match[2];
+
+          const extension =
+            mimeType ===
+            "image/png"
+              ? "png"
+              : mimeType ===
+                  "image/webp"
+                ? "webp"
+                : "jpg";
+
+          const imageBuffer =
+            Buffer.from(
+              base64Data,
+              "base64"
+            );
+
+          if (
+            !imageBuffer.length
+          ) {
+            throw new Error(
+              `Image vide pour la scène ${index + 1}.`
+            );
+          }
+
+          const runwayFile =
+            await runwayToFile(
+              imageBuffer,
+              `scene-${index + 1}.${extension}`
+            );
+
+          const upload =
+            await runway.uploads
+              .createEphemeral(
+                runwayFile
+              );
+
+          if (
+            !upload?.uri
+          ) {
+            throw new Error(
+              `Impossible d'envoyer l'image de la scène ${index + 1} à Runway.`
+            );
+          }
+
+          runwayPromptImage =
+            upload.uri;
+
+          console.log(
+            `📤 Image scène ${index + 1} envoyée à Runway :`,
+            runwayPromptImage
+          );
+        }
+
+        // ========================================
+        // 📝 CONTEXTE DE LA SCÈNE
+        // ========================================
+
+        const sceneData =
+          narrationScenes[
+            index
+          ] || {};
+
+        const globalPrompt =
+          typeof prompt ===
+          "string"
+            ? prompt.trim()
+            : "";
+
+        const sceneText =
+          typeof sceneData.text ===
+          "string"
+            ? sceneData.text.trim()
+            : "";
+
+        const sceneImagePrompt =
+          typeof sceneData
+            .imagePrompt ===
+          "string"
+            ? sceneData
+                .imagePrompt
+                .trim()
+            : "";
+
+        const sceneActionPrompt =
+          [
+            sceneImagePrompt,
+            sceneText,
+            globalPrompt,
+          ]
+            .filter(Boolean)
+            .join(" ");
+
+        console.log(
+          `📝 Préparation Runway scène ${index + 1}/${sceneCount}`
+        );
+
+        // ========================================
+        // ♻️ CRÉATION OU REPRISE RUNWAY
+        // ========================================
+
+        const sceneVideoUrl =
+          await createOrResumeRunwayScene({
+            uid,
+
+            generationRef,
+
+            sceneIndex:
+              index,
+
+            imageUrl:
+              runwayPromptImage,
+
+            scenePrompt:
+              sceneActionPrompt,
+
+            videoModel,
+          });
+
+        if (
+          !sceneVideoUrl
+        ) {
+          throw new Error(
+            `Runway n'a retourné aucune vidéo pour la scène ${index + 1}.`
+          );
+        }
+
+        // Évite un doublon dans
+        // videoUrls si la scène avait
+        // déjà été enregistrée.
+        videoUrls[index] =
+          sceneVideoUrl;
+
+        // Retire d'éventuelles cases
+        // vides avant sauvegarde.
+        const completedVideoUrls =
+          videoUrls.filter(
+            (url) =>
+              typeof url ===
+                "string" &&
+              url.trim()
+          );
+
+        await saveVideoSceneProgress(
+          uid,
+          generationRef,
+          completedVideoUrls
+        );
+
+        videoUrls =
+          completedVideoUrls;
+
+        console.log(
+          `✅ Scène ${index + 1}/${sceneCount} générée ou récupérée.`
+        );
+      }
+
+      if (
+        videoUrls.length !==
+        sceneCount
+      ) {
+        throw new Error(
+          `La génération vidéo est incomplète : ${videoUrls.length}/${sceneCount} scènes disponibles.`
+        );
+      }
+
+      runwaySucceeded =
+        true;
+
+      console.log(
+        `✅ Dessin animé complet généré : ${sceneCount} scènes`,
+        generationRef.id
+      );
+
+      // ========================================
+      // 🔊 NARRATION
+      // ========================================
+
+      // narrator, mode et language ont déjà été
+// récupérés et normalisés au début de la route /video.
+
+      if (
+        narrationScenes.length !==
+        videoUrls.length
+      ) {
+        throw new Error(
+          "Le nombre de textes ne correspond pas au nombre de scènes vidéo."
+        );
+      }
+
+      const narrationTempDir =
+        await fs.promises.mkdtemp(
+          path.join(
+            os.tmpdir(),
+            "contemagiqueia-narration-"
+          )
+        );
+
+      let mergedVideo =
+        null;
+
+      try {
+        const narratedVideoPaths =
+          [];
+
+        for (
+          let index = 0;
+          index <
+          videoUrls.length;
+          index++
+        ) {
+          const sceneData =
+            narrationScenes[
+              index
+            ] || {};
+
+          const narratedPath =
+            await createNarratedSceneVideo({
+              videoUrl:
+                videoUrls[
+                  index
+                ],
+
+              sceneText:
+                sceneData.text ||
+                "",
+
+              emotion:
+                sceneData.emotion ||
+                sceneData.ambience ||
+                "warm",
+
+              narrator,
+
+              mode,
+
+              language,
+
+              sceneIndex:
+                index,
+
+              tempDir:
+                narrationTempDir,
+            });
+
+          narratedVideoPaths.push(
+            narratedPath
+          );
+
+          console.log(
+            `🔊 Narration scène ${index + 1}/${videoUrls.length} créée.`
+          );
+        }
+
+        // ========================================
+        // 🎞️ ASSEMBLAGE FINAL
+        // ========================================
+
+        mergedVideo =
+          await mergeLocalVideoClips(
+            narratedVideoPaths,
+            generationRef.id
+          );
+
+        console.log(
+          "🎬 Vidéo finale avec narration assemblée."
+        );
+
+        // ========================================
+        // ☁️ FIREBASE STORAGE
+        // ========================================
+
+        const bucket =
+          adminStorage.bucket();
+
+        const finalVideoStoragePath =
+          `videos/${uid}/${generationRef.id}/final.mp4`;
+
+        const finalVideoFile =
+          bucket.file(
+            finalVideoStoragePath
+          );
+
+        const downloadToken =
+          crypto.randomUUID();
+
+        await finalVideoFile.save(
+          mergedVideo.buffer,
+          {
+            resumable:
+              false,
+
+            metadata: {
+              contentType:
+                "video/mp4",
+
+              cacheControl:
+                "private,max-age=3600",
+
+              metadata: {
+                firebaseStorageDownloadTokens:
+                  downloadToken,
+              },
+            },
+          }
+        );
+
+        const encodedStoragePath =
+          encodeURIComponent(
+            finalVideoStoragePath
+          );
+
+        const finalVideoUrl =
+          `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedStoragePath}?alt=media&token=${downloadToken}`;
+
+        console.log(
+          "🎬 URL finale Firebase :",
+          finalVideoUrl
+        );
+
+        await generationRef.update({
+          finalVideoUrl,
+
+          finalVideoStoragePath,
+
+          finalVideoCreatedAt:
+            FieldValue
+              .serverTimestamp(),
+        });
+
+        await completeVideoGeneration(
+          uid,
+          generationRef,
+          videoUrls
+        );
+
+        return res.json({
+          success:
+            true,
+
+          videoUrls,
+
+          finalVideoUrl,
+
+          sceneCount,
+
+          generationId:
+            generationRef.id,
+        });
+      } finally {
+        await fs.promises.rm(
+          narrationTempDir,
+          {
+            recursive:
+              true,
+
+            force:
+              true,
+          }
+        );
+
+        if (
+          mergedVideo?.tempDir
+        ) {
+          await fs.promises.rm(
+            mergedVideo.tempDir,
+            {
+              recursive:
+                true,
+
+              force:
+                true,
+            }
+          );
+        }
+      }
+    } catch (error) {
+      console.error(
+        "❌ Erreur génération vidéo Runway :",
+        error
+      );
+
+      // ========================================
+      // 💳 PROTECTION DU CRÉDIT
+      // ========================================
+
+      if (
+        uid &&
+        generationRef &&
+        !runwaySucceeded
+      ) {
+        try {
+          const generationSnapshot =
+            await generationRef.get();
+
+          const generation =
+            generationSnapshot.exists
+              ? generationSnapshot.data()
+              : null;
+
+          const runwayTasks =
+            generation
+              ?.runwayTasks ||
+            {};
+
+          const taskStates =
+            Object.values(
+              runwayTasks
+            );
+
+          const hasSubmittedRunwayTask =
+            taskStates.some(
+              (task) =>
+                task &&
+                (
+                  task.taskId ||
+                  task.status ===
+                    "submitting" ||
+                  task.status ===
+                    "processing" ||
+                  task.status ===
+                    "completed"
+                )
+            );
+
+          // Une tâche Runway a déjà été
+          // soumise ou peut encore être
+          // en cours.
+          //
+          // Dans ce cas, NE PAS rendre
+          // automatiquement le crédit.
+          if (
+            hasSubmittedRunwayTask
+          ) {
+            const completedUrls =
+              videoUrls.filter(
+                (url) =>
+                  typeof url ===
+                    "string" &&
+                  url.trim()
+              );
+
+            await generationRef.update({
+              status:
+                "partial",
+
+              videoUrls:
+                completedUrls,
+
+              completedScenes:
+                completedUrls.length,
+
+              nextSceneIndex:
+                completedUrls.length,
+
+              lastErrorAt:
+                FieldValue
+                  .serverTimestamp(),
+
+              lastError:
+                String(
+                  error?.message ||
+                    "Erreur vidéo"
+                ).slice(
+                  0,
+                  1000
+                ),
+            });
+
+            console.log(
+              "⚠️ Génération conservée pour reprise afin d'éviter une double consommation Runway."
+            );
+          }
+
+          // Aucun appel Runway n'a encore
+          // été soumis : le crédit peut
+          // être rendu sans risque.
+          else if (
+            videoUrls.length ===
+            0
+          ) {
+            await refundVideoCredit(
+              uid,
+              generationRef
+            );
+
+            console.log(
+              "💰 Crédit vidéo remboursé :",
+              generationRef.id
+            );
+          }
+
+          // Des vidéos existent déjà :
+          // conservation pour reprise.
+          else {
+            await savePartialVideoGeneration(
+              uid,
+              generationRef,
+              videoUrls,
+              videoUrls.length
+            );
+
+            console.log(
+              `⚠️ Génération partielle sauvegardée : ${videoUrls.length} scène(s) terminée(s).`
+            );
+          }
+        } catch (
+          creditError
+        ) {
+          console.error(
+            "❌ Erreur gestion crédit vidéo après échec :",
+            creditError
+          );
+        }
+      }
+
+      if (
+        error?.code ===
+        "NO_VIDEO_CREDIT"
+      ) {
+        return res
+          .status(402)
+          .json({
+            error:
+              "Aucun crédit vidéo disponible.",
+
+            code:
+              "NO_VIDEO_CREDIT",
+          });
+      }
+
+      if (
+        error?.code ===
+        "RUNWAY_SUBMISSION_UNCERTAIN"
+      ) {
+        return res
+          .status(409)
+          .json({
+            error:
+              "Une demande Runway a peut-être déjà été envoyée pour cette scène. Elle n'est pas relancée automatiquement afin d'éviter une double facturation.",
+
+            code:
+              "RUNWAY_SUBMISSION_UNCERTAIN",
+
+            generationId:
+              generationRef?.id ||
+              null,
+          });
+      }
+
+      if (
+        error?.code ===
+        "RUNWAY_TASK_TIMEOUT"
+      ) {
+        return res
+          .status(202)
+          .json({
+            success:
+              false,
+
+            pending:
+              true,
+
+            error:
+              "La génération Runway est toujours en cours. Elle pourra être reprise avec le même generationId.",
+
+            code:
+              "RUNWAY_TASK_TIMEOUT",
+
+            generationId:
+              generationRef?.id ||
+              null,
+
+            completedScenes:
+              videoUrls.length,
+          });
+      }
+
+      if (
+        error instanceof
+        TaskFailedError
+      ) {
+        console.error(
+          "Détails Runway :",
+          error.taskDetails
+        );
+      }
+
+      return res
+        .status(500)
+        .json({
+          error:
+            "Erreur génération vidéo",
+
+          details:
+            error?.message,
+
+          code:
+            error?.code ||
+            null,
+
+          generationId:
+            generationRef?.id ||
+            null,
+        });
     }
-  );
-
-  const encodedStoragePath =
-  encodeURIComponent(
-    finalVideoStoragePath
-  );
-
-const finalVideoUrl =
-  `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedStoragePath}?alt=media&token=${downloadToken}`;
-
-console.log(
-  "🎬 URL finale Firebase :",
-  finalVideoUrl
+  }
 );
 
-  await generationRef.update({
-    finalVideoUrl,
-  });
-
-  await completeVideoGeneration(
-    uid,
-    generationRef,
-    videoUrls
-  );
-
-  return res.json({
-    success: true,
-    videoUrls,
-    finalVideoUrl,
-    sceneCount,
-    generationId:
-      generationRef.id,
-  });
-} catch (error) {
-  console.error(
-    "❌ Erreur génération vidéo Runway :",
-    error
-  );
-
-  if (
-    uid &&
-    generationRef &&
-    leaseOwned
-  ) {
-    try {
-      if (error?.code === "RUNWAY_TASK_FAILED") {
-        // A terminal provider failure must not strand a purchased app credit,
-        // including on older clients that cannot send a resume identifier.
-        await refundVideoCredit(uid, generationRef);
-        creditRefunded = true;
-        await generationRef.update({ failureCode: error.failureCode || "UNKNOWN", failedTaskId: error.taskId || null });
-      } else {
-        await generationRef.update({ status: "partial", lastErrorAt: FieldValue.serverTimestamp() });
-      }
-    } catch (creditError) {
-      console.error(
-        "❌ Erreur gestion crédit vidéo après échec :",
-        creditError
-      );
-    }
-  }
-
-  if (
-    error?.code ===
-    "NO_VIDEO_CREDIT"
-  ) {
-    return res.status(402).json({
-      error:
-        "Aucun crédit vidéo disponible.",
-      code:
-        "NO_VIDEO_CREDIT",
-    });
-  }
-
-  if (
-    error instanceof TaskFailedError
-  ) {
-    console.error(
-      "Détails Runway :",
-      error.taskDetails
-    );
-  }
-
-  return res.status(500).json({
-    error:
-      creditRefunded ? "La création a échoué chez le fournisseur vidéo. Votre crédit dessin animé a été restitué. Vous pouvez réessayer." : "Erreur génération vidéo",
-    details:
-      creditRefunded ? "La création a échoué chez le fournisseur vidéo. Votre crédit dessin animé a été restitué. Vous pouvez réessayer." : error?.message,
-    code: creditRefunded ? "VIDEO_GENERATION_REFUNDED" : error?.code,
-    generationId: generationRef?.id || null,
-  });
-} finally {
-  if (heartbeat) clearInterval(heartbeat);
-  if (leaseOwned) {
-    await adminDb.runTransaction(async transaction => {
-      const snap = await transaction.get(generationRef);
-      if (snap.data()?.leaseOwner === leaseOwner) transaction.update(generationRef, { leaseUntil: 0, leaseOwner: null });
-    }).catch(error => console.error("Video lease cleanup:", error.message));
-  }
-  for (const dir of [workDir, mergedVideo?.tempDir].filter(Boolean)) {
-    await fs.promises.rm(dir, { recursive: true, force: true }).catch(error => console.error("Video cleanup:", error.message));
-  }
-}
-});
+// =========================
+// 🎞️ ASSEMBLAGE LOCAL
+// =========================
 
 async function mergeLocalVideoClips(
   localFiles,
   generationId
 ) {
   if (!ffmpegPath) {
-    throw new Error("FFmpeg introuvable.");
+    throw new Error(
+      "FFmpeg introuvable."
+    );
   }
 
   if (
-    !Array.isArray(localFiles) ||
+    !Array.isArray(
+      localFiles
+    ) ||
     localFiles.length === 0
   ) {
     throw new Error(
@@ -3338,46 +6026,56 @@ async function mergeLocalVideoClips(
     );
 
   await new Promise(
-    (resolve, reject) => {
-      const ffmpeg = spawn(
-        ffmpegPath,
-        [
-          "-y",
-          "-f",
-          "concat",
-          "-safe",
-          "0",
-          "-i",
-          concatFilePath,
-          "-c:v",
-          "libx264",
+    (
+      resolve,
+      reject
+    ) => {
+      const ffmpeg =
+        spawn(
+          ffmpegPath,
+          [
+            "-y",
 
-          "-preset",
-          "veryfast",
+            "-f",
+            "concat",
 
-          "-crf",
-          "20",
+            "-safe",
+            "0",
 
-          "-c:a",
-          "aac",
+            "-i",
+            concatFilePath,
 
-          "-b:a",
-          "160k",
+            "-c:v",
+            "libx264",
 
-          "-pix_fmt",
-          "yuv420p",
+            "-preset",
+            "veryfast",
 
-          "-movflags",
-          "+faststart",
+            "-crf",
+            "20",
 
-          outputPath,
-        ],
-        {
-          windowsHide: true,
-        }
-      );
+            "-c:a",
+            "aac",
 
-      let stderr = "";
+            "-b:a",
+            "160k",
+
+            "-pix_fmt",
+            "yuv420p",
+
+            "-movflags",
+            "+faststart",
+
+            outputPath,
+          ],
+          {
+            windowsHide:
+              true,
+          }
+        );
+
+      let stderr =
+        "";
 
       ffmpeg.stderr.on(
         "data",
@@ -3390,8 +6088,10 @@ async function mergeLocalVideoClips(
       ffmpeg.on(
         "close",
         (code) => {
-          if (code === 0) {
-            resolve();
+          if (
+            code === 0
+          ) {
+                        resolve();
           } else {
             reject(
               new Error(
@@ -3415,17 +6115,27 @@ async function mergeLocalVideoClips(
     );
 
   return {
-    buffer: finalBuffer,
+    buffer:
+      finalBuffer,
+
     tempDir,
   };
 }
 
+// =========================
+// 🔔 ADMIN - NOTIFICATIONS
+// =========================
+
 app.post(
   "/admin/send-notification",
+
   async (req, res) => {
     try {
       const adminUser =
-        await requireAdminUser(req, res);
+        await requireAdminUser(
+          req,
+          res
+        );
 
       if (!adminUser) {
         return;
@@ -3441,15 +6151,19 @@ app.post(
         !title?.trim() ||
         !body?.trim()
       ) {
-        return res.status(400).json({
-          error:
-            "Le titre et le message sont obligatoires.",
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Le titre et le message sont obligatoires.",
+          });
       }
 
       const usersSnapshot =
         await adminDb
-          .collection("users")
+          .collection(
+            "users"
+          )
           .where(
             "pushNotificationsEnabled",
             "==",
@@ -3457,51 +6171,77 @@ app.post(
           )
           .get();
 
-      const tokens = [];
+      const tokens =
+        [];
 
       usersSnapshot.forEach(
-        (docSnapshot) => {
+        (
+          docSnapshot
+        ) => {
           const userData =
-            docSnapshot.data() || {};
+            docSnapshot.data() ||
+            {};
 
           const token =
-            userData.expoPushToken;
+            userData
+              .expoPushToken;
 
           if (
-            typeof token === "string" &&
+            typeof token ===
+              "string" &&
             token.startsWith(
               "ExponentPushToken["
             )
           ) {
-            tokens.push(token);
+            tokens.push(
+              token
+            );
           }
         }
       );
 
-      if (tokens.length === 0) {
+      if (
+        tokens.length ===
+        0
+      ) {
         return res.json({
-          success: true,
-          sent: 0,
+          success:
+            true,
+
+          sent:
+            0,
+
           message:
             "Aucun appareil inscrit aux notifications.",
         });
       }
 
-      const results = [];
+      const results =
+        [];
 
-      for (const token of tokens) {
+      for (
+        const token of
+        tokens
+      ) {
         try {
           const result =
             await sendExpoPushNotification({
-              to: token,
+              to:
+                token,
+
               title,
+
               body,
+
               data,
             });
 
           results.push({
             token,
-            success: true,
+
+            success:
+              true,
+
             result,
           });
         } catch (error) {
@@ -3512,27 +6252,40 @@ app.post(
 
           results.push({
             token,
-            success: false,
+
+            success:
+              false,
+
             error:
-              error instanceof Error
+              error instanceof
+              Error
                 ? error.message
-                : String(error),
+                : String(
+                    error
+                  ),
           });
         }
       }
 
       const sent =
         results.filter(
-          (item) => item.success
+          (item) =>
+            item.success
         ).length;
 
       const failed =
-        results.length - sent;
+        results.length -
+        sent;
 
       return res.json({
-        success: true,
-        total: results.length,
+        success:
+          true,
+
+        total:
+          results.length,
+
         sent,
+
         failed,
       });
     } catch (error) {
@@ -3541,20 +6294,38 @@ app.post(
         error
       );
 
-      return res.status(500).json({
-        error:
-          "Erreur pendant l'envoi des notifications.",
-        details:
-          error instanceof Error
-            ? error.message
-            : String(error),
-      });
+      return res
+        .status(500)
+        .json({
+          error:
+            "Erreur pendant l'envoi des notifications.",
+
+          details:
+            error instanceof
+            Error
+              ? error.message
+              : String(
+                  error
+                ),
+        });
     }
   }
 );
 
-const PORT = process.env.PORT || 3000;
+// =========================
+// 🚀 LANCEMENT DU SERVEUR
+// =========================
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Backend lancé sur ${PORT}`);
-});
+const PORT =
+  process.env.PORT ||
+  3000;
+
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+    console.log(
+      `Backend lancé sur ${PORT}`
+    );
+  }
+);
