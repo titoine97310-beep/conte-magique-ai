@@ -4435,97 +4435,114 @@ function createVideoImagesHash(
 function buildRunwayMotionPrompt(
   scenePrompt = ""
 ) {
+  const cleanScenePrompt =
+    String(scenePrompt || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
   const basePrompt = `
-Animate the exact source illustration with very high visual fidelity.
+Animate the exact source illustration as a lively children's animated movie scene.
 
-Preserve every main character exactly as shown in the source image.
+PRESERVE THE SOURCE IMAGE:
+Keep the same characters, faces, clothing, colors, proportions, environment and illustration style.
 
-IDENTITY LOCK:
-- same face
-- same facial structure
+CHARACTER IDENTITY LOCK:
+- same face and facial structure
 - same skin tone
-- same hairstyle
-- same hair color
+- same hairstyle and hair color
 - same apparent age
 - same body proportions
-- same clothing
-- same clothing colors
-- same shoes
-- same accessories
+- same clothing and clothing colors
+- same shoes and accessories
 - same important objects
+- do not redesign the characters
 
-STRICT CONTINUITY:
+CHARACTER CONTINUITY:
 - do not add characters
 - do not remove characters
 - do not duplicate characters
 - do not merge characters
 - do not replace characters
-- do not redesign faces
-- do not change clothes
-- do not change colors
-- do not invent accessories
 - do not transform one character into another
+- do not change clothing
+- do not invent new accessories
 
-MOVEMENT:
-Use only subtle and natural animation:
-- blinking
-- breathing
-- very small head movements
-- gentle hand or arm movements when appropriate
-- slight hair movement
-- slight environmental movement
+ACTION AND MOVEMENT:
+Create clearly visible, natural and expressive movement.
+
+The characters should actively perform the action suggested by the scene context.
+
+When appropriate:
+- characters can walk, run, turn, reach, point, wave or interact
+- characters can move their arms, hands, head and body naturally
+- characters can look at each other or react to events
+- use expressive but natural body language
+- animate hair and clothing naturally
+- animate relevant objects in the scene
+- animate the environment when appropriate
+- use natural blinking and facial reactions
+
+Do not keep the characters almost motionless.
+Do not limit the animation to only blinking or breathing.
 
 CAMERA:
-- locked camera
-- no zoom
-- no pan
-- no dolly
-- no camera rotation
-- preserve the original framing
-- keep all main characters visible
-- do not crop heads or bodies
+Use gentle cinematic camera movement when it improves the scene.
+
+Allowed camera movement:
+- slow push-in
+- slow pull-back
+- gentle pan
+- subtle tracking movement
+- slight cinematic reframing
+
+Keep camera movement smooth and child-friendly.
+
+Do not use:
+- violent camera shake
+- rapid spinning
+- extreme zoom
+- abrupt cuts
+- distorted perspective
+
+Keep the important characters visible and avoid cropping faces.
+
+SCENE DIRECTION:
+The animation must visually express what is happening in the scene context.
+
+Prioritize one clear main action instead of random movement.
+
+If the scene describes movement, show that movement clearly.
+If the scene describes a reaction, animate the character's reaction.
+If the scene contains magic, animate the magical elements.
+If the scene contains nature, give the environment gentle life.
+If the scene is calm, use slower movement.
+If the scene is exciting, use more energetic but controlled movement.
 
 STYLE:
-Preserve the exact illustration style, lighting, colors, atmosphere and visual identity of the source image.
+Preserve the exact illustration style, lighting, colors and atmosphere of the source image.
 
-The result must look like the original illustration gently coming to life, not like a newly redesigned scene.
+The result should feel like the original illustration has become a real animated children's movie scene.
 
-Smooth, stable, child-friendly animation.
+Smooth, coherent, expressive and stable animation.
 `;
 
-  const cleanScenePrompt =
-    String(
-      scenePrompt || ""
-    )
-      .replace(
-        /\s+/g,
-        " "
-      )
-      .trim();
-
-  if (
-    !cleanScenePrompt
-  ) {
+  if (!cleanScenePrompt) {
     return basePrompt
       .trim()
-      .slice(
-        0,
-        1000
-      );
+      .slice(0, 1000);
   }
 
   const sceneContext = `
-Scene context:
+SCENE CONTEXT:
 ${cleanScenePrompt}
+
+Animate the characters according to this specific scene while preserving their identity and the original illustration.
 `;
 
   return `${basePrompt}
 ${sceneContext}`
     .trim()
-    .slice(
-      0,
-      1000
-    );
+    .slice(0, 1000);
 }
 
 function getRunwayTaskOutputUrl(
