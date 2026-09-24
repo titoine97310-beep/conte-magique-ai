@@ -4,8 +4,7 @@ import {
   SignedDataVerifier,
 } from "@apple/app-store-server-library";
 import RunwayML, {
-  TaskFailedError,
-  toFile as runwayToFile,
+  TaskFailedError
 } from "@runwayml/sdk";
 import { spawn } from "child_process";
 import cors from "cors";
@@ -22,7 +21,9 @@ import { google } from "googleapis";
 import OpenAI, { toFile } from "openai";
 import os from "os";
 import path from "path";
-
+import {
+  continuousScene,
+} from "./backend/continuous-video.js";
 dotenv.config();
 
 console.log(
@@ -4769,6 +4770,344 @@ async function waitForRunwayTask(
   throw error;
 }
 
+// ========================================
+// 🎬 CONTINUOUS VIDEO - FIREBASE ADAPTER
+// ========================================
+
+async function getContinuousSceneState(
+  uid,
+  generationRef,
+  sceneIndex
+) {
+  const snapshot =
+    await generationRef.get();
+
+  if (!snapshot.exists) {
+    throw new Error(
+      "Génération vidéo introuvable."
+    );
+  }
+
+  const generation =
+    snapshot.data();
+
+  if (generation.uid !== uid) {
+    throw new Error(
+      "Utilisateur incorrect pour cette génération vidéo."
+    );
+  }
+
+  const existingState =
+    generation
+      ?.continuousScenes?.[
+        sceneIndex
+      ];
+
+  if (
+    existingState &&
+    typeof existingState ===
+      "object"
+  ) {
+    return existingState;
+  }
+
+  return {
+    clips: [],
+  };
+}
+
+async function saveContinuousSceneState({
+  uid,
+  generationRef,
+  sceneIndex,
+  state,
+}) {
+  const snapshot =
+    await generationRef.get();
+
+  if (!snapshot.exists) {
+    throw new Error(
+      "Génération vidéo introuvable."
+    );
+  }
+
+  const generation =
+    snapshot.data();
+
+  if (generation.uid !== uid) {
+    throw new Error(
+      "Utilisateur incorrect pour cette génération vidéo."
+    );
+  }
+
+  await generationRef.update({
+    [`continuousScenes.${sceneIndex}`]:
+      state,
+
+    status:
+      "partial",
+
+    lastProgressAt:
+      FieldValue.serverTimestamp(),
+  });
+}
+
+function createContinuousSceneFiles({
+  uid,
+  generationId,
+  sceneIndex,
+}) {
+  const bucket =
+    adminStorage.bucket();
+
+  const basePath =
+    `videos/${uid}/${generationId}/continuous/scene-${sceneIndex + 1}`;
+
+  function storagePath(
+    name
+  ) {
+    return `${basePath}/${name}`;
+  }
+
+  return {
+    async exists(name) {
+      const file =
+        bucket.file(
+          storagePath(name)
+        );
+
+      const [exists] =
+        await file.exists();
+
+      return exists;
+    },
+
+    async get(
+      name,
+      localPath
+    ) {
+      const file =
+        bucket.file(
+          storagePath(name)
+        );
+
+      await file.download({
+        destination:
+          localPath,
+      });
+    },
+
+    async put(
+      name,
+      localPath
+    ) {
+      const file =
+        bucket.file(
+          storagePath(name)
+        );
+
+      await bucket.upload(
+        localPath,
+        {
+          destination:
+            file.name,
+
+          resumable:
+            false,
+
+          metadata: {
+            cacheControl:
+              "private,max-age=3600",
+          },
+        }
+      );
+    },
+  };
+}
+
+async function createContinuousNarratedScene({
+  uid,
+  generationRef,
+  sceneIndex,
+  imageUrl,
+  sceneText,
+  motionText,
+  emotion,
+  narrator,
+  mode,
+  language,
+  videoModel,
+  legacyVideoUrl = null,
+  tempDir,
+}) {
+  if (!ffmpegPath) {
+    throw new Error(
+      "FFmpeg introuvable."
+    );
+  }
+
+  const state =
+    await getContinuousSceneState(
+      uid,
+      generationRef,
+      sceneIndex
+    );
+
+  const files =
+    createContinuousSceneFiles({
+      uid,
+      generationId:
+        generationRef.id,
+      sceneIndex,
+    });
+
+  const sceneDir =
+    path.join(
+      tempDir,
+      `continuous-scene-${sceneIndex + 1}`
+    );
+
+  const saveState =
+    async (nextState) => {
+      await saveContinuousSceneState({
+        uid,
+        generationRef,
+        sceneIndex,
+        state:
+          nextState,
+      });
+    };
+
+  const createAudio =
+    async () => {
+      return createNarrationMp3({
+        text:
+          sceneText,
+
+        mode,
+
+        emotion,
+
+        narrator,
+
+        language,
+      });
+    };
+
+  return continuousScene({
+    state,
+
+    saveState,
+
+    files,
+
+    createAudio,
+
+    runway,
+
+    download:
+      downloadFile,
+
+    ffmpeg:
+      ffmpegPath,
+
+    dir:
+      sceneDir,
+
+    image:
+      imageUrl,
+
+    // Le texte envoyé à Runway peut
+    // contenir le prompt visuel,
+    // la narration et le contexte global.
+    text:
+      motionText ||
+      sceneText,
+
+    model:
+      videoModel,
+
+    // Permet de reprendre une ancienne
+    // première vidéo Runway si elle existe.
+    legacyVideoUrl,
+  });
+}
+
+// ========================================
+// ☁️ SAUVEGARDE D'UNE SCÈNE CONTINUE
+// ========================================
+
+async function saveContinuousNarratedScene({
+  uid,
+  generationRef,
+  sceneIndex,
+  localPath,
+}) {
+  const bucket =
+    adminStorage.bucket();
+
+  const storagePath =
+    `videos/${uid}/${generationRef.id}/continuous/scene-${sceneIndex + 1}/narrated.mp4`;
+
+  const file =
+    bucket.file(
+      storagePath
+    );
+
+  const downloadToken =
+    crypto.randomUUID();
+
+  await file.save(
+    await fs.promises.readFile(
+      localPath
+    ),
+    {
+      resumable:
+        false,
+
+      metadata: {
+        contentType:
+          "video/mp4",
+
+        cacheControl:
+          "private,max-age=3600",
+
+        metadata: {
+          firebaseStorageDownloadTokens:
+            downloadToken,
+        },
+      },
+    }
+  );
+
+  const encodedPath =
+    encodeURIComponent(
+      storagePath
+    );
+
+  const videoUrl =
+    `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+
+  await generationRef.update({
+    [`continuousScenes.${sceneIndex}.narratedVideoUrl`]:
+      videoUrl,
+
+    [`continuousScenes.${sceneIndex}.narratedStoragePath`]:
+      storagePath,
+
+    [`continuousScenes.${sceneIndex}.completed`]:
+      true,
+
+    [`continuousScenes.${sceneIndex}.completedAt`]:
+      FieldValue.serverTimestamp(),
+
+    lastProgressAt:
+      FieldValue.serverTimestamp(),
+  });
+
+  return videoUrl;
+}
+
 async function createOrResumeRunwayScene({
   uid,
   generationRef,
@@ -4851,7 +5190,7 @@ async function createOrResumeRunwayScene({
               ),
 
             ratio:
-              "1280:720",
+              "720:1280",
 
             duration:
               5,
@@ -5264,8 +5603,8 @@ let startSceneIndex =
         );
       }
 
-      console.log(
-        `🎬 Génération de ${sceneCount} scènes vidéo Runway...`
+            console.log(
+        `🎬 Génération continue de ${sceneCount} scènes vidéo...`
       );
 
       const narrationScenes =
@@ -5275,297 +5614,24 @@ let startSceneIndex =
           ? req.body.scenes
           : [];
 
-      // ========================================
-      // 🎬 GÉNÉRATION / REPRISE DES SCÈNES
-      // ========================================
-
-      for (
-        let index =
-          startSceneIndex;
-        index <
-        images.length;
-        index++
-      ) {
-        const imageUrl =
-          images[index];
-
-        console.log(
-          `🖼️ Image reçue scène ${index + 1} :`,
-          {
-            type:
-              typeof imageUrl,
-
-            length:
-              typeof imageUrl ===
-              "string"
-                ? imageUrl.length
-                : null,
-
-            start:
-              typeof imageUrl ===
-              "string"
-                ? imageUrl.slice(
-                    0,
-                    100
-                  )
-                : imageUrl,
-          }
-        );
-
-        if (
-          typeof imageUrl !==
-            "string" ||
-          !imageUrl.trim()
-        ) {
-          throw new Error(
-            `Image invalide pour la scène ${index + 1}.`
-          );
-        }
-
-        // La génération passe en état
-        // "partial" AVANT la soumission
-        // Runway.
-        //
-        // Ainsi, si Render ou le téléphone
-        // se coupe pendant une tâche Runway,
-        // la génération reste récupérable
-        // et le crédit n'est pas remboursé
-        // alors qu'une tâche payante peut
-        // encore être en cours.
-        await generationRef.update({
-          status:
-            "partial",
-
-          nextSceneIndex:
-            index,
-
-          lastProgressAt:
-            FieldValue
-              .serverTimestamp(),
-        });
-
-        let runwayPromptImage =
-          imageUrl;
-
-        // ========================================
-        // 📤 IMAGE BASE64 -> RUNWAY
-        // ========================================
-
-        if (
-          imageUrl.startsWith(
-            "data:image/"
-          )
-        ) {
-          const match =
-            imageUrl.match(
-              /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/
-            );
-
-          if (!match) {
-            throw new Error(
-              `Image base64 invalide pour la scène ${index + 1}.`
-            );
-          }
-
-          const mimeType =
-            match[1];
-
-          const base64Data =
-            match[2];
-
-          const extension =
-            mimeType ===
-            "image/png"
-              ? "png"
-              : mimeType ===
-                  "image/webp"
-                ? "webp"
-                : "jpg";
-
-          const imageBuffer =
-            Buffer.from(
-              base64Data,
-              "base64"
-            );
-
-          if (
-            !imageBuffer.length
-          ) {
-            throw new Error(
-              `Image vide pour la scène ${index + 1}.`
-            );
-          }
-
-          const runwayFile =
-            await runwayToFile(
-              imageBuffer,
-              `scene-${index + 1}.${extension}`
-            );
-
-          const upload =
-            await runway.uploads
-              .createEphemeral(
-                runwayFile
-              );
-
-          if (
-            !upload?.uri
-          ) {
-            throw new Error(
-              `Impossible d'envoyer l'image de la scène ${index + 1} à Runway.`
-            );
-          }
-
-          runwayPromptImage =
-            upload.uri;
-
-          console.log(
-            `📤 Image scène ${index + 1} envoyée à Runway :`,
-            runwayPromptImage
-          );
-        }
-
-        // ========================================
-        // 📝 CONTEXTE DE LA SCÈNE
-        // ========================================
-
-        const sceneData =
-          narrationScenes[
-            index
-          ] || {};
-
-        const globalPrompt =
-          typeof prompt ===
-          "string"
-            ? prompt.trim()
-            : "";
-
-        const sceneText =
-          typeof sceneData.text ===
-          "string"
-            ? sceneData.text.trim()
-            : "";
-
-        const sceneImagePrompt =
-          typeof sceneData
-            .imagePrompt ===
-          "string"
-            ? sceneData
-                .imagePrompt
-                .trim()
-            : "";
-
-        const sceneActionPrompt =
-          [
-            sceneImagePrompt,
-            sceneText,
-            globalPrompt,
-          ]
-            .filter(Boolean)
-            .join(" ");
-
-        console.log(
-          `📝 Préparation Runway scène ${index + 1}/${sceneCount}`
-        );
-
-        // ========================================
-        // ♻️ CRÉATION OU REPRISE RUNWAY
-        // ========================================
-
-        const sceneVideoUrl =
-          await createOrResumeRunwayScene({
-            uid,
-
-            generationRef,
-
-            sceneIndex:
-              index,
-
-            imageUrl:
-              runwayPromptImage,
-
-            scenePrompt:
-              sceneActionPrompt,
-
-            videoModel,
-          });
-
-        if (
-          !sceneVideoUrl
-        ) {
-          throw new Error(
-            `Runway n'a retourné aucune vidéo pour la scène ${index + 1}.`
-          );
-        }
-
-        // Évite un doublon dans
-        // videoUrls si la scène avait
-        // déjà été enregistrée.
-        videoUrls[index] =
-          sceneVideoUrl;
-
-        // Retire d'éventuelles cases
-        // vides avant sauvegarde.
-        const completedVideoUrls =
-          videoUrls.filter(
-            (url) =>
-              typeof url ===
-                "string" &&
-              url.trim()
-          );
-
-        await saveVideoSceneProgress(
-          uid,
-          generationRef,
-          completedVideoUrls
-        );
-
-        videoUrls =
-          completedVideoUrls;
-
-        console.log(
-          `✅ Scène ${index + 1}/${sceneCount} générée ou récupérée.`
-        );
-      }
-
-      if (
-        videoUrls.length !==
-        sceneCount
-      ) {
-        throw new Error(
-          `La génération vidéo est incomplète : ${videoUrls.length}/${sceneCount} scènes disponibles.`
-        );
-      }
-
-      runwaySucceeded =
-        true;
-
-      console.log(
-        `✅ Dessin animé complet généré : ${sceneCount} scènes`,
-        generationRef.id
-      );
-
-      // ========================================
-      // 🔊 NARRATION
-      // ========================================
-
-      // narrator, mode et language ont déjà été
-// récupérés et normalisés au début de la route /video.
-
       if (
         narrationScenes.length !==
-        videoUrls.length
+        sceneCount
       ) {
         throw new Error(
           "Le nombre de textes ne correspond pas au nombre de scènes vidéo."
         );
       }
 
+      // ========================================
+      // 📁 DOSSIER TEMPORAIRE
+      // ========================================
+
       const narrationTempDir =
         await fs.promises.mkdtemp(
           path.join(
             os.tmpdir(),
-            "contemagiqueia-narration-"
+            "contemagiqueia-continuous-"
           )
         );
 
@@ -5576,27 +5642,209 @@ let startSceneIndex =
         const narratedVideoPaths =
           [];
 
+        const completedVideoUrls =
+          [];
+
+        // IMPORTANT :
+        // On vérifie toutes les scènes,
+        // y compris lors d'une reprise.
+        //
+        // Une scène continue déjà terminée
+        // sera téléchargée depuis Firebase.
+        //
+        // Une scène partiellement terminée
+        // reprendra ses clips enregistrés.
         for (
           let index = 0;
-          index <
-          videoUrls.length;
+          index < sceneCount;
           index++
         ) {
+          const imageUrl =
+            images[index];
+
+          if (
+            typeof imageUrl !==
+              "string" ||
+            !imageUrl.trim()
+          ) {
+            throw new Error(
+              `Image invalide pour la scène ${index + 1}.`
+            );
+          }
+
           const sceneData =
             narrationScenes[
               index
             ] || {};
 
-          const narratedPath =
-            await createNarratedSceneVideo({
-              videoUrl:
-                videoUrls[
-                  index
-                ],
+          const sceneText =
+            typeof sceneData.text ===
+            "string"
+              ? sceneData.text.trim()
+              : "";
 
-              sceneText:
-                sceneData.text ||
-                "",
+          if (!sceneText) {
+            throw new Error(
+              `Texte manquant pour la scène ${index + 1}.`
+            );
+          }
+
+          const sceneImagePrompt =
+            typeof sceneData
+              .imagePrompt ===
+            "string"
+              ? sceneData
+                  .imagePrompt
+                  .trim()
+              : "";
+
+          const globalPrompt =
+            typeof prompt ===
+            "string"
+              ? prompt.trim()
+              : "";
+
+          const motionText =
+            [
+              sceneImagePrompt,
+              sceneText,
+              globalPrompt,
+            ]
+              .filter(Boolean)
+              .join(" ");
+
+          console.log(
+            `🎬 Scène continue ${index + 1}/${sceneCount}`
+          );
+
+          // ========================================
+          // 🔄 ÉTAT FIRESTORE DE LA SCÈNE
+          // ========================================
+
+          const currentGenerationSnapshot =
+            await generationRef.get();
+
+          if (
+            !currentGenerationSnapshot.exists
+          ) {
+            throw new Error(
+              "Génération vidéo introuvable."
+            );
+          }
+
+          const currentGeneration =
+            currentGenerationSnapshot.data();
+
+          if (
+            currentGeneration.uid !==
+            uid
+          ) {
+            throw new Error(
+              "Utilisateur incorrect pour cette génération."
+            );
+          }
+
+          const continuousState =
+            currentGeneration
+              ?.continuousScenes?.[
+                index
+              ] || null;
+
+          const existingNarratedUrl =
+            typeof continuousState
+              ?.narratedVideoUrl ===
+            "string"
+              ? continuousState
+                  .narratedVideoUrl
+              : null;
+
+          // ========================================
+          // ♻️ SCÈNE DÉJÀ TERMINÉE
+          // ========================================
+
+          if (
+            continuousState
+              ?.completed ===
+              true &&
+            existingNarratedUrl
+          ) {
+            console.log(
+              `♻️ Scène ${index + 1} déjà terminée : récupération Firebase.`
+            );
+
+            const recoveredPath =
+              path.join(
+                narrationTempDir,
+                `recovered-${index + 1}.mp4`
+              );
+
+            await downloadFile(
+              existingNarratedUrl,
+              recoveredPath
+            );
+
+            narratedVideoPaths.push(
+              recoveredPath
+            );
+
+            completedVideoUrls.push(
+              existingNarratedUrl
+            );
+
+            continue;
+          }
+
+          // ========================================
+          // 💾 PASSAGE EN MODE PARTIEL
+          // ========================================
+
+          await generationRef.update({
+            status:
+              "partial",
+
+            nextSceneIndex:
+              index,
+
+            lastProgressAt:
+              FieldValue
+                .serverTimestamp(),
+          });
+
+          // ========================================
+          // 🔙 COMPATIBILITÉ ANCIEN SYSTÈME
+          // ========================================
+
+          // Si cette génération avait déjà
+          // produit une ancienne vidéo Runway
+          // de 5 secondes, continuousScene()
+          // peut la réutiliser comme premier
+          // clip au lieu de la repayer.
+          const legacyVideoUrl =
+            typeof videoUrls[
+              index
+            ] === "string" &&
+            videoUrls[index].trim()
+              ? videoUrls[index]
+              : null;
+
+          // ========================================
+          // 🎬 ANIMATION CONTINUE + NARRATION
+          // ========================================
+
+          const narratedPath =
+            await createContinuousNarratedScene({
+              uid,
+
+              generationRef,
+
+              sceneIndex:
+                index,
+
+              imageUrl,
+
+              sceneText,
+
+              motionText,
 
               emotion:
                 sceneData.emotion ||
@@ -5609,21 +5857,101 @@ let startSceneIndex =
 
               language,
 
-              sceneIndex:
-                index,
+              videoModel,
+
+              legacyVideoUrl,
 
               tempDir:
                 narrationTempDir,
+            });
+
+          if (!narratedPath) {
+            throw new Error(
+              `Impossible de créer la scène continue ${index + 1}.`
+            );
+          }
+
+          // ========================================
+          // ☁️ SAUVEGARDE SCÈNE TERMINÉE
+          // ========================================
+
+          const narratedVideoUrl =
+            await saveContinuousNarratedScene({
+              uid,
+
+              generationRef,
+
+              sceneIndex:
+                index,
+
+              localPath:
+                narratedPath,
             });
 
           narratedVideoPaths.push(
             narratedPath
           );
 
+          completedVideoUrls.push(
+            narratedVideoUrl
+          );
+
+          // videoUrls contient maintenant
+          // les scènes narrées complètes.
+          //
+          // Cela conserve la compatibilité
+          // avec le système de progression
+          // déjà utilisé par l'application.
+          videoUrls =
+            [
+              ...completedVideoUrls,
+            ];
+
+          await saveVideoSceneProgress(
+            uid,
+            generationRef,
+            videoUrls
+          );
+
           console.log(
-            `🔊 Narration scène ${index + 1}/${videoUrls.length} créée.`
+            `✅ Scène continue ${index + 1}/${sceneCount} terminée.`
           );
         }
+
+        // ========================================
+        // ✅ CONTRÔLE FINAL DES SCÈNES
+        // ========================================
+
+        if (
+          narratedVideoPaths.length !==
+          sceneCount
+        ) {
+          throw new Error(
+            `La génération vidéo est incomplète : ${narratedVideoPaths.length}/${sceneCount} scènes disponibles.`
+          );
+        }
+
+        if (
+          completedVideoUrls.length !==
+          sceneCount
+        ) {
+          throw new Error(
+            `Les URL des scènes sont incomplètes : ${completedVideoUrls.length}/${sceneCount}.`
+          );
+        }
+
+        videoUrls =
+          completedVideoUrls;
+
+        // Toutes les scènes continues
+        // sont maintenant terminées.
+        runwaySucceeded =
+          true;
+
+        console.log(
+          `✅ ${sceneCount} scènes animées et narrées terminées.`,
+          generationRef.id
+        );
 
         // ========================================
         // 🎞️ ASSEMBLAGE FINAL
@@ -5636,8 +5964,9 @@ let startSceneIndex =
           );
 
         console.log(
-          "🎬 Vidéo finale avec narration assemblée."
+          "🎬 Vidéo finale continue assemblée."
         );
+
 
         // ========================================
         // ☁️ FIREBASE STORAGE
@@ -5771,18 +6100,24 @@ let startSceneIndex =
               ? generationSnapshot.data()
               : null;
 
+                    // ========================================
+          // 🛡️ DÉTECTION DES TÂCHES RUNWAY PAYANTES
+          // ========================================
+
+          // Ancien système :
+          // une seule tâche Runway par scène.
           const runwayTasks =
             generation
               ?.runwayTasks ||
             {};
 
-          const taskStates =
+          const oldTaskStates =
             Object.values(
               runwayTasks
             );
 
-          const hasSubmittedRunwayTask =
-            taskStates.some(
+          const hasOldSubmittedRunwayTask =
+            oldTaskStates.some(
               (task) =>
                 task &&
                 (
@@ -5795,6 +6130,56 @@ let startSceneIndex =
                     "completed"
                 )
             );
+
+          // Nouveau système :
+          // plusieurs clips Runway peuvent
+          // appartenir à une même scène.
+          const continuousScenes =
+            generation
+              ?.continuousScenes ||
+            {};
+
+          const continuousSceneStates =
+            Object.values(
+              continuousScenes
+            );
+
+          const hasContinuousSubmittedRunwayTask =
+            continuousSceneStates.some(
+              (scene) => {
+                if (
+                  !scene ||
+                  typeof scene !==
+                    "object"
+                ) {
+                  return false;
+                }
+
+                const clips =
+                  Array.isArray(
+                    scene.clips
+                  )
+                    ? scene.clips
+                    : [];
+
+                return clips.some(
+                  (clip) =>
+                    clip &&
+                    (
+                      clip.taskId ||
+                      clip.submitting ===
+                        true
+                    )
+                );
+              }
+            );
+
+          // Compatible avec les générations
+          // créées avant ET après le passage
+          // à continuousScene().
+          const hasSubmittedRunwayTask =
+            hasOldSubmittedRunwayTask ||
+            hasContinuousSubmittedRunwayTask;
 
           // Une tâche Runway a déjà été
           // soumise ou peut encore être
@@ -5995,9 +6380,7 @@ async function mergeLocalVideoClips(
   }
 
   if (
-    !Array.isArray(
-      localFiles
-    ) ||
+    !Array.isArray(localFiles) ||
     localFiles.length === 0
   ) {
     throw new Error(
@@ -6013,130 +6396,298 @@ async function mergeLocalVideoClips(
       )
     );
 
-  const concatFilePath =
-    path.join(
-      tempDir,
-      "concat.txt"
+  try {
+    const normalizedFiles = [];
+
+    // ==========================================
+    // 📱 NORMALISATION DE CHAQUE SCÈNE EN 9:16
+    // ==========================================
+    //
+    // Objectif :
+    // - vidéo finale 720 x 1280
+    // - aucune bande noire
+    // - conserver toute l'image principale
+    // - arrière-plan rempli avec la même vidéo
+    //   agrandie et floutée
+    //
+    // Cela évite de couper brutalement les
+    // personnages situés sur les côtés.
+
+    for (
+      let index = 0;
+      index < localFiles.length;
+      index++
+    ) {
+      const inputPath =
+        localFiles[index];
+
+      const normalizedPath =
+        path.join(
+          tempDir,
+          `scene-${index + 1}-vertical.mp4`
+        );
+
+      await new Promise(
+        (resolve, reject) => {
+          const filterComplex = [
+            // Arrière-plan :
+            // remplit entièrement le 9:16,
+            // puis applique un flou.
+            "[0:v]split=2[bg][fg]",
+
+            "[bg]" +
+              "scale=720:1280:" +
+              "force_original_aspect_ratio=increase," +
+              "crop=720:1280," +
+              "boxblur=20:10" +
+              "[background]",
+
+            // Premier plan :
+            // conserve l'intégralité de la scène
+            // sans couper les personnages.
+            "[fg]" +
+              "scale=720:1280:" +
+              "force_original_aspect_ratio=decrease" +
+              "[foreground]",
+
+            // Superposition centrée.
+            "[background][foreground]" +
+              "overlay=" +
+              "(W-w)/2:" +
+              "(H-h)/2" +
+              "[video]",
+          ].join(";");
+
+          const ffmpeg =
+            spawn(
+              ffmpegPath,
+              [
+                "-y",
+
+                "-i",
+                inputPath,
+
+                "-filter_complex",
+                filterComplex,
+
+                "-map",
+                "[video]",
+
+                "-map",
+                "0:a?",
+
+                "-c:v",
+                "libx264",
+
+                "-preset",
+                "veryfast",
+
+                "-crf",
+                "20",
+
+                "-c:a",
+                "aac",
+
+                "-b:a",
+                "160k",
+
+                "-r",
+                "24",
+
+                "-pix_fmt",
+                "yuv420p",
+
+                "-movflags",
+                "+faststart",
+
+                normalizedPath,
+              ],
+              {
+                windowsHide: true,
+              }
+            );
+
+          let stderr = "";
+
+          ffmpeg.stderr.on(
+            "data",
+            (data) => {
+              stderr +=
+                data.toString();
+            }
+          );
+
+          ffmpeg.on(
+            "close",
+            (code) => {
+              if (code === 0) {
+                resolve();
+              } else {
+                reject(
+                  new Error(
+                    `FFmpeg recadrage scène ${
+                      index + 1
+                    } échoué avec le code ${code}.\n${stderr}`
+                  )
+                );
+              }
+            }
+          );
+
+          ffmpeg.on(
+            "error",
+            reject
+          );
+        }
+      );
+
+      normalizedFiles.push(
+        normalizedPath
+      );
+
+      console.log(
+        `📱 Scène ${
+          index + 1
+        }/${localFiles.length} normalisée en 720x1280.`
+      );
+    }
+
+    // ==========================================
+    // 📋 FICHIER DE CONCATÉNATION
+    // ==========================================
+
+    const concatFilePath =
+      path.join(
+        tempDir,
+        "concat.txt"
+      );
+
+    const concatContent =
+      normalizedFiles
+        .map(
+          (filePath) =>
+            `file '${filePath.replace(
+              /'/g,
+              "'\\''"
+            )}'`
+        )
+        .join("\n");
+
+    await fs.promises.writeFile(
+      concatFilePath,
+      concatContent,
+      "utf8"
     );
 
-  const concatContent =
-    localFiles
-      .map(
-        (filePath) =>
-          `file '${filePath.replace(
-            /'/g,
-            "'\\''"
-          )}'`
-      )
-      .join("\n");
+    // ==========================================
+    // 🎬 VIDÉO FINALE
+    // ==========================================
 
-  await fs.promises.writeFile(
-    concatFilePath,
-    concatContent,
-    "utf8"
-  );
+    const outputPath =
+      path.join(
+        tempDir,
+        `${generationId}-final.mp4`
+      );
 
-  const outputPath =
-    path.join(
-      tempDir,
-      `${generationId}-final.mp4`
-    );
+    await new Promise(
+      (resolve, reject) => {
+        const ffmpeg =
+          spawn(
+            ffmpegPath,
+            [
+              "-y",
 
-  await new Promise(
-    (
-      resolve,
-      reject
-    ) => {
-      const ffmpeg =
-        spawn(
-          ffmpegPath,
-          [
-            "-y",
+              "-f",
+              "concat",
 
-            "-f",
-            "concat",
+              "-safe",
+              "0",
 
-            "-safe",
-            "0",
+              "-i",
+              concatFilePath,
 
-            "-i",
-            concatFilePath,
+              "-c:v",
+              "libx264",
 
-            "-c:v",
-            "libx264",
+              "-preset",
+              "veryfast",
 
-            "-preset",
-            "veryfast",
+              "-crf",
+              "20",
 
-            "-crf",
-            "20",
+              "-c:a",
+              "aac",
 
-            "-c:a",
-            "aac",
+              "-b:a",
+              "160k",
 
-            "-b:a",
-            "160k",
+              "-r",
+              "24",
 
-            "-pix_fmt",
-            "yuv420p",
+              "-pix_fmt",
+              "yuv420p",
 
-            "-movflags",
-            "+faststart",
+              "-movflags",
+              "+faststart",
 
-            outputPath,
-          ],
-          {
-            windowsHide:
-              true,
+              outputPath,
+            ],
+            {
+              windowsHide: true,
+            }
+          );
+
+        let stderr = "";
+
+        ffmpeg.stderr.on(
+          "data",
+          (data) => {
+            stderr +=
+              data.toString();
           }
         );
 
-      let stderr =
-        "";
-
-      ffmpeg.stderr.on(
-        "data",
-        (data) => {
-          stderr +=
-            data.toString();
-        }
-      );
-
-      ffmpeg.on(
-        "close",
-        (code) => {
-          if (
-            code === 0
-          ) {
-                        resolve();
-          } else {
-            reject(
-              new Error(
-                `FFmpeg fusion finale échouée avec le code ${code}.\n${stderr}`
-              )
-            );
+        ffmpeg.on(
+          "close",
+          (code) => {
+            if (code === 0) {
+              resolve();
+            } else {
+              reject(
+                new Error(
+                  `FFmpeg fusion finale échouée avec le code ${code}.\n${stderr}`
+                )
+              );
+            }
           }
-        }
-      );
+        );
 
-      ffmpeg.on(
-        "error",
-        reject
-      );
-    }
-  );
-
-  const finalBuffer =
-    await fs.promises.readFile(
-      outputPath
+        ffmpeg.on(
+          "error",
+          reject
+        );
+      }
     );
 
-  return {
-    buffer:
-      finalBuffer,
+    const finalBuffer =
+      await fs.promises.readFile(
+        outputPath
+      );
 
-    tempDir,
-  };
+    console.log(
+      "✅ Vidéo finale créée en format vertical 720x1280."
+    );
+
+    return {
+      buffer: finalBuffer,
+      tempDir,
+    };
+  } catch (error) {
+    // En cas d'erreur, on laisse remonter
+    // l'erreur pour conserver le comportement
+    // actuel de remboursement/reprise.
+    throw error;
+  }
 }
 
 // =========================
