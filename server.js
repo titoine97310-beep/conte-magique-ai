@@ -772,6 +772,8 @@ const adminStorage =
     firebaseAdminApp
   );
 
+const storyImagesBucket = adminStorage.bucket();
+
 async function requireFirebaseUser(
   req,
   res
@@ -819,103 +821,317 @@ async function requireFirebaseUser(
   }
 }
 
-async function requireAdminUser(
-  req,
-  res
+// ==========================================
+// ENREGISTREMENT SECURISE DES ILLUSTRATIONS
+// ==========================================
+
+async function saveStoryIllustration(
+  uid,
+  requestId,
+  sceneIndex,
+  base64
 ) {
-  const decodedToken =
-    await requireFirebaseUser(
-      req,
-      res
-    );
+  const filePath =
+    `story-illustrations/${uid}/${requestId}/scene-${sceneIndex}.png`;
 
-  if (!decodedToken) {
-    return null;
-  }
+  const file = storyImagesBucket.file(filePath);
 
-  const userSnapshot =
-    await adminDb
-      .collection("users")
-      .doc(decodedToken.uid)
-      .get();
+  const imageBuffer = Buffer.from(base64, "base64");
 
-  if (
-    !userSnapshot.exists
-  ) {
-    res.status(403).json({
-      error:
-        "Profil administrateur introuvable.",
+  try {
+    await file.save(imageBuffer, {
+      resumable: false,
+      contentType: "image/png",
+
+      // Refuser l'écrasement d'un fichier existant.
+      preconditionOpts: {
+        ifGenerationMatch: 0,
+      },
+
+      metadata: {
+        cacheControl: "private, no-store",
+      },
     });
+  } catch (error) {
+    // Une autre tentative a déjà enregistré
+    // l'image à cet emplacement.
+    if (
+      error.code === 412 ||
+      error.code === "412"
+    ) {
+      throw new Error(
+        "Une illustration existe déjà pour cette scène."
+      );
+    }
 
-    return null;
+    throw error;
   }
 
-  const userData =
-    userSnapshot.data() ||
-    {};
-
-  if (
-    userData.role !== "admin"
-  ) {
-    res.status(403).json({
-      error:
-        "Accès administrateur requis.",
-    });
-
-    return null;
-  }
-
-  return decodedToken;
+  return filePath;
 }
 
-async function sendExpoPushNotification({
-  to,
-  title,
-  body,
-  data = {},
-}) {
-  const response =
-    await fetch(
-      "https://exp.host/--/api/v2/push/send",
-      {
-        method: "POST",
+// ==========================================
+// 📚 RÉSERVATION SÉCURISÉE CRÉDIT HISTOIRE
+// ==========================================
 
-        headers: {
-          Accept:
-            "application/json",
+async function reserveStoryCredit(uid, packType, requestId, sceneCount) {
+  if (packType !== "text" && packType !== "illustrated") {
+    throw new Error("Type de carnet invalide.");
+  }
 
-          "Content-Type":
-            "application/json",
-        },
+  if (
+    typeof requestId !== "string" ||
+    !/^[a-zA-Z0-9_-]{8,128}$/.test(requestId)
+  ) {
+    throw new Error("Identifiant de génération invalide.");
+  }
 
-        body:
-          JSON.stringify({
-            to,
+  if (
+  !Number.isInteger(sceneCount) ||
+  ![4, 6].includes(sceneCount)
+) {
+  throw new Error("Nombre de scènes invalide.");
+}
 
-            sound:
-              "default",
+  const userRef = adminDb.collection("users").doc(uid);
 
-            title,
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(requestId);
 
-            body,
+  const result = await adminDb.runTransaction(
+    async (transaction) => {
+      const generationSnapshot =
+        await transaction.get(generationRef);
 
-            data,
-          }),
+      // Une demande déjà enregistrée ne doit
+      // jamais débiter un deuxième crédit.
+      if (generationSnapshot.exists) {
+        const existing = generationSnapshot.data();
+
+        if (
+          existing.uid !== uid ||
+          existing.packType !== packType
+        ) {
+          throw new Error(
+            "Cette génération ne correspond pas à la demande initiale."
+          );
+        }
+
+        return {
+          generationId: generationRef.id,
+          status: existing.status,
+          alreadyExists: true,
+        };
       }
-    );
 
-  const result =
-    await response.json();
+      const userSnapshot =
+        await transaction.get(userRef);
 
-  if (!response.ok) {
+      if (!userSnapshot.exists) {
+        throw new Error("Profil utilisateur introuvable.");
+      }
+
+      const userData = userSnapshot.data();
+
+      const isAdmin = userData.role === "admin";
+
+      const remaining =
+        userData.packs?.[packType]?.storiesRemaining;
+
+      if (
+        !isAdmin &&
+        (!Number.isInteger(remaining) || remaining <= 0)
+      ) {
+        const error = new Error(
+          "Aucune histoire restante dans ce carnet."
+        );
+
+        error.code = "NO_STORY_CREDIT";
+        throw error;
+      }
+
+      if (!isAdmin) {
+        transaction.update(userRef, {
+          [`packs.${packType}.storiesRemaining`]:
+            FieldValue.increment(-1),
+        });
+      }
+
+      transaction.create(generationRef, {
+        uid,
+        packType,
+        sceneCount,
+        status: "reserved",
+        creditCharged: !isAdmin,
+        createdAt: FieldValue.serverTimestamp(),
+        completedAt: null,
+        refundedAt: null,
+      });
+
+      return {
+        generationId: generationRef.id,
+        status: "reserved",
+        alreadyExists: false,
+      };
+    }
+  );
+
+  return result;
+}
+
+// ==========================================
+// 📚 REMBOURSEMENT SÉCURISÉ CRÉDIT HISTOIRE
+// ==========================================
+
+async function refundStoryCredit(uid, generationId) {
+  const userRef = adminDb.collection("users").doc(uid);
+
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(generationId);
+
+  return adminDb.runTransaction(async (transaction) => {
+    const generationSnapshot =
+      await transaction.get(generationRef);
+
+    if (!generationSnapshot.exists) {
+      throw new Error("Génération introuvable.");
+    }
+
+    const generation = generationSnapshot.data();
+
+    if (generation.uid !== uid) {
+      throw new Error("Utilisateur incorrect.");
+    }
+
+    // Empêche les doubles remboursements.
+    if (generation.status !== "reserved") {
+      return false;
+    }
+
+    if (
+      generation.packType !== "text" &&
+      generation.packType !== "illustrated"
+    ) {
+      throw new Error("Type de carnet invalide.");
+    }
+
+    if (generation.creditCharged === true) {
+      const userSnapshot = await transaction.get(userRef);
+
+      if (!userSnapshot.exists) {
+        throw new Error("Profil utilisateur introuvable.");
+      }
+
+      transaction.update(userRef, {
+        [`packs.${generation.packType}.storiesRemaining`]:
+          FieldValue.increment(1),
+      });
+    }
+
+    transaction.update(generationRef, {
+      status: "refunded",
+      refundedAt: FieldValue.serverTimestamp(),
+    });
+
+    return true;
+  });
+}
+
+// ==========================================
+// 📚 CONFIRMATION D'UNE HISTOIRE GÉNÉRÉE
+// ==========================================
+
+async function completeStoryGeneration(uid, generationId) {
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(generationId);
+
+  return adminDb.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(generationRef);
+
+    if (!snapshot.exists) {
+      throw new Error("Génération introuvable.");
+    }
+
+    const generation = snapshot.data();
+
+    if (generation.uid !== uid) {
+      throw new Error("Utilisateur incorrect.");
+    }
+
+    // Empêche une double confirmation.
+    if (generation.status === "completed") {
+      return true;
+    }
+
+    if (generation.status !== "reserved") {
+      throw new Error(
+        "Cette génération ne peut pas être confirmée."
+      );
+    }
+
+    transaction.update(generationRef, {
+      status: "completed",
+      completedAt: FieldValue.serverTimestamp(),
+    });
+
+    return true;
+  });
+}
+
+// ==========================================
+// 📚 VÉRIFICATION D'UNE HISTOIRE ILLUSTRÉE
+// ==========================================
+
+async function verifyIllustratedStory(
+  uid,
+  requestId,
+  sceneIndex
+) {
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(requestId);
+
+  const snapshot = await generationRef.get();
+
+  if (!snapshot.exists) {
+    throw new Error("Génération introuvable.");
+  }
+
+  const generation = snapshot.data();
+
+  if (generation.uid !== uid) {
     throw new Error(
-      `Erreur Expo Push : ${JSON.stringify(
-        result
-      )}`
+      "Cette histoire appartient à un autre utilisateur."
     );
   }
 
-  return result;
+  if (generation.packType !== "illustrated") {
+    throw new Error(
+      "Cette génération n'autorise pas les illustrations."
+    );
+  }
+
+  if (generation.status !== "reserved") {
+    throw new Error(
+      "Cette génération n'est plus active."
+    );
+  }
+
+  if (
+    !Number.isInteger(generation.sceneCount) ||
+    !Number.isInteger(sceneIndex) ||
+    sceneIndex < 0 ||
+    sceneIndex >= generation.sceneCount
+  ) {
+    throw new Error(
+      "Illustration non autorisée pour cette histoire."
+    );
+  }
+
+  return generationRef;
 }
 
 async function reserveVideoCredit(
@@ -1186,6 +1402,341 @@ async function reserveVideoCredit(
   return generationRef;
 }
 
+// ==========================================
+// 📚 RÉSERVATION ATOMIQUE D'UNE ILLUSTRATION
+// ==========================================
+
+
+async function reserveIllustration(uid, requestId, sceneIndex) {
+  const attemptId = crypto.randomUUID();
+
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(requestId);
+
+  const sceneRef = generationRef
+    .collection("scenes")
+    .doc(String(sceneIndex));
+
+  await adminDb.runTransaction(async (transaction) => {
+    const generationSnapshot = await transaction.get(generationRef);
+    const sceneSnapshot = await transaction.get(sceneRef);
+
+    if (!generationSnapshot.exists) {
+      throw new Error("Génération introuvable.");
+    }
+
+    const generation = generationSnapshot.data();
+
+    if (
+      generation.uid !== uid ||
+      generation.packType !== "illustrated" ||
+      generation.status !== "reserved"
+    ) {
+      throw new Error("Illustration non autorisée.");
+    }
+
+    if (
+      !Number.isInteger(generation.sceneCount) ||
+      !Number.isInteger(sceneIndex) ||
+      sceneIndex < 0 ||
+      sceneIndex >= generation.sceneCount
+    ) {
+      throw new Error("Numéro de scène invalide.");
+    }
+
+    if (sceneSnapshot.exists) {
+      const scene = sceneSnapshot.data();
+
+      const startedAt =
+        scene.processingStartedAt?.toMillis?.() ?? 0;
+
+      const processingExpired =
+        scene.status === "processing" &&
+        scene.attempts === 1 &&
+        startedAt > 0 &&
+        Date.now() - startedAt > 30 * 60 * 1000;
+
+      const retryAllowed =
+        scene.status === "failed" &&
+        scene.attempts === 1;
+
+      if (!retryAllowed && !processingExpired) {
+        throw new Error(
+          "Cette illustration est déjà en cours ou ne peut pas être relancée."
+        );
+      }
+
+      transaction.update(sceneRef, {
+        status: "processing",
+        attempts: 2,
+        attemptId,
+        retryStartedAt: FieldValue.serverTimestamp(),
+        processingStartedAt: FieldValue.serverTimestamp(),
+      });
+    } else {
+      transaction.create(sceneRef, {
+        status: "processing",
+        attempts: 1,
+        attemptId,
+        createdAt: FieldValue.serverTimestamp(),
+        processingStartedAt: FieldValue.serverTimestamp(),
+      });
+    }
+  });
+
+  return {
+    sceneRef,
+    attemptId,
+  };
+}
+
+
+// ==========================================
+// ECHEC DE GENERATION D'UNE ILLUSTRATION
+// ==========================================
+
+async function failIllustration(
+  uid,
+  requestId,
+  sceneIndex,
+  attemptId
+) {
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(requestId);
+
+  const sceneRef = generationRef
+    .collection("scenes")
+    .doc(String(sceneIndex));
+
+  await adminDb.runTransaction(async (transaction) => {
+    const generationSnapshot =
+      await transaction.get(generationRef);
+
+    const sceneSnapshot =
+      await transaction.get(sceneRef);
+
+    if (!generationSnapshot.exists || !sceneSnapshot.exists) {
+      return;
+    }
+
+    const generation = generationSnapshot.data();
+    const scene = sceneSnapshot.data();
+
+    if (
+  generation.uid !== uid ||
+  generation.packType !== "illustrated" ||
+  generation.status !== "reserved" ||
+  scene.status !== "processing" ||
+  !attemptId ||
+  scene.attemptId !== attemptId
+) {
+  return;
+}
+
+    transaction.update(sceneRef, {
+      status: "failed",
+      failedAt: FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+// ==========================================
+// 📚 CONFIRMATION D'UNE ILLUSTRATION
+// ==========================================
+
+async function completeIllustration(
+  uid,
+  requestId,
+  sceneIndex,
+  filePath,
+  attemptId
+) {
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(requestId);
+
+  const sceneRef = generationRef
+    .collection("scenes")
+    .doc(String(sceneIndex));
+
+  await adminDb.runTransaction(async (transaction) => {
+    const generationSnapshot =
+      await transaction.get(generationRef);
+
+    const sceneSnapshot =
+      await transaction.get(sceneRef);
+
+    if (!generationSnapshot.exists || !sceneSnapshot.exists) {
+      throw new Error("Génération ou illustration introuvable.");
+    }
+
+    const generation = generationSnapshot.data();
+    const scene = sceneSnapshot.data();
+
+    if (
+  generation.uid !== uid ||
+  generation.packType !== "illustrated" ||
+  generation.status !== "reserved" ||
+  scene.status !== "processing" ||
+  !attemptId ||
+  scene.attemptId !== attemptId
+) {
+  throw new Error(
+    "Confirmation refusée : tentative d'illustration non autorisée."
+  );
+}
+
+    const expectedPath =
+      `story-illustrations/${uid}/${requestId}/scene-${sceneIndex}.png`;
+
+    if (
+      !Number.isInteger(sceneIndex) ||
+      sceneIndex < 0 ||
+      sceneIndex >= generation.sceneCount ||
+      filePath !== expectedPath
+    ) {
+      throw new Error("Chemin d'illustration invalide.");
+    }
+
+    transaction.update(sceneRef, {
+      status: "completed",
+      filePath,
+      completedAt: FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+// ==========================================
+// 📚 RÉCUPÉRATION D'UNE ILLUSTRATION
+// ==========================================
+
+async function getCompletedIllustration(
+  uid,
+  requestId,
+  sceneIndex
+) {
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(requestId);
+
+  const sceneRef = generationRef
+    .collection("scenes")
+    .doc(String(sceneIndex));
+
+  const [generationSnapshot, sceneSnapshot] =
+    await Promise.all([
+      generationRef.get(),
+      sceneRef.get(),
+    ]);
+
+  if (!generationSnapshot.exists) {
+    throw new Error("Génération introuvable.");
+  }
+
+  const generation = generationSnapshot.data();
+
+  if (
+    generation.uid !== uid ||
+    generation.packType !== "illustrated"
+  ) {
+    throw new Error("Accès non autorisé.");
+  }
+
+  if (
+    !Number.isInteger(generation.sceneCount) ||
+    !Number.isInteger(sceneIndex) ||
+    sceneIndex < 0 ||
+    sceneIndex >= generation.sceneCount
+  ) {
+    throw new Error("Numéro de scène invalide.");
+  }
+
+  if (!sceneSnapshot.exists) {
+    return null;
+  }
+
+  const scene = sceneSnapshot.data();
+
+  if (scene.status !== "completed") {
+    return null;
+  }
+
+  const expectedPath =
+    `story-illustrations/${uid}/${requestId}/scene-${sceneIndex}.png`;
+
+  if (scene.filePath !== expectedPath) {
+    throw new Error("Chemin d'illustration incorrect.");
+  }
+
+  return {
+    filePath: expectedPath,
+  };
+}
+
+// ==========================================
+// LECTURE SECURISEE D'UNE ILLUSTRATION
+// ==========================================
+
+async function readCompletedIllustration(
+  uid,
+  requestId,
+  sceneIndex
+) {
+  const illustration = await getCompletedIllustration(
+    uid,
+    requestId,
+    sceneIndex
+  );
+
+  if (!illustration) {
+    return null;
+  }
+
+  const file = storyImagesBucket.file(
+    illustration.filePath
+  );
+
+  const [exists] = await file.exists();
+
+  if (!exists) {
+    throw new Error(
+      "Illustration enregistrée mais fichier introuvable."
+    );
+  }
+
+  const [imageBuffer] = await file.download();
+
+  return {
+    imageUrl:
+      `data:image/png;base64,${imageBuffer.toString("base64")}`,
+  };
+}
+
+// ==========================================
+// VERIFICATION D'UNE IMAGE DANS STORAGE
+// ==========================================
+
+async function findStoredIllustration(
+  uid,
+  requestId,
+  sceneIndex
+) {
+  const filePath =
+    `story-illustrations/${uid}/${requestId}/scene-${sceneIndex}.png`;
+
+  const file = storyImagesBucket.file(filePath);
+
+  const [exists] = await file.exists();
+
+  if (!exists) {
+    return null;
+  }
+
+  return filePath;
+}
+
 async function refundVideoCredit(
   uid,
   generationRef
@@ -1268,11 +1819,108 @@ async function refundVideoCredit(
           refundedAt:
             FieldValue
               .serverTimestamp(),
-        }
+                      }
       );
     }
   );
 }
+
+      // ==========================================
+// RECUPERATION D'UNE ILLUSTRATION INTERROMPUE
+// ==========================================
+
+async function recoverStoredIllustration(
+  uid,
+  requestId,
+  sceneIndex
+) {
+  const generationRef = adminDb
+    .collection("storyGenerations")
+    .doc(requestId);
+
+  const sceneRef = generationRef
+    .collection("scenes")
+    .doc(String(sceneIndex));
+
+  const [generationSnapshot, sceneSnapshot] =
+    await Promise.all([
+      generationRef.get(),
+      sceneRef.get(),
+    ]);
+
+  if (!generationSnapshot.exists || !sceneSnapshot.exists) {
+    return null;
+  }
+
+  const generation = generationSnapshot.data();
+  const scene = sceneSnapshot.data();
+
+  if (
+    generation.uid !== uid ||
+    generation.packType !== "illustrated" ||
+    !["reserved", "completed"].includes(generation.status) ||
+    !Number.isInteger(generation.sceneCount) ||
+    !Number.isInteger(sceneIndex) ||
+    sceneIndex < 0 ||
+    sceneIndex >= generation.sceneCount
+  ) {
+    throw new Error("Récupération non autorisée.");
+  }
+
+  if (scene.status !== "processing") {
+    return null;
+  }
+
+  const filePath = await findStoredIllustration(
+    uid,
+    requestId,
+    sceneIndex
+  );
+
+  if (!filePath) {
+    return null;
+  }
+
+  await adminDb.runTransaction(async (transaction) => {
+    const currentGeneration =
+      await transaction.get(generationRef);
+
+    const currentScene =
+      await transaction.get(sceneRef);
+
+    if (
+      !currentGeneration.exists ||
+      currentGeneration.data().uid !== uid ||
+      currentGeneration.data().packType !== "illustrated" ||
+      !["reserved", "completed"].includes(
+        currentGeneration.data().status
+      ) ||
+      !currentScene.exists
+    ) {
+      throw new Error("Récupération non autorisée.");
+    }
+
+    if (currentScene.data().status === "processing") {
+      transaction.update(sceneRef, {
+        status: "completed",
+        filePath,
+        completedAt: FieldValue.serverTimestamp(),
+      });
+    } else if (
+      currentScene.data().status !== "completed" ||
+      currentScene.data().filePath !== filePath
+    ) {
+      throw new Error("État de l'illustration modifié.");
+    }
+  });
+
+  return readCompletedIllustration(
+    uid,
+    requestId,
+    sceneIndex
+  );
+}
+
 
 async function completeVideoGeneration(
   uid,
@@ -2623,16 +3271,49 @@ IMPORTANT :
 app.post(
   "/story",
   async (req, res) => {
+    let reservedGenerationId = null;
+
     try {
+      const decodedToken = await requireFirebaseUser(req, res);
+
+if (!decodedToken) {
+  return;
+}
       const {
-        prompt,
+  prompt,
+  type = "magic",
+  sceneCount = 4,
+  language = "fr",
+  packType,
+  requestId,
+} = req.body;
 
-        type = "magic",
+if (
+  packType !== "text" &&
+  packType !== "illustrated"
+) {
+  return res.status(400).json({
+    error: "Type de carnet invalide.",
+  });
+}
 
-        sceneCount = 4,
+if (
+  typeof requestId !== "string" ||
+  !/^[a-zA-Z0-9_-]{8,128}$/.test(requestId)
+) {
+  return res.status(400).json({
+    error: "Identifiant de génération invalide.",
+  });
+}
 
-        language = "fr",
-      } = req.body;
+if (
+  !Number.isInteger(sceneCount) ||
+  ![4, 6].includes(sceneCount)
+) {
+  return res.status(400).json({
+    error: "Nombre de scènes invalide.",
+  });
+}
 
       if (!prompt) {
         return res
@@ -2711,6 +3392,24 @@ IDIOMA OBLIGATORIO:
         "Prompt reçu :",
         prompt
       );
+
+      const uid = decodedToken.uid;
+
+const reservation = await reserveStoryCredit(
+  uid,
+  packType,
+  requestId,
+  sceneCount
+);
+
+if (reservation.alreadyExists) {
+  return res.status(409).json({
+    error:
+      "Cette demande de génération a déjà été enregistrée.",
+  });
+}
+
+  reservedGenerationId = reservation.generationId;
 
       const response =
         await openai.chat.completions.create({
@@ -2880,9 +3579,14 @@ ${prompt}
           content
         );
 
-      return res.json(
-        story
-      );
+      if (packType === "text") {
+  await completeStoryGeneration(
+    decodedToken.uid,
+    reservedGenerationId
+  );
+}
+
+return res.json(story);
     } catch (e) {
       console.error(
         "Erreur /story :",
@@ -2996,11 +3700,46 @@ Style premium, cohérent entre les scènes.
 app.post(
   "/image",
   async (req, res) => {
+    let illustrationReserved = false;
+    let attemptId = null;
+    let uid = null;
+    let requestId = null;
+    let sceneIndex = null;
+
     try {
+      const decodedToken = await requireFirebaseUser(req, res);
+
+if (!decodedToken) {
+  return;
+}
       const {
-        prompt,
-        referenceImage,
-      } = req.body;
+  prompt,
+  referenceImage,
+  requestId: bodyRequestId,
+  sceneIndex: bodySceneIndex,
+} = req.body;
+
+requestId = bodyRequestId;
+sceneIndex = bodySceneIndex;
+
+      if (
+  typeof requestId !== "string" ||
+  !/^[a-zA-Z0-9_-]{8,128}$/.test(requestId)
+) {
+  return res.status(400).json({
+    error: "Identifiant de génération invalide.",
+  });
+}
+
+if (
+  !Number.isInteger(sceneIndex) ||
+  sceneIndex < 0 ||
+  sceneIndex >= 6
+) {
+  return res.status(400).json({
+    error: "Numéro d'illustration invalide.",
+  });
+}
 
       if (
         !prompt?.trim()
@@ -3039,7 +3778,46 @@ Scène à générer :
 ${safePrompt}
 `;
 
-      let result;
+      uid = decodedToken.uid;
+
+// Vérifier si cette illustration existe déjà
+const existingIllustration =
+  await readCompletedIllustration(
+    uid,
+    requestId,
+    sceneIndex
+  );
+
+if (existingIllustration) {
+  return res.json(existingIllustration);
+}
+
+// Vérifier si une illustration a déjà été
+// enregistrée dans Storage après une interruption.
+const recoveredIllustration =
+  await recoverStoredIllustration(
+    uid,
+    requestId,
+    sceneIndex
+  );
+
+if (recoveredIllustration) {
+  return res.json(recoveredIllustration);
+}
+
+// Réserver la scène uniquement si aucune
+// illustration n'a été retrouvée.
+const reservation = await reserveIllustration(
+  uid,
+  requestId,
+  sceneIndex
+);
+
+attemptId = reservation.attemptId;
+
+illustrationReserved = true;
+
+let result;
 
       if (
         referenceImage
@@ -3050,13 +3828,13 @@ ${safePrompt}
           );
 
         if (!match) {
-          return res
-            .status(400)
-            .json({
-              error:
-                "Format de photo de référence invalide",
-            });
-        }
+  const error = new Error(
+    "Format de photo de référence invalide"
+  );
+
+  error.statusCode = 400;
+  throw error;
+}
 
         const mimeType =
           match[1];
@@ -3259,36 +4037,84 @@ ${finalPrompt}
           ?.b64_json;
 
       if (!base64) {
-        throw new Error(
-          "Aucune image retournée par OpenAI"
-        );
-      }
+  throw new Error(
+    "Aucune image retournée par OpenAI"
+  );
+}
 
-      return res.json({
-        imageUrl:
-          `data:image/png;base64,${base64}`,
-      });
+const filePath = await saveStoryIllustration(
+  uid,
+  requestId,
+  sceneIndex,
+  base64
+);
+
+await completeIllustration(
+  uid,
+  requestId,
+  sceneIndex,
+  filePath,
+  attemptId
+);
+
+illustrationReserved = false;
+
+return res.json({
+  imageUrl: `data:image/png;base64,${base64}`,
+});
     } catch (e) {
-      console.error(
-        "Erreur /image complète :",
-        e
+  console.error("Erreur /image complète :", e);
+
+  if (
+    illustrationReserved &&
+    uid &&
+    requestId &&
+    Number.isInteger(sceneIndex) &&
+    attemptId
+  ) {
+    try {
+      // Vérifier si l'image a déjà été enregistrée.
+      const recovered = await recoverStoredIllustration(
+        uid,
+        requestId,
+        sceneIndex
       );
 
-      return res
-        .status(500)
-        .json({
-          error:
-            "Erreur génération image",
+      if (recovered) {
+        return res.json(recovered);
+      }
 
-          message:
-            e?.message,
+      // Aucun fichier retrouvé : libérer la tentative.
+      await failIllustration(
+        uid,
+        requestId,
+        sceneIndex,
+        attemptId
+      );
 
-          status:
-            e?.status,
-        });
+      console.log(
+        "Tentative d'illustration marquée comme échouée."
+      );
+    } catch (recoveryError) {
+      console.error(
+        "Impossible de finaliser la récupération :",
+        recoveryError
+      );
     }
   }
-);
+
+  return res.status(e.statusCode === 400 ? 400 : 500).json({
+  error:
+    e.statusCode === 400
+      ? e.message
+      : "Erreur génération image",
+  message:
+    e.statusCode === 400
+      ? "Vérifiez le format de la photo."
+      : "La génération n'a pas pu être terminée.",
+});
+}
+});
 
 // =========================
 // 🔊 TTS

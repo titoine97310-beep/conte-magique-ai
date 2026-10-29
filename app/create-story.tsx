@@ -37,8 +37,7 @@ import {
 import { auth } from "../services/firebase";
 
 import {
-  consumeStory,
-  getUserProfile,
+  getUserProfile
 } from "../services/userService";
 
 
@@ -830,11 +829,19 @@ Une photo de référence a été ajoutée.
 `
   : prompt;
 
+  const packType: "text" | "illustrated" =
+  textOnlyMode ? "text" : "illustrated";
+
+const requestId =
+  `story_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+
       const storyData = await generateStory(
   storyPrompt,
   selectedStoryTypes,
   sceneCount,
-  language
+  language,
+  packType,
+  requestId
 );
       const scenes = storyData.scenes || [];
       const selectedStylePrompt = getStylePrompt(imageStyle);
@@ -900,7 +907,9 @@ Consignes importantes :
 
 const imageUrl = await generateImage(
   styledImagePrompt,
-  referenceImage
+  referenceImage,
+  requestId,
+  i
 );
 
         scenesWithImages.push({
@@ -925,24 +934,37 @@ const imageUrl = await generateImage(
       const savedStory = await saveStory(finalStory);
       setCurrentStory(savedStory || finalStory);
 
-      let finishedPack: "text" | "illustrated" | null = null;
+      
+let finishedPack: "text" | "illustrated" | null = null;
 
-      if (currentUser) {
-        if (usage.mode === "paid-text") {
-          const remaining = await consumeStory(currentUser.uid, "text");
-          setTextRemaining(remaining);
-          if (remaining === 0) finishedPack = "text";
-        } else if (usage.mode === "paid-image") {
-          const remaining = await consumeStory(
-            currentUser.uid,
-            "illustrated"
-          );
-          setIllustratedRemaining(remaining);
-          if (remaining === 0) finishedPack = "illustrated";
-        }
-      } else {
-        await incrementStoryUsage(usage.mode);
-      }
+if (currentUser) {
+  // Le backend gère désormais la consommation des crédits.
+  // On recharge les soldes réels depuis Firestore.
+  const profile = await getUserProfile(currentUser.uid);
+
+  const remainingText =
+    profile?.packs?.text?.storiesRemaining ?? 0;
+
+  const remainingIllustrated =
+    profile?.packs?.illustrated?.storiesRemaining ?? 0;
+
+  setTextRemaining(remainingText);
+  setIllustratedRemaining(remainingIllustrated);
+
+  if (usage.mode === "paid-text" && remainingText === 0) {
+    finishedPack = "text";
+  }
+
+  if (
+    usage.mode === "paid-image" &&
+    remainingIllustrated === 0
+  ) {
+    finishedPack = "illustrated";
+  }
+} else {
+  await incrementStoryUsage(usage.mode);
+}
+
 
       if (finishedPack) {
   const label =
