@@ -1191,17 +1191,18 @@ function closeVideoModal() {
           },
         ]
       );
-    } catch (error) {
-      console.error(
-        "Erreur création dessin animé :",
-        error
-      );
+        } catch (error) {
+      console.error("Erreur création dessin animé :", error);
 
-      Alert.alert(
-        t.player.videoCreationImpossible,
+      const message =
         error instanceof Error
           ? error.message
-          : t.player.videoCreationError
+          : t.player.videoCreationError;
+
+      Alert.alert(
+        "🎬 Génération interrompue",
+        `${message}\n\nTa génération est conservée pour une reprise. Appuie de nouveau sur « Créer mon dessin animé » pour réessayer avec la même demande.`,
+        [{ text: "Compris" }]
       );
     } finally {
       setVideoGenerating(false);

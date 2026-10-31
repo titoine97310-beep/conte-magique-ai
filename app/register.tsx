@@ -23,7 +23,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../services/firebase";
 import { setUserMode } from "../services/usageService";
 import {
-  addStories,
   createUserProfile,
   getUserProfile,
   updateLastLogin,
@@ -228,15 +227,6 @@ export default function RegisterScreen() {
           privacyVersion: "2026-08-12",
         },
       });
-
-      await setUserMode();
-
-      await addStories(
-        credential.user.uid,
-        "text",
-        2,
-        false
-      );
 
       Alert.alert(
         t.account.welcomeGift,
