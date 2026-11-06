@@ -355,19 +355,18 @@ export async function continuousScene({
     let clip =
       state.clips[index];
 
-    // Un échec Runway confirmé ne doit pas
-// déclencher automatiquement une nouvelle
-// tâche payante lors d'une reprise.
-if (clip?.failed) {
-  const error = new Error(
-    "Ce clip a échoué sur Runway. Une nouvelle tentative doit être autorisée explicitement."
-  );
+    // Un échec Runway confirmé
+    // peut être retenté lors d'une
+    // nouvelle demande utilisateur.
+    if (clip?.failed) {
+      clip = undefined;
 
-  error.code = "RUNWAY_CLIP_FAILED";
-  error.taskId = clip.taskId || null;
-  error.failureCode = clip.failureCode || null;
+      state.clips[index] =
+        {};
 
-  throw error;
+      await saveState(
+        state
+      );
     }
 
     // ========================================
