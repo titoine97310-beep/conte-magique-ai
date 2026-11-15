@@ -300,123 +300,42 @@ Voix vive, enthousiaste et naturelle, expressive.
   );
 }
 
-async function createNarrationMp3({
-  text,
-  mode = "story",
-  emotion = "warm",
-  narrator = "narratrice",
-  language = "fr",
-}) {
-  if (!text?.trim()) {
-    throw new Error(
-      "Texte de narration manquant."
-    );
+// Narration Runway Seed Audio 1.0 (MP3).
+// Le texte est prononcé tel quel, sans instructions ajoutées au script.
+async function createNarrationMp3({ text, mode = "story", emotion = "warm", narrator = "narratrice", language = "fr" }) {
+  const narrationText = typeof text === "string" ? text.trim() : "";
+  if (!narrationText) {
+    throw new Error("Texte de narration manquant.");
+  }
+  if (narrationText.length > 2048) {
+    throw new Error("Narration trop longue pour Seed Audio 1.0 (2048 caractères maximum par scène).");
   }
 
-  const profile =
-    getNarratorProfile(
-      narrator
-    );
+  console.log("Narration Runway Seed Audio 1.0 :", { language, narrator, characters: narrationText.length });
 
-  const supportedLanguages = [
-    "fr",
-    "en",
-    "es",
-  ];
+  const task = await runway.textToSpeech
+    .create({
+      model: "seed_audio",
+      promptText: narrationText,
+      outputFormat: "mp3",
+    })
+    .waitForTaskOutput();
 
-  const selectedLanguage =
-    supportedLanguages.includes(
-      language
-    )
-      ? language
-      : "fr";
-
-  const languageInstructions = {
-    fr: `
-Lis le texte en français.
-Utilise une prononciation française naturelle et claire.
-Ne traduis pas le texte.
-`,
-
-    en: `
-Read the text in English.
-Use natural, clear English pronunciation.
-Do not translate the text.
-`,
-
-    es: `
-Lee el texto en español.
-Utiliza una pronunciación española natural y clara.
-No traduzcas el texto.
-`,
-  };
-
-  let emotionInstructions =
-    "";
-
-  if (
-    emotion === "danger"
-  ) {
-    emotionInstructions =
-      "Ajoute un suspense très léger, sans jamais devenir effrayant.";
-  } else if (
-    emotion === "victory"
-  ) {
-    emotionInstructions =
-      "Utilise un ton joyeux et chaleureux.";
-  } else if (
-    emotion === "calm"
-  ) {
-    emotionInstructions =
-      "Utilise un ton doux et paisible.";
-  } else if (
-    emotion === "night"
-  ) {
-    emotionInstructions =
-      "Utilise un ton calme et rassurant.";
+  const audioUrl = Array.isArray(task?.output) ? task.output[0] : null;
+  if (typeof audioUrl !== "string" || !audioUrl.startsWith("https://")) {
+    throw new Error("Runway n'a pas retourné d'URL audio MP3 valide.");
   }
 
-  const bedtimeInstructions =
-    mode === "bedtime"
-      ? `
-Cette lecture est destinée au coucher.
-Parle calmement et marque davantage les pauses.
-`
-      : "";
-
-  const instructions = `
-${profile.instructions}
-
-${languageInstructions[selectedLanguage]}
-
-${emotionInstructions}
-
-${bedtimeInstructions}
-
-Respecte exactement la langue du texte fourni.
-Prononce les mots naturellement.
-`;
-
-  const response =
-    await openai.audio.speech.create({
-      model:
-        "gpt-4o-mini-tts",
-
-      voice:
-        profile.voice,
-
-      input:
-        text,
-
-      instructions,
-
-      response_format:
-        "mp3",
-    });
-
-  return Buffer.from(
-    await response.arrayBuffer()
-  );
+  const response = await fetch(audioUrl);
+  if (!response.ok) {
+    throw new Error(`Téléchargement narration Runway impossible : HTTP ${response.status}`);
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length) {
+    throw new Error("Fichier audio Runway vide.");
+  }
+  console.log("Narration Runway MP3 téléchargée :", buffer.length, "octets");
+  return buffer;
 }
 
 async function createNarratedSceneVideo({
@@ -4076,259 +3995,23 @@ return res.json({
 app.post(
   "/tts",
   async (req, res) => {
-    console.log(
-      "Requête TTS reçue :",
-      req.body?.text?.slice(
-        0,
-        80
-      )
-    );
-
     try {
-      const {
-        text,
-        mode = "story",
-        emotion = "warm",
-        narrator =
-          "narratrice",
-        language = "fr",
-      } = req.body;
-
-      const supportedLanguages =
-        [
-          "fr",
-          "en",
-          "es",
-        ];
-
-      const selectedLanguage =
-        supportedLanguages.includes(
-          language
-        )
-          ? language
-          : "fr";
-
-      const languageInstructions =
-        {
-          fr: `
-Lis le texte en français.
-Utilise une prononciation française naturelle et claire.
-Ne traduis pas le texte dans une autre langue.
-`,
-
-          en: `
-Read the text in English.
-Use natural, clear English pronunciation.
-Do not translate the text into another language.
-`,
-
-          es: `
-Lee el texto en español.
-Utiliza una pronunciación española natural y clara.
-No traduzcas el texto a otro idioma.
-`,
-        };
-
-      if (!text?.trim()) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Texte manquant",
-          });
+      const { text, mode = "story", emotion = "warm", narrator = "narratrice", language = "fr" } = req.body || {};
+      console.log("Requête TTS Runway reçue :", typeof text === "string" ? text.slice(0, 80) : "");
+      if (typeof text !== "string" || !text.trim()) {
+        return res.status(400).json({ error: "Texte manquant" });
       }
-
-      const narratorProfiles =
-        {
-          narratrice: {
-            voice:
-              "nova",
-
-            instructions: `
-Lis comme une conteuse chaleureuse pour enfants.
-Voix naturelle, douce, expressive.
-Raconte comme une maman lisant une histoire.
-`,
-          },
-
-          narrateur: {
-            voice:
-              "onyx",
-
-            instructions: `
-Lis comme un papa racontant une histoire.
-Voix grave, rassurante, naturelle, expressive.
-Prends ton temps et fais des pauses naturelles.
-`,
-          },
-
-          magicien: {
-            voice:
-              "sage",
-
-            instructions: `
-Lis comme un vieux magicien bienveillant.
-Voix mystérieuse mais chaleureuse, expressive, naturelle.
-`,
-          },
-
-          fee: {
-            voice:
-              "shimmer",
-
-            instructions: `
-Lis comme une fée joyeuse.
-Voix légère, lumineuse, pleine d'émerveillement, naturelle, expressive.
-`,
-          },
-
-          mamie: {
-            voice:
-              "ballad",
-
-            instructions: `
-Lis comme une grand-mère racontant un conte à ses petits-enfants.
-Voix très douce, lente et affectueuse, expressive, naturelle.
-`,
-          },
-
-          garcon: {
-            voice:
-              "echo",
-
-            instructions: `
-Lis comme un jeune garçon racontant une aventure.
-Voix vive, enthousiaste et naturelle, expressive.
-`,
-          },
-        };
-
-      const profile =
-        narratorProfiles[
-          narrator
-        ] ||
-        narratorProfiles
-          .narratrice;
-
-      console.log(
-        "Narrateur reçu :",
-        narrator
-      );
-
-      console.log(
-        "Voix choisie :",
-        profile.voice
-      );
-
-      let emotionInstructions =
-        "";
-
-      if (
-        emotion ===
-        "danger"
-      ) {
-        emotionInstructions =
-          "Ajoute un suspense très léger, sans jamais devenir effrayant.";
-      } else if (
-        emotion ===
-        "victory"
-      ) {
-        emotionInstructions =
-          "Utilise un ton joyeux et chaleureux.";
-      } else if (
-        emotion ===
-        "calm"
-      ) {
-        emotionInstructions =
-          "Utilise un ton doux et paisible.";
-      } else if (
-        emotion ===
-        "night"
-      ) {
-        emotionInstructions =
-          "Utilise un ton calme et rassurant.";
-      }
-
-      const bedtimeInstructions =
-        mode === "bedtime"
-          ? `
-Cette lecture est destinée au coucher.
-Parle calmement et marque davantage les pauses.
-`
-          : "";
-
-      const instructions = `
-${profile.instructions}
-
-${languageInstructions[selectedLanguage]}
-
-${emotionInstructions}
-
-${bedtimeInstructions}
-
-Respecte exactement le texte fourni.
-Ne traduis jamais le contenu.
-Prononce les mots naturellement dans la langue sélectionnée.
-`;
-
-      console.log(
-        "Langue TTS :",
-        selectedLanguage
-      );
-
-      const response =
-        await openai.audio.speech.create({
-          model:
-            "gpt-4o-mini-tts",
-
-          voice:
-            profile.voice,
-
-          input:
-            text,
-
-          instructions,
-
-          response_format:
-            "mp3",
-        });
-
-      const buffer =
-        Buffer.from(
-          await response.arrayBuffer()
-        );
-
-      res.setHeader(
-        "Content-Type",
-        "audio/mpeg"
-      );
-
-      res.setHeader(
-        "Content-Length",
-        buffer.length.toString()
-      );
-
-      return res.send(
-        buffer
-      );
+      const buffer = await createNarrationMp3({ text, mode, emotion, narrator, language });
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Length", buffer.length.toString());
+      return res.send(buffer);
     } catch (e) {
-      console.error(
-        "Erreur TTS complète :",
-        e
-      );
-
-      return res
-        .status(500)
-        .json({
-          error:
-            "Erreur génération TTS",
-
-          message:
-            e?.message,
-
-          status:
-            e?.status,
-        });
+      console.error("Erreur TTS Runway :", e);
+      return res.status(500).json({
+        error: "Erreur génération TTS Runway",
+        message: e?.message,
+        status: e?.status,
+      });
     }
   }
 );
