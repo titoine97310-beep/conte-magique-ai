@@ -18,7 +18,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import fs from "fs";
 import { google } from "googleapis";
-import OpenAI, { toFile } from "openai";
+import OpenAI from "openai";
 import os from "os";
 import path from "path";
 import {
@@ -3806,6 +3806,72 @@ Style premium, cohérent entre les scènes.
 `;
 }
 
+async function awaitRunwayTask(taskId, label, { attempts = 120, delayMs = 5000 } = {}) {
+  for (let i = 0; i < attempts; i++) {
+    const task = await runway.tasks.retrieve(taskId);
+    if (task.status === 'SUCCEEDED') {
+      if (!task.output?.[0]) throw new Error(`${label} : sortie Runway manquante.`);
+      return task.output[0];
+    }
+    if (['FAILED', 'CANCELED'].includes(task.status)) {
+      const error = new Error(`${label} : échec Runway (${task.failureCode || task.status}).`);
+      error.code = 'RUNWAY_TASK_FAILED';
+      error.taskId = taskId;
+      throw error;
+    }
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+  const error = new Error(`${label} : tâche toujours en cours, ID conservé : ${taskId}`);
+  error.code = 'RUNWAY_TASK_PENDING';
+  error.taskId = taskId;
+  throw error;
+}
+
+async function downloadRunwayBuffer(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Téléchargement Runway impossible : HTTP ${response.status}`);
+  return Buffer.from(await response.arrayBuffer());
+}
+
+// Conversion explicite en PNG : Firebase attend des fichiers scene-X.png.
+async function normalizeImagePng(input) {
+  if (input.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return input;
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'runway-png-'));
+  try {
+    const src = path.join(dir, 'input.img');
+    const dst = path.join(dir, 'output.png');
+    await fs.promises.writeFile(src, input);
+    await new Promise((resolve, reject) => {
+      const proc = spawn(ffmpegPath, ['-y', '-i', src, '-frames:v', '1', dst], { windowsHide: true });
+      let stderr = '';
+      proc.stderr.on('data', chunk => { stderr += chunk.toString(); });
+      proc.on('error', reject);
+      proc.on('close', code => code === 0 ? resolve() : reject(new Error(`Conversion PNG : ${stderr.slice(-400)}`)));
+    });
+    return await fs.promises.readFile(dst);
+  } finally {
+    await fs.promises.rm(dir, { recursive: true, force: true });
+  }
+}
+
+
+async function generateSingleRunwayImage(promptText, referenceImage) {
+  const request = { model: "gen4_image", ratio: "1024:1024", promptText: promptText.slice(0, 950) };
+  if (referenceImage) {
+    const match = referenceImage.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/s);
+    if (!match) { const error = new Error("Format de photo de référence invalide."); error.statusCode = 400; throw error; }
+    const mime = match[1] === "image/jpg" ? "image/jpeg" : match[1];
+    const uri = `data:${mime};base64,${match[2]}`;
+    if (Buffer.byteLength(uri) > 5 * 1024 * 1024) { const error = new Error("Photo de référence trop volumineuse."); error.statusCode = 400; throw error; }
+    request.referenceImages = [{ uri, tag: "personnages" }];
+    request.promptText = (`@personnages. Préserve les visages et vêtements des personnages. ${request.promptText}`).slice(0, 950);
+  }
+  const task = await runway.textToImage.create(request, { maxRetries: 0 });
+  if (!task?.id) throw new Error("Runway n'a pas retourné d'identifiant de tâche.");
+  const outputUrl = await awaitRunwayTask(task.id, "Illustration");
+  return normalizeImagePng(await downloadRunwayBuffer(outputUrl));
+}
+
 app.post(
   "/image",
   async (req, res) => {
@@ -3926,230 +3992,8 @@ attemptId = reservation.attemptId;
 
 illustrationReserved = true;
 
-let result;
-
-      if (
-        referenceImage
-      ) {
-        const match =
-          referenceImage.match(
-            /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/
-          );
-
-        if (!match) {
-  const error = new Error(
-    "Format de photo de référence invalide"
-  );
-
-  error.statusCode = 400;
-  throw error;
-}
-
-        const mimeType =
-          match[1];
-
-        const base64Data =
-          match[2];
-
-        const extension =
-          mimeType ===
-          "image/png"
-            ? "png"
-            : mimeType ===
-                "image/webp"
-              ? "webp"
-              : "jpg";
-                      const imageBuffer =
-          Buffer.from(
-            base64Data,
-            "base64"
-          );
-
-        const referenceFile =
-          await toFile(
-            imageBuffer,
-            `reference.${extension}`,
-            {
-              type:
-                mimeType ===
-                "image/jpg"
-                  ? "image/jpeg"
-                  : mimeType,
-            }
-          );
-
-        result =
-          await openai.images.edit({
-            model:
-              "gpt-image-2",
-
-            image:
-              referenceFile,
-
-            prompt: `
-Utilise la photo fournie comme référence visuelle principale et obligatoire.
-
-OBJECTIF PRIORITAIRE :
-
-Conserver les mêmes personnes et les mêmes éléments visuels importants dans toutes les illustrations de cette histoire.
-
-PERSONNES DE RÉFÉRENCE :
-
-Analyse attentivement la photo de référence avant de créer l'illustration.
-
-Les personnes visibles sur la photo constituent la distribution de référence de l'histoire.
-
-RÈGLES STRICTES :
-
-- n'invente aucun enfant, bébé, adulte ou personnage humain supplémentaire
-- n'ajoute jamais un frère, une sœur, un ami ou un autre enfant qui n'est pas demandé par la scène
-- ne duplique jamais une personne
-- ne fusionne jamais deux personnes
-- ne remplace jamais une personne par une autre
-- conserve l'âge apparent et les proportions relatives entre les personnes
-- lorsqu'une scène met en scène toutes les personnes de référence, représente exactement ces personnes et aucune personne supplémentaire
-- les personnages secondaires éventuellement nécessaires au décor doivent rester clairement en arrière-plan et ne jamais pouvoir être confondus avec les personnages principaux
-
-PRIORITÉ ABSOLUE :
-
-La fidélité et la continuité des personnages principaux sont plus importantes que l'ajout de détails décoratifs.
-
-En cas de doute, simplifie le décor plutôt que d'inventer une personne, un vêtement ou un accessoire.
-
-IDENTITÉ DES PERSONNES :
-
-L'identité visuelle de chaque personnage principal doit rester stable d'une scène à l'autre.
-
-Considère chaque personne de référence comme un personnage fixe de la série.
-
-Conserve strictement :
-
-- la forme générale du visage
-- la structure du visage
-- la forme des yeux
-- l'écartement des yeux
-- la forme du nez
-- la forme de la bouche
-- la ligne de la mâchoire
-- la couleur de peau
-- la coiffure
-- la couleur, la texture et la longueur des cheveux
-- l'âge apparent
-- les proportions générales
-- les traits distinctifs visibles
-
-RÈGLES STRICTES SUR LES VISAGES :
-
-- ne redessine pas un visage différemment d'une scène à l'autre
-- ne change pas arbitrairement la forme des yeux, du nez, de la bouche ou de la mâchoire
-- ne rajeunis pas et ne vieillis pas un personnage
-- ne modifie pas la couleur de peau
-- ne change pas de coiffure sauf si la scène le demande explicitement
-- ne transforme pas progressivement un personnage en une autre personne
-- lorsque le même personnage réapparaît, il doit être immédiatement reconnaissable comme exactement la même personne
-- la pose, l'expression et l'angle de vue peuvent changer, mais l'identité faciale doit rester stable
-
-VÊTEMENTS ET ACCESSOIRES :
-
-Les vêtements doivent rester cohérents avec la photo de référence et entre toutes les scènes.
-
-Conserve :
-
-- les mêmes couleurs principales
-- le même type de haut
-- le même type de bas
-- les mêmes chaussures lorsqu'elles sont visibles
-- le même sac à dos
-- les mêmes accessoires importants
-- lorsqu'un sac à dos est porté ou visible dans la scène, conserve son apparence, sa couleur et ses caractéristiques principales
-- le sac à dos peut naturellement être posé ou hors champ lorsque le contexte le justifie, par exemple lorsque l'enfant est assis en classe
-
-RÈGLES STRICTES :
-
-- ne change jamais volontairement la couleur d'un vêtement
-- n'ajoute pas de chapeau, casquette, couronne, lunettes ou accessoire absent de la photo, sauf si la scène le demande explicitement
-- ne remplace pas un sac à dos par un autre
-- un accessoire peut ne pas être visible lorsque la situation le justifie naturellement, mais s'il réapparaît dans une autre scène, il doit conserver la même apparence
-- n'invente pas de nouveaux logos, lettres, animaux, symboles ou motifs sur les vêtements
-- si un motif précis est difficile à reproduire, simplifie-le mais garde le même motif simplifié dans toutes les scènes
-- ne transforme pas un vêtement en costume
-- privilégie la continuité visuelle plutôt que la créativité vestimentaire
-
-IMPORTANT :
-
-- ne change pas arbitrairement les couleurs des vêtements
-- n'ajoute pas de lettres, logos, symboles ou dessins différents d'une scène à l'autre
-- si un motif précis est difficile à reproduire, utilise un motif simple et cohérent plutôt que d'en inventer un nouveau à chaque scène
-- garde les sacs à dos et accessoires reconnaissables d'une scène à l'autre
-
-DOUDOU / OBJET IMPORTANT :
-
-Si un doudou ou un objet important est visible :
-
-- conserve sa forme
-- conserve ses couleurs
-- conserve ses proportions
-- ne le remplace pas par un autre objet
-
-RÉFÉRENCE PRIORITAIRE :
-
-En cas de conflit entre la créativité de la scène et la fidélité au personnage, privilégie toujours la fidélité au personnage.
-
-Ne crée pas une nouvelle interprétation du visage à chaque illustration.
-
-Traite la photo de référence comme la fiche d'identité visuelle permanente des personnages principaux pour toute l'histoire.
-
-COHÉRENCE ENTRE LES SCÈNES :
-
-Cette illustration appartient à une série.
-
-Les personnages doivent donner l'impression d'être exactement les mêmes personnages que dans les autres scènes.
-
-La scène, l'action, la pose et le décor peuvent changer, mais l'identité visuelle des personnages ne doit pas changer.
-
-STYLE :
-
-Transforme les personnes photographiées en personnages illustrés.
-
-Ne produis pas une photographie réaliste.
-
-Garde une illustration douce, familiale, premium et adaptée aux enfants.
-
-${finalPrompt}
-`,
-
-            size:
-              "1024x1024",
-
-            quality:
-              "medium",
-          });
-      } else {
-        result =
-          await openai.images.generate({
-            model:
-              "gpt-image-2",
-
-            prompt:
-              finalPrompt,
-
-            size:
-              "1024x1024",
-
-            quality:
-              "medium",
-          });
-      }
-
-      const base64 =
-        result.data?.[0]
-          ?.b64_json;
-
-      if (!base64) {
-  throw new Error(
-    "Aucune image retournée par OpenAI"
-  );
-}
+const pngBuffer = await generateSingleRunwayImage(finalPrompt, referenceImage);
+      const base64 = pngBuffer.toString("base64");
 
 const filePath = await saveStoryIllustration(
   uid,
