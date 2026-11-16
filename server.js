@@ -300,23 +300,43 @@ Voix vive, enthousiaste et naturelle, expressive.
   );
 }
 
-// Narration Runway Seed Audio 1.0 (MP3).
-// Le texte est prononcé tel quel, sans instructions ajoutées au script.
+// Narration ElevenLabs Multilingual v2 via Runway (MP3).
+// Une voix fixe est sélectionnée pour chaque personnage.
+const RUNWAY_NARRATOR_VOICES = Object.freeze({
+  elise: "Paula",
+  "élise": "Paula",
+  luna: "Sandra",
+  arthur: "Tom",
+  magicien: "Vincent",
+  narratrice: "Paula", // Compatibilité avec le choix historique de l'application.
+  fee: "Sandra",
+  "fée": "Sandra",
+  narrateur: "Tom",
+  garcon: "Tom",
+  "garçon": "Tom",
+});
+
 async function createNarrationMp3({ text, mode = "story", emotion = "warm", narrator = "narratrice", language = "fr" }) {
   const narrationText = typeof text === "string" ? text.trim() : "";
   if (!narrationText) {
     throw new Error("Texte de narration manquant.");
   }
   if (narrationText.length > 2048) {
-    throw new Error("Narration trop longue pour Seed Audio 1.0 (2048 caractères maximum par scène).");
+    throw new Error("Narration trop longue pour ElevenLabs Multilingual v2 (2048 caractères maximum par scène).");
   }
 
-  console.log("Narration Runway Seed Audio 1.0 :", { language, narrator, characters: narrationText.length });
+  const narratorKey = typeof narrator === "string" ? narrator.trim().toLocaleLowerCase("fr") : "narratrice";
+  const voiceName = RUNWAY_NARRATOR_VOICES[narratorKey] || "Paula";
+  console.log("Narration Runway ElevenLabs Multilingual v2 :", { language, narrator, voice: voiceName, characters: narrationText.length });
 
   const task = await runway.textToSpeech
     .create({
-      model: "seed_audio",
+      model: "eleven_multilingual_v2",
       promptText: narrationText,
+      voice: {
+        type: "runway-preset",
+        presetId: voiceName,
+      },
       outputFormat: "mp3",
     })
     .waitForTaskOutput();
@@ -334,7 +354,7 @@ async function createNarrationMp3({ text, mode = "story", emotion = "warm", narr
   if (!buffer.length) {
     throw new Error("Fichier audio Runway vide.");
   }
-  console.log("Narration Runway MP3 téléchargée :", buffer.length, "octets");
+  console.log("Narration Runway ElevenLabs MP3 téléchargée :", buffer.length, "octets");
   return buffer;
 }
 
