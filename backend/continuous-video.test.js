@@ -1,11 +1,11 @@
-import test from 'node:test';
+import RunwayML from '@runwayml/sdk';
+import ffmpeg from 'ffmpeg-static';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import ffmpeg from 'ffmpeg-static';
-import RunwayML from '@runwayml/sdk';
-import { clipDuration, motionPrompt, runFfmpeg, mediaDuration, continuousScene } from './continuous-video.js';
+import test from 'node:test';
+import { clipDuration, continuousScene, mediaDuration, motionPrompt, runFfmpeg } from './continuous-video.js';
 
 test('durées valides et contexte conservé dans le prompt', () => {
   assert.equal(clipDuration(4.9), 5);
@@ -127,4 +127,35 @@ test('une continuation traverse le vrai SDK upload (HTTP simulé), sans undefine
   await continuousScene(f.options);
   assert.equal(calls.length, 2);
   assert.equal(f.requests[1].promptImage, 'runway://frame');
+});
+
+
+test('45 s de narration : animation complète et reprise sans nouveaux clips', async t => {
+  const f = await fixture(t, 45);
+
+  const result = await continuousScene(f.options);
+
+  // 5 clips de 10 secondes couvrent les 45 secondes de narration.
+  assert.deepEqual(
+    f.requests.map(r => r.duration),
+    [10, 10, 10, 10, 10]
+  );
+
+  // Le fichier final doit durer environ 45 secondes.
+  const duration = await mediaDuration(ffmpeg, result);
+  assert.ok(
+    Math.abs(duration - 45) < 0.2,
+    `Durée obtenue : ${duration} secondes`
+  );
+
+  // Vérifier qu'aucune image figée n'a été ajoutée.
+  assert.equal(
+    f.storage.has('freeze-tail.mp4'),
+    false
+  );
+
+  // Reprendre la génération ne doit pas créer de nouveaux clips.
+  await continuousScene(f.options);
+  assert.equal(f.requests.length, 5);
+  assert.equal(f.getAudioCalls(), 1);
 });

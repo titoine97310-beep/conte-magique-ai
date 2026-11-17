@@ -5839,9 +5839,11 @@ app.post(
 } = req.body;
 
 const videoModel =
-  req.body?.videoModel === "gen4.5"
-    ? "gen4.5"
-    : "gen4_turbo";
+  req.body?.videoModel === "gen4_turbo"
+    ? "gen4_turbo"
+    : req.body?.videoModel === "gen4.5"
+      ? "gen4.5"
+      : "seedance2_5";
 
 if (
   !Array.isArray(images) ||

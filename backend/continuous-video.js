@@ -503,25 +503,8 @@ export async function continuousScene({
 
 
 
-  // On ne paie jamais plus de
-
-  // 30 secondes Runway pour une scène.
-
-  const MAX_RUNWAY_SECONDS =
-
-    30;
-
-
-
-  const animationTarget =
-
-    Math.min(
-
-      seconds,
-
-      MAX_RUNWAY_SECONDS
-
-    );
+  // Animation pendant toute la narration
+const animationTarget = seconds;
 
 
 
@@ -563,11 +546,11 @@ export async function continuousScene({
 
 
 
-    if (index >= 3) {
-
-      break;
-
-    }
+    if (index >= Math.ceil(animationTarget / 5) + 1) {
+  throw new Error(
+    "Nombre maximal de clips atteint avant la fin de la narration."
+  );
+}
 
 
 
@@ -960,62 +943,36 @@ export async function continuousScene({
         try {
 
           task =
+  await runway.imageToVideo.create(
+    {
+      model,
 
-            await runway.imageToVideo.create(
+      // Format vertical 9:16
+      ratio: "720:1280",
 
-              {
+      duration: clip.duration,
 
-                model,
+      // Narration gérée séparément par ElevenLabs
+      ...(model === "seedance2_5"
+        ? { audio: false }
+        : {}),
 
+      // Première image de chaque clip
+      promptImage:
+        model === "seedance2_5"
+          ? [{ uri: promptImage, position: "first" }]
+          : promptImage,
 
-
-                // Format vertical 9:16
-
-                ratio:
-
-                  "720:1280",
-
-
-
-                duration:
-
-                  clip.duration,
-
-
-
-                promptImage,
-
-
-
-                promptText:
-
-                  motionPrompt(
-
-                    text,
-
-                    index > 0
-
-                  ),
-
-              },
-
-              {
-
-                // IMPORTANT :
-
-                // aucune relance automatique
-
-                // pour éviter une double
-
-                // facturation Runway.
-
-                maxRetries:
-
-                  0,
-
-              }
-
-            );
+      promptText: motionPrompt(
+        text,
+        index > 0
+      ),
+    },
+    {
+      // Évite les relances automatiques
+      maxRetries: 0,
+    }
+  );
 
         } catch (error) {
 
