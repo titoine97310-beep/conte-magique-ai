@@ -79,7 +79,7 @@ export async function mediaDuration(binary, file) {
 
   const log = await runFfmpeg(binary, ['-i', file, '-map', '0:0', '-f', 'null', '-']);
 
-  const matches = [...log.matchAll(/time=(\d+):(\d+):(\d+(?:**\.**\d+)?)/g)];
+  const matches = [...log.matchAll(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g)];
 
   const match = matches.at(-1);
 
