@@ -129,7 +129,7 @@ export async function assembleScene(
 
           `file '${file
 
-            .replace(/**\\**/g, "/")
+            .replace(/\\/g, "/")
 
             .replace(/'/g, "'\\''")}'`
 
