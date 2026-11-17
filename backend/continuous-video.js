@@ -827,13 +827,9 @@ export async function continuousScene({
 
         ) {
 
-          const match =
-
-            promptImage.match(
-
-              /^data:(imag&#x65;**\/**(?:png|jpeg|jpg|webp));base64,(.+)$/s
-
-            );
+          const match = promptImage.match(
+  /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/s
+);
 
 
 
